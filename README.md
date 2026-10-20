@@ -1,24 +1,60 @@
 # Music Grabber
 
-Spotify playlist watcher + downloader companion for [Navidrome](https://www.navidrome.org/)
-libraries, split out of [BPM Tagger](https://github.com/PauloJf/BPM-Tagger).
+**Watch your Spotify playlists, browse Deezer, and fill the gaps in your Navidrome library.**
 
-**Private, early.** A CLI, a JSON API and a small web UI (inbox, queue, playlists). Version in
-[`VERSION`](VERSION), history in [`CHANGELOG.md`](CHANGELOG.md). Origin: extracted from BPM Tagger
-v2.18.2 (`eae3f0c2662f590ac8cf0334a282389147152d2f`) with its history kept, see
-[`docs/provenance.md`](docs/provenance.md); the design and the reasons for the split are in
-[`docs/plans/extraction.md`](docs/plans/extraction.md).
+Music Grabber looks at what you already own, finds what's missing, downloads it (Deezer through
+your own account, then YouTube), converts everything to one format, tags it and files it in your
+music folder. It is a standalone companion to a [Navidrome](https://www.navidrome.org/) library,
+with a web UI (search Deezer, queue songs, an inbox for ambiguous matches, live progress), a CLI and
+a JSON API, plus accounts with a login page.
+
+## Where it comes from
+
+Music Grabber began as a feature of [**BPM Tagger**](https://github.com/PauloJf/BPM-Tagger), my
+tool that detects the tempo and loudness of every track in a Navidrome library and writes the
+result into the files. Early on, BPM Tagger grew a "grabber": a way to turn Spotify playlists into
+files, so that new music arrived already analysed. It worked, and it grew into a real subsystem with
+its own queue, scoring, providers, transcoding, tagging and ledger.
+
+That subsystem had very little in common with the rest of BPM Tagger:
+
+- **Different risk.** It talks to Deezer with a personal ARL cookie and to YouTube through
+  yt-dlp, which can breach those services' terms. BPM Tagger is a public, image-published tool;
+  that exposure didn't belong in it.
+- **Different dependencies.** streamrip and yt-dlp break often and move on their own schedule,
+  while BPM Tagger ships heavy audio-analysis libraries (librosa, essentia) on a calm one.
+- **Different cadence.** A fix for a broken downloader shouldn't be a BPM Tagger release, and a
+  tempo-detection change shouldn't rebuild a downloader.
+
+So it was **spun off**. Music Grabber was extracted from BPM Tagger v2.18.2
+(`eae3f0c2662f590ac8cf0334a282389147152d2f`) with its git history preserved (`git log --follow`
+reaches back into BPM Tagger), then rebuilt as its own project: its own repository, SQLite database,
+Docker image and release cycle, under the same licence (AGPL-3.0-or-later). Since then it has
+outgrown the original: pluggable library sources, a post-download analysis port, a Deezer browsing
+UI, per-user accounts and a security review.
+
+The two still work well together, but only through a **shared music folder and, optionally, HTTP**,
+never a shared database or Python imports (a test enforces it). Drop Music Grabber's output into a
+folder BPM Tagger watches and the new files are analysed automatically, or run Music Grabber alone.
+BPM Tagger can drop its own grabber once Music Grabber is stable; see
+[Moving from BPM Tagger](#moving-from-bpm-tagger).
+
+Details: [`docs/provenance.md`](docs/provenance.md) (exactly what moved and how),
+[`docs/plans/extraction.md`](docs/plans/extraction.md) (the plan and its reasoning),
+[`docs/security.md`](docs/security.md), [`CHANGELOG.md`](CHANGELOG.md); the version is in [`VERSION`](VERSION).
 
 > **Legal / ToS.** This tool can download from Deezer using *your own* ARL and from YouTube via
-> yt-dlp. Those uses may breach those services' terms and local law. That exposure is the reason
-> this lives in its own private repo and its image is published only when you create a GitHub release. Use it only
-> on your own account, for music you are entitled to have, at your own risk.
+> yt-dlp. Those uses may breach those services' terms and local law. That exposure is why it
+> was split out of BPM Tagger, lives in its own private repo, and has its image published only
+> when you create a GitHub release. Use it only on your own account, for music you are entitled
+> to have, at your own risk.
 
-**Contents:** [How it works](#how-it-works) · [Quick start](#quick-start) ·
-[Spotify](#spotify-setup) · [Deezer](#deezer-arl) · [Compose examples](#compose-examples) ·
-[Using it](#using-it) · [BPM Tagger, Navidrome, Mediarium](#working-with-bpm-tagger-navidrome-and-mediarium) ·
+**Contents:** [Where it comes from](#where-it-comes-from) · [How it works](#how-it-works) ·
+[Quick start](#quick-start) · [Spotify](#spotify-setup) · [Deezer](#deezer-arl) ·
+[Compose examples](#compose-examples) · [Using it](#using-it) ·
+[BPM Tagger, Navidrome, Mediarium](#working-with-bpm-tagger-navidrome-and-mediarium) ·
 [Moving from BPM Tagger](#moving-from-bpm-tagger) · [Configuration](#configuration) ·
-[Troubleshooting](#troubleshooting) · [Development](#development)
+[Troubleshooting](#troubleshooting) · [Development](#development) · [Releasing](#releasing)
 
 ## How it works
 
@@ -44,7 +80,7 @@ you like, HTTP; never a database or Python imports.
 ```bash
 git clone git@github.com:PauloJf/Music-Grabber.git && cd Music-Grabber
 # edit docker-compose.yml: your music path, Spotify keys, WATCH_PLAYLISTS, DEEZER_ARL
-docker compose build                      # there is no published image: build it yourself
+docker compose build                      # or pull gatoserio/music-grabber once a release is published
 docker compose run --rm music-grabber python -m music_grabber spotify-login   # once
 docker compose up -d
 docker compose exec music-grabber python -m music_grabber status
