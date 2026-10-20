@@ -7,6 +7,7 @@ const SECTIONS = [
   ["states", "What the badges mean"],
   ["inbox", "Queue and Inbox"],
   ["playlists", "Watching Spotify playlists"],
+  ["account", "Accounts and people"],
   ["settings", "Settings"],
   ["fix", "When something goes wrong"],
   ["safe", "Keeping it safe"],
@@ -37,7 +38,7 @@ export default function Help() {
       <div style={{ maxWidth: 720 }}>
         <Section id="start" title="Getting started">
           <ol>
-            <li><b>Sign in</b> with the API token (<code>API_TOKEN</code>) set when the server was started. There are no user accounts: the token is the one key to the app. Your browser remembers it until you close the tab, and <b>Sign out</b> (bottom of Settings) forgets it.</li>
+            <li><b>Sign in</b> with your username and password. The very first visit asks you to create the administrator account, using the server's <code>API_TOKEN</code> to prove you own the installation. Your browser stays signed in for this tab; <b>Sign out</b> (on your <Link to="/account">Account</Link> page) ends it. The API token still works as a sign-in for scripts and recovery.</li>
             <li>Open <Link to="/settings">Settings</Link> and add your <b>Deezer ARL</b> (the login cookie from your own Deezer account). Press <i>Test</i> to check it. Without it, downloads fall back to YouTube, which sounds worse.</li>
             <li>Check the <b>output format</b> and the <b>music folder layout</b>. Files are converted to one format so your library stays consistent.</li>
             <li>Optional: connect <b>Spotify</b> to watch playlists, and set a ntfy topic to get a phone notification when a song needs your decision.</li>
@@ -78,6 +79,14 @@ export default function Help() {
           <p>In <Link to="/playlists">Library</Link>, paste a Spotify playlist link and press <i>Watch playlist</i>. Music Grabber checks the playlist regularly, compares it with your library and queues what's missing. Use <i>Sync</i> to check now, or <i>Queue missing</i> to queue the gaps by hand. Connecting Spotify (Settings) is only needed for private playlists and automatic syncing.</p>
         </Section>
 
+        <Section id="account" title="Accounts and people">
+          <ul>
+            <li>On <Link to="/account">Account</Link> (your name in the header) you can pick a light or dark theme, set the preview volume and change your password. Changing it signs your other devices out.</li>
+            <li><b>Administrators</b> can also add people, make someone an administrator or a regular user, reset a password and delete an account. Regular users can search, queue and handle the Inbox, but can't open Settings.</li>
+            <li>Forgot the only administrator's password? On the server run <code>python -m music_grabber users passwd NAME</code>.</li>
+          </ul>
+        </Section>
+
         <Section id="settings" title="Settings">
           <ul>
             <li><b>Sources:</b> Deezer first, then YouTube, in the order you choose; Deezer quality (MP3 128, MP3 320 or FLAC; 320 and FLAC need a paid Deezer account).</li>
@@ -90,8 +99,8 @@ export default function Help() {
         <Section id="fix" title="When something goes wrong">
           <ul>
             <li><b>"Can't reach Music Grabber":</b> the server is down or restarting. The page retries on its own.</li>
-            <li><b>Signed out suddenly or 401:</b> the token changed. Sign in again with the current <code>API_TOKEN</code>.</li>
-            <li><b>Too many attempts:</b> several wrong tokens in a row lock the address for a minute. Wait, then try again.</li>
+            <li><b>Signed out suddenly:</b> your session expired (after 14 days without use), someone reset your password, or the server's <code>API_TOKEN</code> changed. Sign in again.</li>
+            <li><b>Too many attempts:</b> several wrong passwords or tokens in a row lock the address for a minute. Wait, then try again.</li>
             <li><b>Everything fails on Deezer:</b> the ARL probably expired. Get a fresh one and test it in Settings.</li>
             <li><b>No previews or covers:</b> a browser extension or network is blocking Deezer's image/audio servers.</li>
             <li><b>A song was matched wrongly:</b> remove it from the Queue, then search again in the Inbox with different words.</li>
@@ -100,7 +109,7 @@ export default function Help() {
 
         <Section id="safe" title="Keeping it safe">
           <ul>
-            <li>Anyone with the token can use the app and see its settings, so use a long random one and keep it private.</li>
+            <li>Use a long, unique password. Anyone with the <code>API_TOKEN</code> is an administrator, so keep it private too.</li>
             <li>Serve it over <b>HTTPS</b> (a reverse proxy such as Caddy or Traefik) if it's reachable outside your home network. Don't expose it directly to the internet without that.</li>
             <li>Use only your own Deezer account, and download music you're entitled to have.</li>
           </ul>

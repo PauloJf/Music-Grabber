@@ -5,7 +5,8 @@ from .ledger import LedgerMixin
 from .library import LibraryMixin
 from .playlists import PlaylistsMixin
 from .queue import QueueMixin
+from .users import UsersMixin
 
 
-class Database(QueueMixin, PlaylistsMixin, LedgerMixin, LibraryMixin, _DBBase):
+class Database(QueueMixin, PlaylistsMixin, LedgerMixin, LibraryMixin, UsersMixin, _DBBase):
     pass

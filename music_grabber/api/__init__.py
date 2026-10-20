@@ -1,7 +1,9 @@
 """The JSON API (a thin Flask shell over ``Ops``), and the small web UI's static files.
 
-Bearer-token auth (``API_TOKEN``, required, at least 16 characters) on every ``/api/*``
-route; no cookies, so no CSRF surface. The browser-facing routes are the Spotify OAuth
+Bearer auth on every ``/api/*`` route, with two kinds of credential: the ``API_TOKEN``
+(required, at least 16 characters; the machine/bootstrap key, always an admin) and a session
+token issued by ``POST /api/auth/login`` for a user account (admin or user). No cookies, so no
+CSRF surface. The browser-facing routes are the Spotify OAuth
 ``/callback`` (protected by a single-use ``state``) and, when a built UI is present, its
 static files (public: they contain no data, and the UI asks for the token itself). Only this
 package imports Flask, so the engine and the CLI stay light.
@@ -14,13 +16,14 @@ import threading
 import time
 from html import escape
 
-from flask import Flask, Response, jsonify, request, send_from_directory
+from flask import Flask, Response, g, jsonify, request, send_from_directory
 
 from ..ops import Ops, OpsError
 
 log = logging.getLogger(__name__)
 
 MIN_TOKEN_LENGTH = 16
+ADMIN_PREFIXES = ("/api/settings", "/api/users", "/api/spotify")      # administrators only
 # After this many wrong tokens inside the window, that address is refused (429) until the
 # window passes, whatever it sends. Per address, in memory.
 AUTH_MAX_FAILURES = 10
@@ -89,24 +92,39 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
         raise ValueError(f"API token must be at least {MIN_TOKEN_LENGTH} characters")
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
-    open_paths = {"/healthz", "/callback"}
+    open_paths = {"/healthz", "/callback", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
     throttle = throttle or AuthThrottle()
+
+    def too_many(who: str):
+        wait = throttle.retry_after(who)
+        if not wait:
+            return None
+        return (jsonify(error="too_many_attempts", message=f"too many wrong attempts; retry in {wait}s"),
+                429, {"Retry-After": str(wait)})
 
     @app.before_request
     def _auth():
+        g.principal, g.bearer = None, ""
         if request.path in open_paths or not request.path.startswith("/api/"):
             return None                  # open routes and the UI's static files
         who = request.remote_addr or "?"
-        wait = throttle.retry_after(who)
-        if wait:
-            return (jsonify(error="too_many_attempts", message=f"too many wrong tokens; retry in {wait}s"),
-                    429, {"Retry-After": str(wait)})
+        locked = too_many(who)
+        if locked:
+            return locked
         header = request.headers.get("Authorization", "")
         supplied = header[7:] if header.lower().startswith("bearer ") else ""
-        if not supplied or not hmac.compare_digest(supplied.encode(), token.encode()):
+        principal = None
+        if supplied and hmac.compare_digest(supplied.encode(), token.encode()):
+            principal = {"id": None, "username": "api-token", "role": "admin", "prefs": {}}   # the machine/bootstrap key
+        elif supplied:
+            principal = ops.session_user(supplied)
+        if not principal:
             throttle.fail(who)
-            return (jsonify(error="unauthorized", message="send 'Authorization: Bearer <API_TOKEN>'"),
+            return (jsonify(error="unauthorized", message="sign in, or send 'Authorization: Bearer <token>'"),
                     401, {"WWW-Authenticate": "Bearer"})
+        g.principal, g.bearer = principal, supplied
+        if request.path.startswith(ADMIN_PREFIXES) and principal["role"] != "admin":
+            return jsonify(error="forbidden", message="administrators only"), 403
         return None
 
     @app.after_request
@@ -166,6 +184,83 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
             log.warning("Spotify callback rejected: %s", e.code)
             return _page("Not connected", "That login link is invalid or expired. Start again.", 400)
         return _page("Connected to Spotify", "You can close this tab.")
+
+    # ── accounts ──────────────────────────────────────────────────────────────
+    @app.get("/api/auth/state")
+    def auth_state():
+        return jsonify(ops.auth_state())
+
+    @app.post("/api/auth/login")
+    def auth_login():
+        who = request.remote_addr or "?"
+        locked = too_many(who)
+        if locked:
+            return locked
+        b = body()
+        try:
+            return jsonify(ops.login(b.get("username", ""), b.get("password", "")))
+        except OpsError as e:
+            if e.code == "bad_credentials":
+                throttle.fail(who)
+            raise
+
+    @app.post("/api/auth/setup")
+    def auth_setup():
+        """First-run only: creates the first admin. Needs the API token, so reaching the port is not enough."""
+        who = request.remote_addr or "?"
+        locked = too_many(who)
+        if locked:
+            return locked
+        b = body()
+        supplied = b.get("api_token", "")
+        if not isinstance(supplied, str) or not hmac.compare_digest(supplied.encode(), token.encode()):
+            throttle.fail(who)
+            return jsonify(error="unauthorized", message="the API token is wrong"), 401
+        ops.create_first_admin(b.get("username", ""), b.get("password", ""))
+        return jsonify(ops.login(b.get("username", ""), b.get("password", ""))), 201
+
+    @app.post("/api/auth/logout")
+    def auth_logout():
+        return jsonify(ops.logout(g.bearer)) if g.principal["id"] else jsonify(ok=True)
+
+    @app.get("/api/me")
+    def me():
+        p = g.principal
+        return jsonify(user={k: p.get(k) for k in ("id", "username", "role", "prefs", "created_at", "last_login")},
+                       via="token" if p["id"] is None else "session")
+
+    def need_account():
+        if g.principal["id"] is None:
+            raise OpsError("no_account", "you are using the API token, which has no personal profile; sign in with an account", 409)
+        return g.principal["id"]
+
+    @app.post("/api/me/password")
+    def me_password():
+        b = body()
+        return jsonify(ops.change_password(need_account(), b.get("current", ""), b.get("new", ""), g.bearer))
+
+    @app.patch("/api/me/prefs")
+    def me_prefs():
+        return jsonify(ops.prefs_update(need_account(), body()))
+
+    @app.get("/api/users")
+    def users_list():
+        return jsonify(ops.users_list())
+
+    @app.post("/api/users")
+    def users_create():
+        b = body()
+        return jsonify(ops.users_create(b.get("username", ""), b.get("password", ""), b.get("role", "user"))), 201
+
+    @app.patch("/api/users/<int:user_id>")
+    def users_update(user_id: int):
+        return jsonify(ops.users_update(user_id, body()))
+
+    @app.delete("/api/users/<int:user_id>")
+    def users_delete(user_id: int):
+        if user_id == g.principal["id"]:
+            raise OpsError("invalid_account", "you cannot delete your own account while signed in as it")
+        return jsonify(ops.users_delete(user_id))
 
     # ── status / library / settings ───────────────────────────────────────────
     @app.get("/api/status")

@@ -12,12 +12,20 @@
   names, one vermilion signal colour, light/dark by system preference); no external fonts.
 - API: `/api/browse/*` and `/api/activity`; CSP allows Deezer/Spotify image CDNs and Deezer previews only.
 
+### Accounts
+- **User accounts and a login page.** Username + password sign-in (scrypt hashes, server-side
+  sessions that expire after 14 days of disuse), a first-run screen that creates the administrator
+  (needs `API_TOKEN`), roles (admin / user), and an **Account** page: theme, preview volume,
+  change password, and for admins add / promote / reset / delete people. Settings, Spotify and
+  accounts are admin-only. `API_TOKEN` keeps working as an admin key for scripts and recovery.
+- CLI: `users list|add|passwd|role|delete` (passwords from a hidden prompt or stdin).
+- API: `/api/auth/{state,login,setup,logout}`, `/api/me`, `/api/me/{password,prefs}`, `/api/users`.
+
 ### Security
 - Security review (`docs/security.md`): wrong-token lockout (429), SSRF/size guard on cover downloads,
   stricter URL settings, column allowlist in the queue update, owner-only database file, `/healthz`
   no longer reveals the version, JSON for unexpected errors, `react-router` upgraded (0 npm
   advisories). Pillow stays pinned by streamrip (mitigated, documented).
-- There is no username/password login: the shared `API_TOKEN` is the single credential.
 
 ### Added
 - **Help** page (`/help`, the **?** in the header): setup order, finding and queueing music, badge

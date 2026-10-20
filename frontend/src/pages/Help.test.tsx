@@ -12,12 +12,12 @@ describe("help", () => {
     renderApp(<Help />);
     expect(screen.getByRole("heading", { name: "How Music Grabber works" })).toBeTruthy();
     for (const h of ["Getting started", "Finding and queueing music", "What the badges mean", "Queue and Inbox",
-      "Watching Spotify playlists", "Settings", "When something goes wrong", "Keeping it safe"]) {
+      "Accounts and people", "Watching Spotify playlists", "Settings", "When something goes wrong", "Keeping it safe"]) {
       expect(screen.getByRole("heading", { name: h })).toBeTruthy();
       const link = screen.getAllByRole("link", { name: h }).find((a) => a.getAttribute("href")?.startsWith("#"));
       expect(link).toBeTruthy();
     }
-    expect(screen.getByText(/There are no user accounts/)).toBeTruthy();
+    expect(screen.getByText(/create the administrator account/i)).toBeTruthy();
     fireEvent.click(screen.getByRole("link", { name: "Getting started" }));
   });
 

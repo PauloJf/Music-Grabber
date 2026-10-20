@@ -40,7 +40,8 @@ live in `docs/plans/extraction.md`, the origin in `docs/provenance.md`.
 | `music_grabber/main.py` | entry point: `run` (engine + API), `spotify-login`, `version`; everything else goes to `cli.py` |
 | `music_grabber/ops.py` | `Ops`: every operation as a plain method returning JSON-able dicts; `OpsError` codes. The API and CLI are thin shells over it, so add behaviour here first |
 | `music_grabber/cli.py`, `remote.py` | argparse CLI; `RemoteOps` mirrors `Ops` over HTTP for `--remote` |
-| `music_grabber/api/` | the only package that imports Flask: bearer-token JSON API + OAuth `/callback` |
+| `music_grabber/api/` | the only package that imports Flask: bearer JSON API (API_TOKEN or a user session token) + OAuth `/callback` |
+| `music_grabber/accounts.py`, `db/users.py` | scrypt hashing and username/password rules; `users` + `sessions` tables (token stored hashed). Account logic lives in `Ops` |
 | `music_grabber/importer.py` | one-way, read-only import of BPM Tagger `grab_*` data |
 | `music_grabber/config.py` | env to config, `settings.json` overrides, `__version__` |
 | `music_grabber/db/` | own SQLite schema; mixins: `queue`, `playlists`, `ledger`, `library` (index cache) |

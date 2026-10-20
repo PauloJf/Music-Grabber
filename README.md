@@ -134,7 +134,7 @@ first (tab bar, thumb-sized targets, safe areas) and works as well on a desktop.
   with a live example; changes apply without a restart.
 
 Cover art and previews come from Deezer's CDN (the only external hosts the page may contact; strict
-CSP otherwise). It signs in with the API token (kept for that browser tab only). The Docker image
+CSP otherwise). It signs in with a username and password (the session is kept for that browser tab only). The Docker image
 builds it; from a checkout: `cd frontend && npm ci && npm run build` (`npm run dev` proxies to
 `:8099`). Browsing needs Deezer's public catalogue to be reachable; queued downloads don't.
 
@@ -145,12 +145,27 @@ Set `API_TOKEN` and the API listens on `API_PORT`. Every `/api/*` call needs
 `GET /api/status`; `/api/playlists` (`POST {"value": url}`, `PATCH {"enabled": false}`, `DELETE`,
 `POST /api/playlists/<id>/sync`, `/enqueue-missing`); `POST /api/sync`; `/api/queue` and
 `/api/queue/<id>/{retry,cancel,priority}`; `/api/inbox` and `/api/inbox/<id>/{choose,search,research,skip}`;
-`/api/browse/{search,artist/<id>,album/<id>,queue,undo}` (catalogue + queueing) and `/api/activity`; `/api/settings` (secrets come back masked); `/api/spotify/*`; `POST /api/library/refresh`; open:
+`/api/browse/{search,artist/<id>,album/<id>,queue,undo}` (catalogue + queueing) and `/api/activity`; accounts: `/api/auth/{state,login,setup,logout}`, `/api/me`, `/api/users` (admin); `/api/settings` (secrets come back masked); `/api/spotify/*`; `POST /api/library/refresh`; open:
 `GET /healthz` (just `{"ok": true}`) and the Spotify `/callback` (which only accepts a single-use `state` this instance
 issued). Errors are `{"error": "<code>", "message": "..."}` with a matching HTTP status. Publish
 the port on loopback only, and put TLS in front before exposing it further. Ten wrong tokens in a minute
-lock that address out for a minute (HTTP 429). There is no username/password: the token is the single
-credential. See [`docs/security.md`](docs/security.md) for the review and residual risks.
+lock that address out for a minute (HTTP 429). The token is an always-admin key; people sign in with
+an account (below). See [`docs/security.md`](docs/security.md) for the review and residual risks.
+
+### Accounts and signing in
+
+The first time you open the web UI it asks you to create the administrator account (username and
+password; it also asks for `API_TOKEN` once, to prove you own the installation). After that everyone
+signs in with a username and password. Administrators add people on the **Account** page; a regular
+user can browse, queue and use the Inbox but cannot open Settings. Sessions last 14 days from last
+use and end on Sign out, a password change or a reset. API clients keep using `Authorization:
+Bearer <API_TOKEN>` (an admin) or a session token from `POST /api/auth/login`.
+
+```bash
+python -m music_grabber users list
+python -m music_grabber users add alice --role admin    # prompts for the password
+python -m music_grabber users passwd alice              # also the way back after a lost password
+```
 
 ### Settings
 

@@ -44,6 +44,11 @@ class RemoteOps:
     def settings_get(self): return self._get("/api/settings")
     def settings_update(self, changes): return self._post("/api/settings", changes)
     def test_deezer(self, arl=None): return self._post("/api/settings/test-deezer", {"deezer_arl": arl})
+    def users_list(self): return self._get("/api/users")
+    def users_create(self, username, password, role="user"):
+        return self._post("/api/users", {"username": username, "password": password, "role": role})
+    def users_update(self, uid, changes): return self._req("PATCH", f"/api/users/{int(uid)}", changes)
+    def users_delete(self, uid): return self._req("DELETE", f"/api/users/{int(uid)}")
     def test_ntfy(self): return self._post("/api/settings/test-ntfy")
 
     # spotify

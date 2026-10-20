@@ -22,6 +22,7 @@ playlist list|show|add|remove|enable|disable
 queue [list|history|show|add|retry|retry-failed|cancel|delete|clear-completed|priority]
 inbox [list|show|choose|search|research|research-all|skip]
 settings [show|set|test-deezer|test-ntfy]
+users [list|add|passwd|role|delete]   accounts for the web UI (also the way back in after a lost password)
 library refresh           reload the library index
 import-bpm-tagger DB      import grab_* data from a BPM Tagger database
 import-env SETTINGS_JSON  print a config block from a BPM Tagger settings.json
@@ -108,6 +109,17 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("pairs", nargs="+", metavar="KEY VALUE")
     st.add("test-deezer")
     st.add("test-ntfy")
+
+    us = top.nested(top.add("users"))
+    us.add("list")
+    x = us.add("add")
+    x.add_argument("username")
+    x.add_argument("--role", default="user", choices=["user", "admin"])
+    for a in ("passwd", "delete"):
+        us.add(a).add_argument("username")
+    x = us.add("role")
+    x.add_argument("username")
+    x.add_argument("role", choices=["user", "admin"])
 
     top.nested(top.add("library")).add("refresh")
 
@@ -228,6 +240,8 @@ def _dispatch(args, ops, out) -> int:
         _inbox(args, a or "list", ops, emit)
     elif c == "settings":
         _settings(args, a or "show", ops, emit)
+    elif c == "users":
+        _users(args, a or "list", ops, emit)
     else:
         print(f"unknown command: {c}", file=sys.stderr)
         return 2
@@ -313,6 +327,42 @@ def _inbox(args, a, ops, emit):
         emit(d, f"Re-queued {d['requeued']} item(s)")
     elif a == "skip":
         emit(ops.inbox_skip(args.id), f"#{args.id}: skipped")
+
+
+def _read_password(confirm=True) -> str:
+    """From stdin when piped (scripts), else a hidden prompt; never an argument (shell history)."""
+    import getpass
+    if not sys.stdin.isatty():
+        return sys.stdin.readline().rstrip("\n")
+    pw = getpass.getpass("Password: ")
+    if confirm and getpass.getpass("Again: ") != pw:
+        raise OpsError("invalid_account", "the two passwords differ")
+    return pw
+
+
+def _users(args, a, ops, emit):
+    users = ops.users_list()["users"]
+    if a == "list":
+        emit({"users": users}, _table(users, [("USER", "username"), ("ROLE", "role"), ("LAST LOGIN", "last_login")])
+             if users else "No accounts yet: the web UI offers to create the first admin.")
+        return
+    if a == "add":
+        d = ops.users_create(args.username, _read_password(), args.role)
+        emit(d, f"Created {d['user']['role']} '{d['user']['username']}'")
+        return
+    match = [u for u in users if u["username"].lower() == args.username.lower()]
+    if not match:
+        raise OpsError("not_found", f"no user '{args.username}'", 404)
+    uid = match[0]["id"]
+    if a == "passwd":
+        ops.users_update(uid, {"password": _read_password()})
+        emit({"ok": True}, f"Password changed for '{match[0]['username']}'; they are signed out everywhere")
+    elif a == "role":
+        ops.users_update(uid, {"role": args.role})
+        emit({"ok": True}, f"'{match[0]['username']}' is now {args.role}")
+    elif a == "delete":
+        ops.users_delete(uid)
+        emit({"ok": True}, f"Deleted '{match[0]['username']}'")
 
 
 def _settings(args, a, ops, emit):

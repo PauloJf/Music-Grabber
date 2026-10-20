@@ -3,7 +3,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Banner, ErrorState, Pill, Skeleton } from "../components/ui";
 import { errorText, get, post } from "../lib/api";
 import { ago, useStatus } from "../lib/hooks";
-import { useAuth } from "../lib/auth";
 import { useToast } from "../lib/toast";
 
 interface Settings { settings: Record<string, string | number | boolean | null>; editable: Record<string, { kind: string; options: string[] | null }> }
@@ -21,7 +20,6 @@ export default function SettingsPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const status = useStatus();
-  const { logout } = useAuth();
   const q = useQuery({ queryKey: ["settings"], queryFn: () => get<Settings>("/api/settings") });
   const [draft, setDraft] = useState<Record<string, string | number | boolean | null>>({});
   useEffect(() => { if (q.data) setDraft(q.data.settings); }, [q.data]);
@@ -102,7 +100,7 @@ export default function SettingsPage() {
         <Banner kind="warn">These are set by environment variables and need a restart to change: music folder, library index, BPM analysis, hooks.</Banner>
       </Section>
 
-      <div style={{ margin: "10px 0 70px" }}><button className="btn" onClick={logout}>Sign out of this browser</button></div>
+      <div style={{ height: 70 }} />
       {dirty.length > 0 && (
         <div className="selbar" role="region" aria-label="Save settings">
           <span className="grow">{dirty.length} unsaved change{dirty.length > 1 ? "s" : ""}</span>

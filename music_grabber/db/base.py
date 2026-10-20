@@ -188,6 +188,27 @@ class _DBBase:
             )
         """)
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                password_hash TEXT NOT NULL,
+                role          TEXT NOT NULL DEFAULT 'user',
+                prefs         TEXT NOT NULL DEFAULT '{}',
+                created_at    TEXT,
+                last_login    TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                token_hash TEXT PRIMARY KEY,
+                user_id    INTEGER NOT NULL,
+                created_at TEXT,
+                expires_at TEXT NOT NULL,
+                last_seen  TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS app_counters (
                 key   TEXT PRIMARY KEY,
                 value INTEGER NOT NULL DEFAULT 0

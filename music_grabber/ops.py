@@ -12,7 +12,7 @@ import time
 from typing import Optional
 from urllib.parse import urlsplit
 
-from . import deezer_catalog
+from . import accounts, deezer_catalog
 from .config import SECRET_KEYS, __version__, masked, save_settings, settings_file_path
 from .db import GRAB_TERMINAL
 from .notify import Notifier
@@ -29,6 +29,9 @@ PROVIDER_NAMES = ("deezer", "ytdlp")
 DEEZER_QUALITIES = ("MP3_128", "MP3_320", "FLAC")
 MASK = "********"
 OAUTH_STATE_TTL = 600
+SESSION_DAYS = 14
+# Per-user preferences: key -> (kind, allowed values or range).
+PREFS = {"theme": ("enum", ("system", "light", "dark")), "preview_volume": ("float", (0.0, 1.0))}
 
 
 class OpsError(Exception):
@@ -345,6 +348,130 @@ class Ops:
             return {"ok": True, **self.svc.index.refresh()}
         except Exception as exc:
             raise OpsError("library_error", str(exc), 502) from None
+
+    # ── accounts ──────────────────────────────────────────────────────────────
+    def auth_state(self) -> dict:
+        return {"needs_setup": self.db.count_users() == 0}
+
+    def _public_user(self, user: dict) -> dict:
+        return {k: user.get(k) for k in ("id", "username", "role", "prefs", "created_at", "last_login")}
+
+    def _validated(self, username: str, password: str) -> str:
+        username = (username or "").strip()
+        problem = accounts.check_username(username) or accounts.check_password(password, username)
+        if problem:
+            raise OpsError("invalid_account", problem)
+        return username
+
+    def _make_user(self, username: str, password: str, role: str) -> dict:
+        username = self._validated(username, password)
+        if role not in accounts.ROLES:
+            raise OpsError("invalid_account", f"role must be one of: {', '.join(accounts.ROLES)}")
+        try:
+            return self._public_user(self.db.create_user(username, accounts.hash_password(password), role))
+        except ValueError:
+            raise OpsError("username_taken", "that username is already taken", 409) from None
+
+    def create_first_admin(self, username: str, password: str) -> dict:
+        with self._lock:                       # two simultaneous setups must not both win
+            if self.db.count_users():
+                raise OpsError("already_set_up", "an account already exists; sign in instead", 409)
+            return self._make_user(username, password, "admin")
+
+    def login(self, username: str, password: str) -> dict:
+        row = self.db.get_user_credentials((username or "").strip())
+        ok = accounts.verify_password(password if isinstance(password, str) else "",
+                                      row["password_hash"] if row else accounts.DUMMY_HASH)
+        if not row or not ok:
+            raise OpsError("bad_credentials", "wrong username or password", 401)
+        token = secrets.token_urlsafe(32)
+        self.db.create_session(row["id"], token, SESSION_DAYS)
+        self.db.touch_login(row["id"])
+        return {"token": token, "user": self._public_user(self.db.get_user(row["id"]))}
+
+    def logout(self, token: str) -> dict:
+        self.db.delete_session(token)
+        return {"ok": True}
+
+    def session_user(self, token: str) -> Optional[dict]:
+        u = self.db.session_user(token, SESSION_DAYS)
+        return self._public_user(u) if u else None
+
+    def change_password(self, user_id: int, current: str, new: str, keep_token: Optional[str] = None) -> dict:
+        row = self.db.get_user(user_id)
+        if not row:
+            raise _not_found("user")
+        creds = self.db.get_user_credentials(row["username"])
+        if not accounts.verify_password(current if isinstance(current, str) else "", creds["password_hash"]):
+            raise OpsError("bad_credentials", "the current password is wrong", 403)
+        problem = accounts.check_password(new, row["username"])
+        if problem:
+            raise OpsError("invalid_account", problem)
+        self.db.set_user_password(user_id, accounts.hash_password(new))
+        self.db.delete_user_sessions(user_id, keep_token)          # other devices sign in again
+        return {"ok": True}
+
+    def prefs_update(self, user_id: int, changes: dict) -> dict:
+        if not isinstance(changes, dict) or not changes:
+            raise OpsError("invalid_pref", "no preferences given")
+        user = self.db.get_user(user_id)
+        if not user:
+            raise _not_found("user")
+        prefs = dict(user["prefs"])
+        for key, value in changes.items():
+            if key not in PREFS:
+                raise OpsError("invalid_pref", f"unknown preference '{key}'", known=sorted(PREFS))
+            kind, arg = PREFS[key]
+            if kind == "enum":
+                if value not in arg:
+                    raise OpsError("invalid_pref", f"{key} must be one of: {', '.join(arg)}")
+                prefs[key] = value
+            else:
+                try:
+                    v = float(value)
+                except (TypeError, ValueError):
+                    raise OpsError("invalid_pref", f"{key} must be a number") from None
+                if not arg[0] <= v <= arg[1]:
+                    raise OpsError("invalid_pref", f"{key} must be between {arg[0]} and {arg[1]}")
+                prefs[key] = v
+        self.db.set_user_prefs(user_id, prefs)
+        return {"ok": True, "prefs": prefs}
+
+    def users_list(self) -> dict:
+        return {"users": [self._public_user(u) for u in self.db.list_users()]}
+
+    def users_create(self, username: str, password: str, role: str = "user") -> dict:
+        return {"user": self._make_user(username, password, role)}
+
+    def _other_admin_needed(self, user: dict) -> None:
+        if user["role"] == "admin" and self.db.count_admins() <= 1:
+            raise OpsError("last_admin", "there must be at least one admin", 409)
+
+    def users_update(self, user_id: int, changes: dict) -> dict:
+        user = self.db.get_user(user_id)
+        if not user:
+            raise _not_found("user")
+        if "role" in changes:
+            if changes["role"] not in accounts.ROLES:
+                raise OpsError("invalid_account", f"role must be one of: {', '.join(accounts.ROLES)}")
+            if changes["role"] != "admin":
+                self._other_admin_needed(user)
+            self.db.set_user_role(user_id, changes["role"])
+        if "password" in changes:
+            problem = accounts.check_password(changes["password"], user["username"])
+            if problem:
+                raise OpsError("invalid_account", problem)
+            self.db.set_user_password(user_id, accounts.hash_password(changes["password"]))
+            self.db.delete_user_sessions(user_id)
+        return {"user": self._public_user(self.db.get_user(user_id))}
+
+    def users_delete(self, user_id: int) -> dict:
+        user = self.db.get_user(user_id)
+        if not user:
+            raise _not_found("user")
+        self._other_admin_needed(user)
+        self.db.delete_user(user_id)
+        return {"ok": True}
 
     # ── settings ──────────────────────────────────────────────────────────────
     def settings_get(self) -> dict:
