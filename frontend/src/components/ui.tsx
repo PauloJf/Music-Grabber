@@ -1,0 +1,136 @@
+import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
+import { errorText, post } from "../lib/api";
+import { fmtDuration, useRefreshJobs } from "../lib/hooks";
+import { usePlayer } from "../lib/player";
+import { useQueueing } from "../lib/queueing";
+import { useToast } from "../lib/toast";
+import type { CatTrack, TrackState } from "../lib/types";
+import { Check, Explicit, Pause, Play, Plus, Retry, X } from "./icons";
+
+export function Cover({ src, name, size = "", round = false }: { src?: string; name: string; size?: "lg" | "xl" | ""; round?: boolean }) {
+  const [bad, setBad] = useState(false);
+  const cls = `cover ${size} ${round ? "round" : ""}`;
+  if (!src || bad) return <div className={`${cls} ph`} aria-hidden>{(name || "?").trim().charAt(0).toUpperCase()}</div>;
+  return <img className={cls} src={src} alt="" loading="lazy" onError={() => setBad(true)} />;
+}
+
+export function Banner({ kind, children, action }: { kind: "err" | "warn" | "ok"; children: ReactNode; action?: ReactNode }) {
+  return <div className={`banner ${kind}`} role={kind === "err" ? "alert" : "status"}><div className="row">{<span className="grow">{children}</span>}{action}</div></div>;
+}
+
+export function Empty({ title, children }: { title: string; children?: ReactNode }) {
+  return <div className="empty"><h3>{title}</h3>{children && <div>{children}</div>}</div>;
+}
+
+export function ErrorState({ error, retry }: { error: unknown; retry?: () => void }) {
+  return <Banner kind="err" action={retry && <button className="btn sm" onClick={retry}>Try again</button>}>{errorText(error)}</Banner>;
+}
+
+export function Skeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <div aria-busy="true" aria-label="Loading">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="item" style={{ gridTemplateColumns: "52px 1fr 70px" }}>
+          <div className="skel" style={{ width: 52, height: 52 }} /><div><div className="skel" style={{ height: 14, width: `${50 + (i * 13) % 35}%`, marginBottom: 7 }} /><div className="skel" style={{ height: 11, width: "35%" }} /></div><div className="skel" style={{ height: 32, width: 70 }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function Pill({ kind, children }: { kind: "ok" | "warn" | "err" | "signal" | "mute"; children: ReactNode }) {
+  return <span className={`pill ${kind}`}>{children}</span>;
+}
+
+const STATUS_WORD: Record<string, string> = { searching: "Searching", downloading: "Downloading", transcoding: "Converting", tagging: "Tagging", placing: "Filing" };
+
+/** One control that tells the whole story of a track: queue it, or see where it is. */
+export function StateControl({ track, busy }: { track: CatTrack; busy: boolean }) {
+  const { queueTracks } = useQueueing();
+  const refresh = useRefreshJobs();
+  const toast = useToast();
+  const s: TrackState = track.state;
+  if (busy) return <div className="state"><div className="ring spin" role="status" aria-label="Queuing" /></div>;
+  if (s.kind === "library") return <div className="state"><Pill kind="ok"><Check width={13} height={13} />In library</Pill></div>;
+  if (s.kind === "queued") return <div className="state"><Pill kind="signal">Queued</Pill></div>;
+  if (s.kind === "active") {
+    const pct = Math.round((s.progress || 0) * 100);
+    return (
+      <div className="state row tight" title={STATUS_WORD[s.status] ?? s.status}>
+        <span className="muted" style={{ fontSize: 12 }}>{STATUS_WORD[s.status] ?? s.status}</span>
+        <div className="ring" style={{ ["--p" as string]: pct }} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><span>{pct}</span></div>
+      </div>
+    );
+  }
+  if (s.kind === "review") return <div className="state"><Link className="pill warn" to={`/inbox/${s.item_id}`}>Needs you</Link></div>;
+  if (s.kind === "failed") {
+    return (
+      <div className="state row tight">
+        <span title={s.error}><Pill kind="err">Failed</Pill></span>
+        <button className="btn sm icon" aria-label={`Retry ${track.title}`} onClick={() => post(`/api/queue/${s.item_id}/retry`).then(() => { toast.push({ kind: "info", text: "Trying again" }); refresh(); }).catch((e) => toast.push({ kind: "err", text: errorText(e) }))}><Retry width={16} height={16} /></button>
+      </div>
+    );
+  }
+  return (
+    <div className="state">
+      <button className="btn signal sm" aria-label={`Queue ${track.title}`} onClick={() => queueTracks([track], track.title)}><Plus width={16} height={16} />Queue</button>
+    </div>
+  );
+}
+
+export function PreviewButton({ track }: { track: CatTrack }) {
+  const { playing, progress, toggle } = usePlayer();
+  const on = playing === track.dz_id;
+  return (
+    <div className="preview">
+      <Cover src={track.cover_url} name={track.album || track.title} />
+      {track.preview_url && (
+        <button className={`pbtn ${on ? "on" : ""}`} aria-label={`${on ? "Pause" : "Preview"} ${track.title}`} aria-pressed={on} onClick={() => toggle(track.dz_id, track.preview_url)}>
+          {on ? <Pause /> : <Play />}
+        </button>
+      )}
+      {on && <div className="pbar" style={{ width: `${progress * 100}%` }} />}
+    </div>
+  );
+}
+
+export function TrackRow({ track, ord, selected, onSelect, hideAlbum = false, hideArtist = false }: {
+  track: CatTrack; ord?: number; selected?: boolean; onSelect?: (on: boolean) => void; hideAlbum?: boolean; hideArtist?: boolean;
+}) {
+  const { pending } = useQueueing();
+  const own = track.state.kind === "library";
+  return (
+    <li className={`item ${own ? "dim" : ""}`} style={onSelect ? { gridTemplateColumns: "auto auto 1fr auto" } : undefined}>
+      {onSelect && <input type="checkbox" aria-label={`Select ${track.title}`} checked={!!selected} disabled={own} onChange={(e) => onSelect(e.target.checked)} />}
+      {ord != null ? <div className="row tight"><span className="ord">{ord}</span></div> : null}
+      <div className="row" style={{ flexWrap: "nowrap", minWidth: 0, gap: 12 }}>
+        {ord == null && <PreviewButton track={track} />}
+        <div style={{ minWidth: 0 }}>
+          <div className="t clamp">{track.title}{track.explicit && <> <Explicit width={13} height={13} style={{ verticalAlign: "-2px", color: "var(--ink-3)" }} /></>}</div>
+          <div className="s clamp">
+            {[
+              !hideArtist && track.artist ? (track.artist_id ? <Link key="ar" to={`/artist/${track.artist_id}`}>{track.artist}</Link> : track.artist) : null,
+              !hideAlbum && track.album ? (track.album_id ? <Link key="al" to={`/album/${track.album_id}`}>{track.album}</Link> : track.album) : null,
+              track.duration_ms ? <span key="d" className="mono">{fmtDuration(track.duration_ms)}</span> : null,
+            ].filter(Boolean).flatMap((x, i) => (i ? [" · ", x] : [x]))}
+          </div>
+        </div>
+      </div>
+      <StateControl track={track} busy={pending.has(track.dz_id)} />
+    </li>
+  );
+}
+
+export function Tile({ to, cover, title, sub, round }: { to: string; cover?: string; title: string; sub?: string; round?: boolean }) {
+  return (
+    <Link className="tile" to={to}>
+      <Cover src={cover} name={title} size="xl" round={round} />
+      <div><div className="tn">{title}</div>{sub && <div className="ts">{sub}</div>}</div>
+    </Link>
+  );
+}
+
+export function CloseButton({ onClick, label = "Close" }: { onClick: () => void; label?: string }) {
+  return <button className="btn quiet icon sm" aria-label={label} onClick={onClick}><X width={18} height={18} /></button>;
+}

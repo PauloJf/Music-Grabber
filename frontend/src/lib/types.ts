@@ -79,3 +79,25 @@ export interface QueueEvent {
   detail: string | null;
   created_at: string;
 }
+
+export type TrackState =
+  | { kind: "none" }
+  | { kind: "library" }
+  | { kind: "queued" | "active" | "review"; item_id: number; status: string; progress: number }
+  | { kind: "failed"; item_id: number; error: string };
+
+export interface CatTrack {
+  dz_id: string; title: string; artist: string; artist_id: string; album: string; album_id: string;
+  duration_ms: number | null; preview_url: string; cover_url: string; explicit: boolean;
+  track_no: number | null; disc_no: number | null; year: number | null; state: TrackState;
+}
+export interface CatArtist { dz_id: string; name: string; image_url: string; fans: number | null; album_count: number | null }
+export interface CatAlbum { dz_id: string; title: string; artist: string; artist_id: string; cover_url: string; year: number | null; track_count: number | null; kind: string; explicit: boolean }
+
+export interface Activity {
+  active: { id: number; status: string; progress: number | null; title: string; artist: string }[];
+  inbox: number;
+  recent: { id: number; status: string; title: string; artist: string; updated_at: string; error: string | null }[];
+  counts: Record<string, number>;
+}
+export interface QueueResult { ok: boolean; queued: number; item_ids: number[]; results: { dz_id: string; result: string }[]; album?: string }

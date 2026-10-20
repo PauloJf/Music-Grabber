@@ -200,7 +200,8 @@ def test_html_carries_a_same_origin_only_csp_and_no_framing(ui):
     h = ui.get("/").headers
     csp = h["Content-Security-Policy"]
     assert "default-src 'self'" in csp and "script-src 'self'" in csp and "frame-ancestors 'none'" in csp
-    assert "http" not in csp and h["X-Frame-Options"] == "DENY" and h["Referrer-Policy"] == "no-referrer"
+    assert "img-src 'self' data: https://*.dzcdn.net" in csp and "media-src https://*.dzcdn.net" in csp
+    assert "unsafe-eval" not in csp and "script-src 'self';" in csp and h["X-Frame-Options"] == "DENY" and h["Referrer-Policy"] == "no-referrer"
     assert "Content-Security-Policy" not in ui.get("/healthz").headers      # JSON needs none
 
 

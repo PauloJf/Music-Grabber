@@ -64,7 +64,7 @@ def enqueue_track(db, grabber, meta: dict, *, playlist_track_id: Optional[int] =
 
     if not adopted and dz_track_id and not meta.get("isrc"):
         try:
-            from .. import deezer_catalog as dz
+            from . import deezer_catalog as dz
             meta["isrc"] = dz.track_isrc(dz_track_id)
         except Exception as exc:
             log.debug("Deezer ISRC lookup failed for %s: %s", dz_track_id, exc)

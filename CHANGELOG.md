@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Redesign
+- **The web UI is rebuilt** around browsing: Discover (search Deezer for songs, artists, albums),
+  artist pages (popular, albums vs singles, related artists), album pages (queue all / missing /
+  selected), 30-second previews, and a live state on every song (queue, queued, progress ring,
+  in library, needs you, failed + retry). Instant feedback: optimistic *Queuing…*, toasts with
+  **Undo**, a floating activity tray, and a toast when a download finishes or fails. New Settings
+  page. Mobile-first with a tab bar and a distinctive "liner notes" look (warm paper and ink, serif
+  names, one vermilion signal colour, light/dark by system preference); no external fonts.
+- API: `/api/browse/*` and `/api/activity`; CSP allows Deezer/Spotify image CDNs and Deezer previews only.
+
+### Fixed
+- The Deezer ISRC lookup on enqueue never ran since the extraction (a wrong relative import hidden by
+  a best-effort `except`); queueing a catalogue track now resolves its ISRC.
+
 ### Documentation
 - README rewritten around a contents list, setup (Spotify OAuth, Deezer ARL), a troubleshooting
   section and the full configuration table; every variable the code reads is documented, and

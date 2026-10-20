@@ -90,3 +90,13 @@ def test_enqueue_missing_without_spotify_id_reflects_queued_status(tmp_path):
     # The playlist row now reads 'queued' (via the grab's playlist_track_id link).
     rows = db.get_playlist_tracks(pid)
     assert rows[0]["derived_status"] == "queued"
+
+
+def test_deezer_isrc_is_resolved_when_enqueueing_a_catalogue_track(tmp_path, monkeypatch):
+    """Regression: a wrong relative import here was swallowed by the best-effort except, so the
+    ISRC lookup silently never ran."""
+    from music_grabber import deezer_catalog
+    monkeypatch.setattr(deezer_catalog, "_get", lambda path, params=None: {"isrc": "gbaht2000001"})
+    db = _db(tmp_path)
+    item = enqueue_track(db, None, {"title": "Levitating", "artist": "Dua Lipa"}, dz_track_id="101")
+    assert db.get_grab_item(item)["isrc"] == "GBAHT2000001"
