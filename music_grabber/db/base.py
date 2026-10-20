@@ -185,7 +185,7 @@ class _DBBase:
         """)
         # What Music Grabber itself filed. "Managed" == "has a row here"; also the
         # Spotify-id fast path of library matching (docs/plans/extraction.md §3).
-        # `rel_path` is relative to the filing root so a changed mount point doesn't
+        # `rel_path` is relative to the library root so a changed mount point doesn't
         # strand the ledger; `placed_hash` is size:mtime of the file as placed.
         conn.execute("""
             CREATE TABLE IF NOT EXISTS grabbed_files (

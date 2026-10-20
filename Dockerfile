@@ -21,6 +21,9 @@ COPY VERSION CHANGELOG.md ./
 RUN mkdir -p /data /music
 VOLUME ["/data"]
 
-ENV PYTHONUNBUFFERED=1 DATA_DIR=/data MUSIC_DIR=/music
+# The API listens on all interfaces inside the container but is off unless API_TOKEN is set;
+# publish it on loopback only (see docker-compose.yml) unless you front it with TLS.
+ENV PYTHONUNBUFFERED=1 DATA_DIR=/data MUSIC_DIR=/music API_HOST=0.0.0.0 API_PORT=8099
+EXPOSE 8099
 
 CMD ["python", "-m", "music_grabber"]

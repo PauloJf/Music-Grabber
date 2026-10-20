@@ -107,3 +107,10 @@ def test_new_secrets_are_masked_and_never_persisted(tmp_path):
     c.save_settings(path, {k: "x" for k in secrets} | {"output_format": "flac"})
     import json
     assert json.load(open(path)) == {"output_format": "flac"}
+
+
+def test_a_short_api_token_is_a_config_error(tmp_path):
+    with pytest.raises(ConfigError, match="API_TOKEN must be at least 16"):
+        mg.build_service(_cfg(tmp_path, api_token="short"))
+    mg.build_service(_cfg(tmp_path, api_token="x" * 16)).hooks.close()
+    mg.build_service(_cfg(tmp_path, api_token="")).hooks.close()           # API simply off

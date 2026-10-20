@@ -3,7 +3,7 @@
 Spotify playlist watcher + downloader companion for [Navidrome](https://www.navidrome.org/)
 libraries, split out of [BPM Tagger](https://github.com/PauloJf/BPM-Tagger).
 
-**v0.2.0-dev, private, early.** Headless for now: no web UI yet (see the roadmap). Origin and
+**v0.3.0-dev, private, early.** Headless: a CLI and a JSON API; no web UI yet (see the roadmap). Origin and
 history: [`docs/provenance.md`](docs/provenance.md), extracted from BPM Tagger v2.18.2
 (`eae3f0c2662f590ac8cf0334a282389147152d2f`). The design and the reasons for the split:
 [`docs/plans/extraction.md`](docs/plans/extraction.md).
@@ -91,11 +91,83 @@ Names match BPM Tagger's grabber settings, so an existing compose block carries 
 | `MEDIARIUM_URL`, `MEDIARIUM_API_KEY`, `MEDIARIUM_API_KEY_HEADER` | | header defaults to `X-Api-Key` (`Authorization` sends a Bearer token) |
 | `NAVIDROME_URL`, `NAVIDROME_USER`, `NAVIDROME_PASS` | | for the `navidrome` hook |
 | `HOOK_DEBOUNCE_SECONDS` / `HOOK_MAX_WAIT_SECONDS` / `HOOK_MIN_INTERVAL_SECONDS` | `45` / `600` / `60` | hook coalescing |
+| `NTFY_NOTIFY_DONE` | `true` | a ping per finished track; ambiguity, failures and credential problems always ping |
+| `API_TOKEN` | | enables the API; 16+ characters; env only |
+| `API_HOST` / `API_PORT` | `127.0.0.1` (`0.0.0.0` in the image) / `8099` | |
 
 Secrets (`SPOTIFY_CLIENT_SECRET`, `LIBRARY_API_KEY`, `LIBRARY_PASS`, `BPM_TAGGER_PASSWORD`,
-`MEDIARIUM_API_KEY`, `NAVIDROME_PASS`) are read from the environment only and never written
+`MEDIARIUM_API_KEY`, `NAVIDROME_PASS`, `API_TOKEN`) are read from the environment only and never written
 to `settings.json`. A configuration that cannot work (unknown index, `intake` without
 `INTAKE_DIR`, a listed hook with no URL) makes `run` exit with code 2 and say what to set.
+
+## Command line
+
+```bash
+python -m music_grabber status                  # what is going on (add --json for scripts)
+python -m music_grabber playlist add https://open.spotify.com/playlist/...
+python -m music_grabber sync                    # reconcile now (or: sync <playlist id>)
+python -m music_grabber queue                   # in-flight work; also: history, show, retry, cancel ...
+python -m music_grabber inbox                   # ambiguous matches waiting for you
+python -m music_grabber inbox show 12           # candidates with scores, plus the next commands
+python -m music_grabber inbox choose 12 41      # download candidate 41 for item 12
+python -m music_grabber inbox search 12 "weeknd blinding lights"   # try another search
+python -m music_grabber settings set output_format flac
+```
+
+In Docker run them inside the container (`docker compose exec music-grabber python -m
+music_grabber status`), or from anywhere against a running instance with `--remote
+http://host:8099 --token ...` (or `MG_REMOTE_URL` + `API_TOKEN`). `--json` works before or after
+the command. Exit codes: 0 ok, 1 failed, 2 invalid request or configuration.
+
+When a track is ambiguous the ntfy ping carries the command to run (`inbox show <id>`); once
+the web UI exists it will also link to it.
+
+## JSON API
+
+Set `API_TOKEN` (16+ characters) and the API listens on `API_PORT`. Every call needs
+`Authorization: Bearer <token>`; there are no cookies and no CSRF surface. Routes mirror the
+CLI: `GET /api/status`, `/api/playlists` (`POST {"value": url}`, `PATCH {"enabled": false}`,
+`DELETE`, `POST /api/playlists/<id>/sync`), `POST /api/sync`, `/api/queue` and
+`/api/queue/<id>/{retry,cancel,priority}`, `/api/inbox` and `/api/inbox/<id>/{choose,search,research,skip}`,
+`/api/settings` (secrets come back masked), `/api/spotify/*`, `POST /api/library/refresh`.
+Errors are `{"error": "<code>", "message": "..."}` with a matching HTTP status. Publish the port
+on loopback only (see `docker-compose.yml`) and put TLS in front before exposing it further.
+
+The Spotify login also works in a browser: set `SPOTIFY_REDIRECT_URI` to
+`http://127.0.0.1:8099/callback`, `GET /api/spotify/authorize-url`, open the URL, approve. The
+callback only accepts a `state` this instance issued (single use, 10 minutes). Without the API,
+use `spotify-login`.
+
+## Settings
+
+`settings show` / `settings set KEY VALUE ...` (or `POST /api/settings`) change the options that
+make sense at runtime: `output_format`, `path_template`, `provider_order`, `deezer_quality`,
+`deezer_arl`, `auto_accept_threshold`, `ask_threshold`, `grab_dry_run`, `lyrics_enabled`,
+`spotify_sync_minutes`, `grab_workers`, `ntfy_url`, `ntfy_topic`, `ntfy_notify_done`,
+`ui_public_url`. Values are validated, saved to `settings.json` (mode 0600, next to the DB) and
+applied to the running instance without a restart (`grab_workers` and `spotify_sync_minutes` need
+one). Settings saved this way override the environment from then on. Credentials from the
+environment (Spotify secret, API token, ...) are never written to the file.
+
+## Moving over from BPM Tagger
+
+```bash
+# 1. Stop the grabber in BPM Tagger (GRABBER_ENABLED=false) so nothing writes while you copy.
+# 2. Carry over the non-secret settings (secrets are listed, never printed):
+python -m music_grabber import-env /path/to/bpm-tagger-data/settings.json
+# 3. Look before you leap, then import. BPM Tagger's database is opened read-only.
+python -m music_grabber import-bpm-tagger /path/to/bpm-tagger-data/bpm_tagger.db --dry-run
+python -m music_grabber import-bpm-tagger /path/to/bpm-tagger-data/bpm_tagger.db \
+    --source-music-dir /music            # BPM Tagger's MUSIC_DIR as it saw it
+# 4. Start Music Grabber and check `status`.
+```
+
+It copies Spotify playlists and their tracks, the queue with candidates and events (in-flight
+items become pending again), the lifetime counter, and every `managed` track as a ledger row so
+"already have it" answers stay stable. The Spotify refresh token is only copied with
+`--include-tokens` (otherwise run `spotify-login`). Importing into a database that already has
+data needs `--merge`; re-running a merge adds only what is new. Navidrome and Local playlists
+stay in BPM Tagger. A fuller guide arrives with 0.5.0.
 
 ## Working with BPM Tagger
 
@@ -143,15 +215,14 @@ route (401/403) it logs one clear line and disables itself until restart. Off by
 See [`docs/plans/extraction.md`](docs/plans/extraction.md) section 6.
 
 - **0.1.0**: skeleton move, own DB, filesystem library index, ledger, tests, CI.
-- **0.2.0** (this): OpenSubsonic (BPM Tagger / Navidrome) library index; intake-folder and API
+- **0.2.0**: OpenSubsonic (BPM Tagger / Navidrome) library index; intake-folder and API
   analysis modes; Mediarium and Navidrome post-import hooks.
-- **0.3.0**: JSON API + CLI (`sync`, `queue`, `inbox`, `status`), settings persistence, ntfy,
-  and an import tool for existing BPM Tagger `grab_*` data.
+- **0.3.0** (this): JSON API + CLI (`sync`, `queue`, `inbox`, `status`, `settings`), settings
+  persistence, ntfy, and an import tool for existing BPM Tagger `grab_*` data.
 - **0.4.0**: minimal web UI (playlists, queue, ambiguity inbox).
 - **0.5.0**: docs polish, compose examples, migration guide.
 
-Until the CLI lands, an ambiguous track waits in the database inbox (`awaiting_user`) and
-the ntfy ping tells you it is there; there is nothing to click yet.
+Until the web UI lands, resolve ambiguous tracks with `inbox` on the command line.
 
 ## Development
 
