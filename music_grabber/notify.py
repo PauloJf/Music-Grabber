@@ -4,11 +4,22 @@ The scan-batching half of that class is BPM Tagger specific and not carried over
 Sending never raises: ntfy being down must not fail a grab.
 """
 
+import base64
 import logging
 
 import requests
 
 log = logging.getLogger(__name__)
+
+
+def _header(value: str) -> str:
+    """HTTP headers are latin-1; ntfy reads RFC 2047 encoded words, so anything else (an en dash
+    in a track title, say) is sent as =?UTF-8?B?...?= instead of failing the whole ping."""
+    try:
+        value.encode("ascii")
+        return value
+    except UnicodeEncodeError:
+        return "=?UTF-8?B?" + base64.b64encode(value.encode()).decode() + "?="
 
 
 class Notifier:
@@ -31,11 +42,11 @@ class Notifier:
     def _post(self, title: str, body: str, tag: str, priority: str = "low",
               click_url: str = "", actions: str = ""):
         try:
-            headers = {"Title": title, "Priority": priority, "Tags": tag}
+            headers = {"Title": _header(title.replace("\n", " ")), "Priority": priority, "Tags": tag}
             if click_url:
-                headers["Click"] = click_url
+                headers["Click"] = _header(click_url)
             if actions:
-                headers["Actions"] = actions
+                headers["Actions"] = _header(actions)
             resp = requests.post(f"{self._url}/{self._topic}", data=body.encode(),
                                  headers=headers, timeout=10)
             resp.raise_for_status()

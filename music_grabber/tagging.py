@@ -5,8 +5,11 @@ step, so this module only handles the descriptive tags + artwork.
 """
 
 import base64
+import ipaddress
 import logging
 import os
+import socket
+from urllib.parse import urljoin, urlsplit
 
 import mutagen
 import requests
@@ -96,7 +99,10 @@ def resize_cover(image_bytes: bytes, max_px: int = 1200) -> bytes:
         import io
 
         from PIL import Image
-        img = Image.open(io.BytesIO(image_bytes))
+        # streamrip pins Pillow<11 (known CVEs in rarely used decoders), so only the three formats
+        # a cover really is get decoded, and decompression bombs are capped.
+        Image.MAX_IMAGE_PIXELS = 40_000_000
+        img = Image.open(io.BytesIO(image_bytes), formats=["JPEG", "PNG", "WEBP"])
         if max(img.size) <= max_px:
             return image_bytes
         img = img.convert("RGB")
@@ -109,13 +115,43 @@ def resize_cover(image_bytes: bytes, max_px: int = 1200) -> bytes:
         return image_bytes
 
 
+MAX_COVER_BYTES = 15 * 1024 * 1024
+MAX_COVER_REDIRECTS = 3
+
+
+def _public_http_url(url: str) -> bool:
+    """http(s) only, and the host must resolve to public addresses: a cover URL comes from a
+    remote catalogue, so it must not be able to point the grabber at the LAN or localhost."""
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        return False
+    try:
+        infos = socket.getaddrinfo(parts.hostname, parts.port or (443 if parts.scheme == "https" else 80),
+                                   type=socket.SOCK_STREAM)
+        return bool(infos) and all(ipaddress.ip_address(i[4][0]).is_global for i in infos)
+    except (OSError, ValueError):
+        return False
+
+
 def fetch_cover(url: str) -> bytes | None:
     if not url:
         return None
     try:
-        resp = requests.get(url, timeout=15)
-        resp.raise_for_status()
-        return resize_cover(resp.content)
+        for _ in range(MAX_COVER_REDIRECTS + 1):
+            if not _public_http_url(url):
+                log.debug("Cover fetch refused (not a public http(s) URL): %s", url)
+                return None
+            with requests.get(url, timeout=15, stream=True, allow_redirects=False) as resp:
+                if resp.is_redirect:
+                    url = urljoin(url, resp.headers.get("Location", ""))
+                    continue
+                resp.raise_for_status()
+                data = resp.raw.read(MAX_COVER_BYTES + 1, decode_content=True)
+                if len(data) > MAX_COVER_BYTES:
+                    log.debug("Cover fetch refused (over %d bytes): %s", MAX_COVER_BYTES, url)
+                    return None
+                return resize_cover(data)
+        return None
     except Exception as exc:
         log.debug("Cover fetch failed (%s): %s", url, exc)
         return None

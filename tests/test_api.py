@@ -221,3 +221,28 @@ def test_find_ui_dir(tmp_path):
     assert find_ui_dir(str(tmp_path)) != str(tmp_path)      # no index.html there: not chosen
     (tmp_path / "index.html").write_text("x")
     assert find_ui_dir(str(tmp_path)) == str(tmp_path)
+
+
+def test_healthz_does_not_fingerprint(client):
+    assert client.get("/healthz").json == {"ok": True}
+
+
+def test_repeated_wrong_tokens_lock_the_address_out_then_recover(app_ops):
+    from music_grabber.api import AuthThrottle
+    now = [0.0]
+    app = create_app(app_ops[1], TOKEN, throttle=AuthThrottle(3, 60, clock=lambda: now[0]))
+    c = app.test_client()
+    for _ in range(3):
+        assert c.get("/api/status", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    r = c.get("/api/status", headers=H)                      # even the right token waits
+    assert r.status_code == 429 and int(r.headers["Retry-After"]) > 0
+    now[0] += 61
+    assert c.get("/api/status", headers=H).status_code == 200
+
+
+def test_unexpected_errors_are_json_and_do_not_leak(app_ops):
+    app, ops = app_ops
+    def boom(): raise RuntimeError("secret detail /srv/x")
+    ops.status = boom
+    r = app.test_client().get("/api/status", headers=H)
+    assert r.status_code == 500 and r.json["error"] == "internal_error" and "secret" not in r.get_data(as_text=True)

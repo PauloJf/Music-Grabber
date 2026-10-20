@@ -28,6 +28,13 @@ def test_ping_headers_and_body_over_real_http():
     assert req.headers["Actions"].startswith("view,")
 
 
+def test_non_latin1_titles_are_encoded_instead_of_dropping_the_ping():
+    with FakeServer(lambda r: Reply(200)) as srv:
+        Notifier(srv.url, "t").send_grabber("Grabbed \u2013 Beyonc\u00e9 \u266b", "ok")
+    (req,) = srv.requests                                   # a ping arrived at all
+    assert req.headers["Title"].startswith("=?UTF-8?B?")
+
+
 def test_ntfy_being_down_or_erroring_never_raises():
     Notifier("http://127.0.0.1:9", "t").send_grabber("x", "y")            # connection refused
     with FakeServer(lambda r: Reply(500)) as srv:

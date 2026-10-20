@@ -12,7 +12,19 @@
   names, one vermilion signal colour, light/dark by system preference); no external fonts.
 - API: `/api/browse/*` and `/api/activity`; CSP allows Deezer/Spotify image CDNs and Deezer previews only.
 
+### Security
+- Security review (`docs/security.md`): wrong-token lockout (429), SSRF/size guard on cover downloads,
+  stricter URL settings, column allowlist in the queue update, owner-only database file, `/healthz`
+  no longer reveals the version, JSON for unexpected errors, `react-router` upgraded (0 npm
+  advisories). Pillow stays pinned by streamrip (mitigated, documented).
+- There is no username/password login: the shared `API_TOKEN` is the single credential.
+
+### Added
+- **Help** page (`/help`, the **?** in the header): setup order, finding and queueing music, badge
+  legend, Queue/Inbox, playlists, settings, troubleshooting and safe-use tips.
+
 ### Fixed
+- ntfy pings whose title contained a non-Latin-1 character (an en dash, accents) were silently never sent.
 - The Deezer ISRC lookup on enqueue never ran since the extraction (a wrong relative import hidden by
   a best-effort `except`); queueing a catalogue track now resolves its ISRC.
 

@@ -16,6 +16,16 @@ class _DBBase:
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
         self._backup_once()
         self._init_db()
+        self._restrict_permissions()
+
+    def _restrict_permissions(self) -> None:
+        """The database holds the Spotify refresh token: owner read/write only (best effort)."""
+        for suffix in ("", "-wal", "-shm"):
+            try:
+                if os.path.exists(self.db_path + suffix):
+                    os.chmod(self.db_path + suffix, 0o600)
+            except OSError:  # pragma: no cover - read-only mounts, foreign owners
+                pass
 
     def _backup_once(self) -> None:
         """Copy the DB file to ``<db>.bak-<version>`` before migrating, once per

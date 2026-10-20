@@ -10,16 +10,51 @@ package imports Flask, so the engine and the CLI stay light.
 import hmac
 import logging
 import os
+import threading
+import time
 from html import escape
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
-from ..config import __version__
 from ..ops import Ops, OpsError
 
 log = logging.getLogger(__name__)
 
 MIN_TOKEN_LENGTH = 16
+# After this many wrong tokens inside the window, that address is refused (429) until the
+# window passes, whatever it sends. Per address, in memory.
+AUTH_MAX_FAILURES = 10
+AUTH_WINDOW_SECONDS = 60
+
+
+class AuthThrottle:
+    def __init__(self, max_failures: int = AUTH_MAX_FAILURES, window: float = AUTH_WINDOW_SECONDS,
+                 clock=time.monotonic):
+        self.max, self.window, self.clock = max_failures, window, clock
+        self._fails: dict[str, list[float]] = {}
+        self._lock = threading.Lock()
+
+    def _recent(self, who: str) -> list[float]:
+        cutoff = self.clock() - self.window
+        recent = [t for t in self._fails.get(who, []) if t > cutoff]
+        if recent: self._fails[who] = recent
+        else: self._fails.pop(who, None)
+        return recent
+
+    def retry_after(self, who: str) -> int:
+        """Seconds until ``who`` may try again; 0 when not locked out."""
+        with self._lock:
+            recent = self._recent(who)
+            if len(recent) < self.max:
+                return 0
+            return max(1, int(recent[0] + self.window - self.clock()) + 1)
+
+    def fail(self, who: str) -> None:
+        with self._lock:
+            self._recent(who)
+            if len(self._fails) > 4096:          # bound memory under a spray from many addresses
+                self._fails.clear()
+            self._fails.setdefault(who, []).append(self.clock())
 
 _PAGE = ("<!doctype html><meta charset=utf-8><title>Music Grabber</title>"
          "<body style='font:16px system-ui;margin:3rem auto;max-width:32rem'>"
@@ -49,20 +84,27 @@ def find_ui_dir(configured: str = "") -> str:
     return ""
 
 
-def create_app(ops: Ops, token: str, ui_dir: str = "") -> Flask:
+def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | None = None) -> Flask:
     if len(token or "") < MIN_TOKEN_LENGTH:
         raise ValueError(f"API token must be at least {MIN_TOKEN_LENGTH} characters")
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
     open_paths = {"/healthz", "/callback"}
+    throttle = throttle or AuthThrottle()
 
     @app.before_request
     def _auth():
         if request.path in open_paths or not request.path.startswith("/api/"):
             return None                  # open routes and the UI's static files
+        who = request.remote_addr or "?"
+        wait = throttle.retry_after(who)
+        if wait:
+            return (jsonify(error="too_many_attempts", message=f"too many wrong tokens; retry in {wait}s"),
+                    429, {"Retry-After": str(wait)})
         header = request.headers.get("Authorization", "")
         supplied = header[7:] if header.lower().startswith("bearer ") else ""
         if not supplied or not hmac.compare_digest(supplied.encode(), token.encode()):
+            throttle.fail(who)
             return (jsonify(error="unauthorized", message="send 'Authorization: Bearer <API_TOKEN>'"),
                     401, {"WWW-Authenticate": "Bearer"})
         return None
@@ -96,6 +138,14 @@ def create_app(ops: Ops, token: str, ui_dir: str = "") -> Flask:
     def _413(_e):
         return jsonify(error="too_large"), 413
 
+    @app.errorhandler(Exception)
+    def _500(e):
+        from werkzeug.exceptions import HTTPException
+        if isinstance(e, HTTPException):
+            return jsonify(error=e.name.lower().replace(" ", "_")), e.code
+        log.exception("unhandled error on %s %s", request.method, request.path)
+        return jsonify(error="internal_error", message="see the server log"), 500
+
     def body() -> dict:
         data = request.get_json(force=True, silent=True)
         return data if isinstance(data, dict) else {}
@@ -103,7 +153,7 @@ def create_app(ops: Ops, token: str, ui_dir: str = "") -> Flask:
     # ── open routes ───────────────────────────────────────────────────────────
     @app.get("/healthz")
     def healthz():
-        return jsonify(ok=True, version=__version__)
+        return jsonify(ok=True)          # open: no version or other fingerprint (/api/status has it)
 
     @app.get("/callback")
     def callback():

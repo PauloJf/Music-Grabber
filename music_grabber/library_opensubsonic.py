@@ -50,7 +50,7 @@ def track_token(t: LibraryTrack) -> str:
     """The API gives no mtime, so the change token is a hash of the fields we store."""
     blob = json.dumps([t.title, t.artist, t.album, t.album_artist, t.duration_ms, t.isrc,
                        t.track_no, t.disc_no, t.year], ensure_ascii=False)
-    return "h:" + hashlib.sha1(blob.encode("utf-8")).hexdigest()[:16]
+    return "h:" + hashlib.sha1(blob.encode("utf-8"), usedforsecurity=False).hexdigest()[:16]
 
 
 class OpenSubsonicSource:

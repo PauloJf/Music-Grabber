@@ -5,6 +5,12 @@ from typing import Optional
 
 from .constants import GRAB_NONTERMINAL, GRAB_TERMINAL
 
+# Columns update_grab may set (keyword names become SQL identifiers, so they are checked).
+GRAB_COLUMNS = frozenset(
+    "playlist_track_id spotify_track_id title artist album album_artist duration_ms isrc track_no "
+    "disc_no year cover_url status provider chosen_candidate_id search_override error attempts "
+    "progress tmp_path final_path priority created_at updated_at note".split())
+
 
 class QueueMixin:
     # Audit events kept per queue item. grab_queue rows persist indefinitely, so
@@ -205,6 +211,9 @@ class QueueMixin:
     def update_grab(self, item_id: int, **fields) -> None:
         if not fields:
             return
+        bad = set(fields) - GRAB_COLUMNS
+        if bad:
+            raise ValueError(f"unknown grab_queue column(s): {', '.join(sorted(bad))}")
         fields["updated_at"] = datetime.now(timezone.utc).isoformat()
         cols = ", ".join(f"{k}=?" for k in fields)
         with self._connect() as conn:

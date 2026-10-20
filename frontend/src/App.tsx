@@ -4,6 +4,7 @@ import { useAuth } from "./lib/auth";
 import Album from "./pages/Album";
 import Artist from "./pages/Artist";
 import Discover from "./pages/Discover";
+import Help from "./pages/Help";
 import Inbox from "./pages/Inbox";
 import Login from "./pages/Login";
 import PlaylistDetail from "./pages/PlaylistDetail";
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/inbox/:id" element={<Inbox />} />
         <Route path="/playlists" element={<Playlists />} />
         <Route path="/playlists/:id" element={<PlaylistDetail />} />
+        <Route path="/help" element={<Help />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
