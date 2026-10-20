@@ -101,3 +101,6 @@ export interface Activity {
   counts: Record<string, number>;
 }
 export interface QueueResult { ok: boolean; queued: number; item_ids: number[]; results: { dz_id: string; result: string }[]; album?: string }
+
+export interface User { id: number | null; username: string; role: "admin" | "user"; prefs: { theme?: "system" | "light" | "dark"; preview_volume?: number }; created_at?: string | null; last_login?: string | null }
+export interface Me { user: User; via: "token" | "session" }

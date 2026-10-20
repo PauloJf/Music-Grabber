@@ -233,3 +233,20 @@ def test_json_flag_works_before_or_after_the_command(env, capsys):
                  ["--json", "inbox", "list"], ["inbox", "list", "--json"], ["playlist", "list", "--json"]):
         code, out, _ = run(argv, capsys)
         assert code == 0 and isinstance(json.loads(out), dict), argv
+
+
+def test_users_commands_create_list_reset_and_protect_the_last_admin(env, capsys, monkeypatch):
+    import io
+    def with_pw(argv, pw):
+        monkeypatch.setattr("sys.stdin", io.StringIO(pw + "\n"))
+        return run(argv, capsys)
+    assert run(["users", "list"], capsys)[1].startswith("No accounts")
+    code, out, _ = with_pw(["users", "add", "paulo", "--role", "admin"], "a long enough secret")
+    assert code == 0 and "Created admin 'paulo'" in out
+    code, out, err = with_pw(["users", "add", "bob"], "short")
+    assert code != 0 and "at least" in (out + err)
+    assert "paulo" in run(["users", "list"], capsys)[1] and "secret" not in run(["users", "list", "--json"], capsys)[1]
+    assert with_pw(["users", "passwd", "PAULO"], "another long secret")[0] == 0
+    assert run(["users", "delete", "paulo"], capsys)[0] != 0               # the last admin stays
+    assert run(["users", "role", "paulo", "user"], capsys)[0] != 0
+    assert run(["users", "delete", "ghost"], capsys)[0] != 0

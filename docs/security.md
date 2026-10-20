@@ -3,19 +3,29 @@
 Reviewed on branch `phase-7/security-help` with bandit, pip-audit, npm audit and a manual read of
 the API, settings, OAuth, download and file-placement paths.
 
-## Does it have a username and password?
+## Accounts and sign-in
 
-No. There are no user accounts. The API and web UI are protected by **one shared bearer token**
-(`API_TOKEN`, at least 16 characters, compared in constant time). The web UI asks for it once and keeps
-it in `sessionStorage` (cleared when the tab closes; *Sign out* in Settings clears it sooner). Anyone
-holding the token has full control, including the Deezer ARL setting (write-only: it is masked on read).
-That fits a single-owner homelab tool. Per-user accounts are not planned; if several people need
-separate access, put the app behind an authenticating reverse proxy (Authelia, Authentik, Caddy
-basic auth) and keep the token as the second factor.
+Yes, since phase 8. The web UI signs people in with a **username and password**:
+
+- First visit: the login page offers to create the first account (an administrator). That endpoint
+  only works while no account exists **and** needs the server's `API_TOKEN`, so merely reaching the
+  port is not enough to claim the installation.
+- Passwords: 10 to 200 characters, hashed with scrypt (N=2^14, r=8, p=1, random 16-byte salt,
+  parameters stored with the hash). Login takes the same time for unknown usernames.
+- Sign-in returns a random 256-bit **session token**, stored server-side only as a SHA-256 hash,
+  valid 14 days from the last use, revoked by Sign out, a password change (other devices) or an
+  admin reset/delete. The browser keeps it in `sessionStorage` and sends it as a bearer header; there
+  are no cookies, so still no CSRF surface.
+- Roles: **admin** (everything, including Settings, Spotify and managing people) and **user**
+  (browse, queue, Inbox, playlists, own account). The last administrator cannot be deleted or demoted.
+- `API_TOKEN` stays: it is an always-admin machine key for the CLI `--remote`, scripts and as
+  first-run/recovery proof. Lost the only admin password? `python -m music_grabber users passwd NAME`
+  on the server.
+- Wrong passwords and wrong tokens share one lockout (10 failures a minute per address).
 
 ## Threat model
 
-A single owner on a home network or a small VPS. The attacker is anyone who can reach the port,
+One owner, or a few trusted people, on a home network or a small VPS. The attacker is anyone who can reach the port,
 a malicious or compromised remote catalogue (Deezer/Spotify metadata and URLs), and malicious
 web pages visited from the owner's browser.
 
@@ -47,7 +57,7 @@ web pages visited from the owner's browser.
 
 ## Residual risks and advice
 
-- One token = full access. Use a long random value; rotate by changing `API_TOKEN` and restarting.
+- The `API_TOKEN` is still a full-admin key. Use a long random value; rotate it by changing `API_TOKEN` and restarting.
 - Plain HTTP exposes the token on the wire. Use TLS (reverse proxy) beyond loopback/LAN.
 - The lockout is per source address; behind a reverse proxy all clients share the proxy's address,
   so a flood of wrong tokens also locks out the owner for a minute. Authenticate at the proxy too.
