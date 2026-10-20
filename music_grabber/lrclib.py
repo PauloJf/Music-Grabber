@@ -11,13 +11,13 @@ import logging
 
 import requests
 
-from ..config import __version__
+from .config import __version__
 
 log = logging.getLogger(__name__)
 
 API_BASE = "https://lrclib.net/api"
 # LRCLIB asks for a descriptive User-Agent from well-behaved clients.
-_HEADERS = {"User-Agent": f"BPM-Tagger/{__version__} (https://github.com/PauloJf/BPM-Tagger)"}
+_HEADERS = {"User-Agent": f"Music-Grabber/{__version__} (https://github.com/PauloJf/Music-Grabber)"}
 _DURATION_TOL_S = 4
 
 

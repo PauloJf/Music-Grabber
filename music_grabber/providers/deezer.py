@@ -22,7 +22,7 @@ from .base import (DownloadedFile, Provider, ProviderAuthError, ProviderCandidat
 log = logging.getLogger(__name__)
 
 ARL_REJECTED = ("Deezer rejected the ARL (expired or invalid) — "
-                "paste a fresh one in Settings → Grabber")
+                "set a fresh DEEZER_ARL")
 ARL_MISSING = "No Deezer ARL configured"
 
 # Human-readable quality → streamrip quality integer.
@@ -117,7 +117,7 @@ class DeezerProvider(Provider):
         isrc = (isrc or "").strip().upper()
         if not isrc:
             return None, ""
-        from bpm_tagger.integrations import deezer_catalog
+        from .. import deezer_catalog
         t = deezer_catalog.track_detail_by_isrc(isrc)
         if t is None:
             return None, f"Couldn't reach Deezer's ISRC lookup for {isrc}; searched by title instead"
