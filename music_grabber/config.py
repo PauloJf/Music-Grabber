@@ -26,10 +26,12 @@ def _read_version() -> str:
 __version__ = _read_version()
 
 # Secrets that are only ever read from the environment (never written to settings.json).
-ENV_ONLY_KEYS = ("spotify_client_id", "spotify_client_secret")
+ENV_ONLY_KEYS = ("spotify_client_id", "spotify_client_secret", "library_api_key", "library_pass",
+                 "bpm_tagger_password", "mediarium_api_key", "navidrome_pass")
 
 # Keys that carry credentials: masked in any API/CLI output.
-SECRET_KEYS = ("spotify_client_secret", "deezer_arl")
+SECRET_KEYS = ("spotify_client_secret", "deezer_arl", "library_api_key", "library_pass",
+               "bpm_tagger_password", "mediarium_api_key", "navidrome_pass")
 
 
 def _bool(name: str, default: str = "false") -> bool:
@@ -50,6 +52,38 @@ def build_config() -> dict:
         "library_dir":           os.environ.get("LIBRARY_DIR") or os.environ.get("MUSIC_DIR", "/music"),
         "db_path":               os.environ.get("DB_PATH", os.path.join(data_dir, "music_grabber.db")),
         "log_level":             os.environ.get("LOG_LEVEL", "INFO").upper(),
+
+        # Library index: what the library already has (docs/plans/extraction.md §2.1).
+        #   filesystem   scan LIBRARY_DIR (standalone)
+        #   opensubsonic ask BPM Tagger's Subsonic API (SUBSONIC_ENABLED there) or Navidrome
+        "library_index":         os.environ.get("LIBRARY_INDEX", "filesystem").strip().lower(),
+        "library_url":           os.environ.get("LIBRARY_URL", ""),
+        "library_api_key":       os.environ.get("LIBRARY_API_KEY", ""),
+        "library_user":          os.environ.get("LIBRARY_USER", ""),
+        "library_pass":          os.environ.get("LIBRARY_PASS", ""),
+
+        # Post-download analysis (§2.2):
+        #   none    standalone: file under MUSIC_DIR, no BPM
+        #   intake  file into INTAKE_DIR; BPM Tagger's watcher tags it
+        #   api     intake + a coalesced scan request to BPM Tagger's HTTP API
+        "analysis":              os.environ.get("ANALYSIS", "none").strip().lower(),
+        "intake_dir":            os.environ.get("INTAKE_DIR", ""),
+        "analysis_wait_seconds": float(os.environ.get("ANALYSIS_WAIT_SECONDS", "0")),
+        "bpm_tagger_url":        os.environ.get("BPM_TAGGER_URL", ""),
+        "bpm_tagger_username":   os.environ.get("BPM_TAGGER_USERNAME", ""),
+        "bpm_tagger_password":   os.environ.get("BPM_TAGGER_PASSWORD", ""),
+
+        # Post-import hooks (§2.4): comma list of mediarium, navidrome. Off by default.
+        "post_import_hooks":     [h.lower() for h in _split_list(os.environ.get("POST_IMPORT_HOOKS", ""))],
+        "mediarium_url":         os.environ.get("MEDIARIUM_URL", ""),
+        "mediarium_api_key":     os.environ.get("MEDIARIUM_API_KEY", ""),
+        "mediarium_api_key_header": os.environ.get("MEDIARIUM_API_KEY_HEADER", "X-Api-Key"),
+        "navidrome_url":         os.environ.get("NAVIDROME_URL", ""),
+        "navidrome_user":        os.environ.get("NAVIDROME_USER", ""),
+        "navidrome_pass":        os.environ.get("NAVIDROME_PASS", ""),
+        "hook_debounce_seconds": float(os.environ.get("HOOK_DEBOUNCE_SECONDS", "45")),
+        "hook_max_wait_seconds": float(os.environ.get("HOOK_MAX_WAIT_SECONDS", "600")),
+        "hook_min_interval_seconds": float(os.environ.get("HOOK_MIN_INTERVAL_SECONDS", "60")),
 
         # Spotify (Authorization Code flow; refresh token lives in the DB).
         "spotify_client_id":     os.environ.get("SPOTIFY_CLIENT_ID", ""),

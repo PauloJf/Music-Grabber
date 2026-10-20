@@ -43,11 +43,14 @@ live in `docs/plans/extraction.md`, the origin in `docs/provenance.md`.
 | `music_grabber/sync_engine.py` | `SpotifySync` thread + `GrabberService` |
 | `music_grabber/worker.py` | `GrabPipeline` (search, score, download, transcode, tag, place, ledger), `GrabPool` |
 | `music_grabber/library.py` | `LibrarySource` port, `FilesystemSource`, `LibraryIndex` |
-| `music_grabber/analysis.py` | `PostDownloadAnalysis` port |
+| `music_grabber/library_opensubsonic.py`, `subsonic.py` | OpenSubsonic `LibrarySource` (BPM Tagger / Navidrome) and its tiny client |
+| `music_grabber/analysis.py` | `PostDownloadAnalysis` port: `NoAnalysis`, `IntakeFolderAnalysis`, `ApiAnalysis` |
+| `music_grabber/coalesce.py`, `hooks.py` | debounce/max-wait/min-interval `Coalescer`; Mediarium + Navidrome post-import hooks |
+| `music_grabber/wiring.py` | config to source/analysis, `ConfigError` |
 | `music_grabber/matching.py`, `text.py` | scoring and normalizers (`text.py` is a pinned duplicate of BPM Tagger's) |
 | `music_grabber/providers/` | Deezer (streamrip) and yt-dlp, lazily imported |
 | `music_grabber/spotify.py` | Spotify Web API client (Authorization Code flow) |
-| `tests/` | pytest; `audio_fixtures.py` builds tiny valid audio with no audio libraries |
+| `tests/` | pytest; `audio_fixtures.py` builds tiny valid audio with no audio libraries; `fake_servers.py` is a loopback fake peer + a manual clock for timer tests |
 
 ## Commands
 

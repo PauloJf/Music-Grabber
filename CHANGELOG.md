@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **OpenSubsonic library index** (`LIBRARY_INDEX=opensubsonic`, `LIBRARY_URL`, `LIBRARY_API_KEY`
+  or `LIBRARY_USER` + `LIBRARY_PASS`): learns what the library has over HTTP from BPM Tagger's
+  Subsonic API (`SUBSONIC_ENABLED` there) or from Navidrome. Walks every song with an empty
+  `search3` query (falling back to `getAlbumList2` + `getAlbum`), loads the same cache as the
+  filesystem source, and never prunes on an error or a partial listing.
+- **Analysis modes** (`ANALYSIS=none|intake|api`, `INTAKE_DIR`, `ANALYSIS_WAIT_SECONDS`):
+  `intake` files into a folder BPM Tagger's watcher covers and can optionally wait to confirm
+  the BPM tag appeared; `api` adds a coalesced scan request to BPM Tagger's HTTP API
+  (`BPM_TAGGER_URL`, `BPM_TAGGER_PASSWORD`; not usable with admin two-factor).
+- **Post-import hooks** (`POST_IMPORT_HOOKS=mediarium,navidrome`, off by default): one coalesced
+  request per burst of placements (trailing debounce, max wait, minimum interval, one dirty
+  follow-up). Mediarium: `POST /api/music/import/scan` with `MEDIARIUM_URL` +
+  `MEDIARIUM_API_KEY`; a 404 (music module off) pauses it for an hour, 401/403 log one clear
+  line and disable it, 429/5xx/network errors back off exponentially. Navidrome: `startScan`.
+- Startup validation: a configuration that names something that cannot work (unknown index,
+  missing `INTAKE_DIR`, a hook with no URL, ...) exits with code 2 and says what to set.
+
+### Changed
+- The Navidrome rescan is no longer fired once per downloaded track; it is a coalesced hook.
+
 ## 0.1.0 (unreleased)
 
 First cut of the Music Grabber as its own project, extracted from BPM Tagger v2.18.2
