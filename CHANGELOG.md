@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Documentation
+- README rewritten around a contents list, setup (Spotify OAuth, Deezer ARL), a troubleshooting
+  section and the full configuration table; every variable the code reads is documented, and
+  `tests/test_docs.py` fails if one is not.
+- Compose examples in `docs/compose/`: standalone, a **shared folder with BPM Tagger** (intake), and
+  the full Navidrome + BPM Tagger + Music Grabber stack. Tests keep them honest: only variables the
+  code reads, no literal secrets, loopback-only ports, one shared `/music`.
+- `docs/migration-from-bpm-tagger.md`: what moves and what does not, step by step, how to back out.
+
 ### Added
 - **Web UI** (React + TypeScript + Vite + Tailwind-as-utilities, BPM Tagger's tokens and
   conventions), served by the API process: Inbox (candidates, scores, choose / search / skip),
