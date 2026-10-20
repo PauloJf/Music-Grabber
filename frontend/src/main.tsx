@@ -4,6 +4,9 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./lib/auth";
+import { PlayerProvider } from "./lib/player";
+import { QueueingProvider } from "./lib/queueing";
+import { ToastProvider } from "./lib/toast";
 import "./styles/design-system.css";
 import "./index.css";
 
@@ -16,7 +19,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
-          <App />
+          <ToastProvider>
+            <PlayerProvider>
+              <QueueingProvider>
+                <App />
+              </QueueingProvider>
+            </PlayerProvider>
+          </ToastProvider>
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>

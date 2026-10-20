@@ -117,14 +117,26 @@ item in the web UI.
 
 ### Web UI
 
-With `API_TOKEN` set, the same process serves a small UI at `http://host:8099/`: **Inbox**
-(candidates with scores, *Download this*, search for something else, skip), **Queue** (active /
-failed / history, retry, cancel, move to front, per-item event log) and **Playlists** (coverage,
-watch toggle, sync, queue missing, tracks by status), plus *Connect Spotify*. It signs in with the
-API token (kept for that browser tab only), loads nothing from outside its own origin, and works
-on a phone. The Docker image builds it; from a checkout: `cd frontend && npm ci && npm run build`
-(`npm run dev` proxies to a running instance on `:8099`). Settings and the BPM Tagger import stay
-on the command line.
+With `API_TOKEN` set, the same process serves the app at `http://host:8099/`. It is built for a phone
+first (tab bar, thumb-sized targets, safe areas) and works as well on a desktop.
+
+- **Discover**: search Deezer for songs, artists and albums (search as you type, recent searches,
+  `/` to focus). Open an **artist** (popular tracks, albums vs singles and EPs, related artists) or an
+  **album** (track list, select some or queue what's missing). Every song shows its state live:
+  *Queue*, *Queued*, a progress ring while it downloads, *In library*, *Needs you*, or *Failed* with a
+  retry. Preview 30 seconds before you decide.
+- **Instant feedback**: pressing *Queue* flips the row at once, a toast confirms (with **Undo**), a
+  floating activity button shows what's running, and you get a toast when a download finishes or fails.
+- **Queue**: Now / Up next / Failed / Finished, retry, cancel, move to front, per-item event log.
+- **Inbox**: ambiguous matches with scored candidates: download one, search again, or skip.
+- **Library**: watched Spotify playlists with coverage, sync, queue missing, tracks by status.
+- **Settings**: Spotify, Deezer ARL (with a test button), ntfy, formats, thresholds, path template
+  with a live example; changes apply without a restart.
+
+Cover art and previews come from Deezer's CDN (the only external hosts the page may contact; strict
+CSP otherwise). It signs in with the API token (kept for that browser tab only). The Docker image
+builds it; from a checkout: `cd frontend && npm ci && npm run build` (`npm run dev` proxies to
+`:8099`). Browsing needs Deezer's public catalogue to be reachable; queued downloads don't.
 
 ### JSON API
 
@@ -133,7 +145,7 @@ Set `API_TOKEN` and the API listens on `API_PORT`. Every `/api/*` call needs
 `GET /api/status`; `/api/playlists` (`POST {"value": url}`, `PATCH {"enabled": false}`, `DELETE`,
 `POST /api/playlists/<id>/sync`, `/enqueue-missing`); `POST /api/sync`; `/api/queue` and
 `/api/queue/<id>/{retry,cancel,priority}`; `/api/inbox` and `/api/inbox/<id>/{choose,search,research,skip}`;
-`/api/settings` (secrets come back masked); `/api/spotify/*`; `POST /api/library/refresh`; open:
+`/api/browse/{search,artist/<id>,album/<id>,queue,undo}` (catalogue + queueing) and `/api/activity`; `/api/settings` (secrets come back masked); `/api/spotify/*`; `POST /api/library/refresh`; open:
 `GET /healthz` and the Spotify `/callback` (which only accepts a single-use `state` this instance
 issued). Errors are `{"error": "<code>", "message": "..."}` with a matching HTTP status. Publish
 the port on loopback only, and put TLS in front before exposing it further.
