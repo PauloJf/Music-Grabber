@@ -159,3 +159,64 @@ def test_library_refresh_route(client, app_ops, tmp_path):
     assert client.post("/api/library/refresh", headers=H).status_code == 502
     os.makedirs(tmp_path / "music")
     assert client.post("/api/library/refresh", headers=H).json["seen"] == 0
+
+
+# ── the web UI's static files ─────────────────────────────────────────────────
+@pytest.fixture
+def ui(tmp_path, app_ops):
+    d = tmp_path / "dist"
+    (d / "assets").mkdir(parents=True)
+    (d / "index.html").write_text("<!doctype html><title>Music Grabber</title><div id=root></div>")
+    (d / "assets" / "app-abc123.js").write_text("console.log(1)")
+    (tmp_path / "secret.txt").write_text("outside the UI dir")
+    return create_app(app_ops[1], TOKEN, str(d)).test_client()
+
+
+def test_ui_is_public_but_the_api_still_needs_the_token(ui):
+    r = ui.get("/")
+    assert r.status_code == 200 and b"Music Grabber" in r.data
+    assert ui.get("/api/status").status_code == 401
+    assert ui.get("/api/status", headers=H).status_code == 200
+
+
+def test_client_side_routes_fall_back_to_index_but_unknown_api_routes_do_not(ui):
+    for path in ("/queue", "/inbox/12", "/playlists/3"):
+        r = ui.get(path)
+        assert r.status_code == 200 and b"id=root" in r.data, path
+    assert ui.get("/api/nope", headers=H).status_code == 404
+    assert ui.get("/api/nope", headers=H).json["error"] == "not_found"
+    assert ui.post("/queue").status_code == 404            # the fallback is for GET only
+
+
+def test_hashed_assets_are_cached_forever_and_html_never(ui):
+    a = ui.get("/assets/app-abc123.js")
+    assert a.status_code == 200 and "immutable" in a.headers["Cache-Control"]
+    index = ui.get("/").headers["Cache-Control"]
+    assert "immutable" not in index and ("no-cache" in index or "no-store" in index)
+    assert ui.get("/assets/missing.js").status_code == 404              # not index.html in disguise
+
+
+def test_html_carries_a_same_origin_only_csp_and_no_framing(ui):
+    h = ui.get("/").headers
+    csp = h["Content-Security-Policy"]
+    assert "default-src 'self'" in csp and "script-src 'self'" in csp and "frame-ancestors 'none'" in csp
+    assert "http" not in csp and h["X-Frame-Options"] == "DENY" and h["Referrer-Policy"] == "no-referrer"
+    assert "Content-Security-Policy" not in ui.get("/healthz").headers      # JSON needs none
+
+
+def test_path_traversal_cannot_read_outside_the_ui_dir(ui):
+    for path in ("/assets/../../secret.txt", "/assets/..%2F..%2Fsecret.txt", "/..%2Fsecret.txt"):
+        r = ui.get(path)
+        assert b"outside the UI dir" not in r.data, path
+
+
+def test_without_a_built_ui_the_root_is_a_plain_404(client):
+    r = client.get("/")
+    assert r.status_code == 404 and r.json["error"] == "not_found"
+
+
+def test_find_ui_dir(tmp_path):
+    from music_grabber.api import find_ui_dir
+    assert find_ui_dir(str(tmp_path)) != str(tmp_path)      # no index.html there: not chosen
+    (tmp_path / "index.html").write_text("x")
+    assert find_ui_dir(str(tmp_path)) == str(tmp_path)
