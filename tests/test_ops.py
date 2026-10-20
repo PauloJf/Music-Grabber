@@ -255,6 +255,9 @@ def test_settings_update_validates_persists_and_applies_live(ops, tmp_path):
     ({"spotify_sync_minutes": "soon"}, "number"),
     ({"grab_dry_run": "maybe"}, "true or false"),
     ({"ask_threshold": 0.95}, "cannot be above"),
+    ({"ntfy_url": "file:///etc/passwd"}, "http"),
+    ({"ui_public_url": "javascript:alert(1)"}, "http"),
+    ({"ntfy_url": "https://user:pw@ntfy.example"}, "credentials"),
     ({"api_token": "x"}, "unknown or read-only"),
     ({"spotify_client_secret": "x"}, "unknown or read-only"),
 ])

@@ -39,6 +39,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               <input type="search" data-search aria-label="Search Deezer" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} style={{ minHeight: 36 }} />
             </form>
           )}
+          <NavLink to="/help" className="helplink" aria-label="Help" title="Help">?</NavLink>
           <div id="tray-slot" className="tray" />
         </div>
       </header>

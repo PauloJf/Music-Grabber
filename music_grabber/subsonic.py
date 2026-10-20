@@ -35,7 +35,7 @@ def auth_params(user: str = "", password: str = "", api_key: str = "") -> dict:
         params["apiKey"] = api_key
     else:
         salt = secrets.token_hex(6)
-        params.update(u=user, t=hashlib.md5((password + salt).encode()).hexdigest(), s=salt)
+        params.update(u=user, t=hashlib.md5((password + salt).encode(), usedforsecurity=False).hexdigest(), s=salt)
     return params
 
 

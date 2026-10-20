@@ -166,3 +166,8 @@ td { padding: 9px 8px; border-bottom: 1px solid var(--rule); vertical-align: mid
 @media (min-width: 760px) { .topsearch { display: flex; } }
 input[type=search]::-webkit-search-cancel-button { display: none; }
 .traybtn { max-width: 70vw; } .traybtn span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+
+.helplink { display: inline-grid; place-items: center; width: 30px; height: 30px; border: 1.5px solid var(--ink-3); border-radius: 50%; color: var(--ink-2); font: 600 15px/1 var(--serif, Georgia, serif); text-decoration: none; }
+.helplink:hover, .helplink.active { color: var(--ink); border-color: var(--signal); }
+.help-sec h2 { margin-bottom: 8px; } .help-sec li, .help-sec dd { margin-bottom: 6px; line-height: 1.55; } .help-sec dt { margin-top: 10px; } .help-sec dd { margin-left: 0; color: var(--ink-2); }
+kbd { font-family: var(--mono, monospace); font-size: .85em; border: 1px solid var(--ink-3); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }

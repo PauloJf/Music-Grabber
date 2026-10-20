@@ -10,6 +10,7 @@ import secrets
 import threading
 import time
 from typing import Optional
+from urllib.parse import urlsplit
 
 from . import deezer_catalog
 from .config import SECRET_KEYS, __version__, masked, save_settings, settings_file_path
@@ -95,6 +96,12 @@ def _coerce(key: str, value, kind: str, arg):
             raise OpsError("invalid_setting", f"provider_order must list {', '.join(PROVIDER_NAMES)} "
                            f"(got {value or 'nothing'})")
         return ",".join(names)
+    if key in ("ntfy_url", "ui_public_url") and value:
+        parts = urlsplit(value)
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            raise OpsError("invalid_setting", f"{key} must be an http:// or https:// URL")
+        if parts.username or parts.password:
+            raise OpsError("invalid_setting", f"{key} must not contain credentials")
     if key == "path_template":
         if not value:
             raise OpsError("invalid_setting", "path_template cannot be empty")

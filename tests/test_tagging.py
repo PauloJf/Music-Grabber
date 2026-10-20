@@ -87,3 +87,29 @@ def test_last_change_updates_on_enqueue(tmp_path):
     before = db.get_last_change()
     db.enqueue_grab({"spotify_track_id": "s1", "title": "X"})
     assert db.get_last_change() != before
+
+
+def test_fetch_cover_refuses_non_public_and_non_http_urls(monkeypatch):
+    import requests
+    from music_grabber.tagging import fetch_cover
+    def never(*a, **k): raise AssertionError("must not connect")
+    monkeypatch.setattr(requests, "get", never)
+    for url in ("http://127.0.0.1:8080/x.jpg", "http://192.168.1.5/x", "http://[::1]/x",
+                "file:///etc/passwd", "ftp://example.com/x", "http://169.254.169.254/latest"):
+        assert fetch_cover(url) is None
+
+
+def test_update_grab_rejects_unknown_columns(tmp_path):
+    import pytest
+    from music_grabber.db import Database
+    db = Database(str(tmp_path / "g.db"))
+    with pytest.raises(ValueError, match="unknown"):
+        db.update_grab(1, **{"note=1, status": "x"})
+
+
+def test_database_file_is_owner_only(tmp_path):
+    import os
+    import stat
+    from music_grabber.db import Database
+    Database(str(tmp_path / "g.db"))
+    assert stat.S_IMODE(os.stat(tmp_path / "g.db").st_mode) == 0o600
