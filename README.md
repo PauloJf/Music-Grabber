@@ -3,7 +3,7 @@
 Spotify playlist watcher + downloader companion for [Navidrome](https://www.navidrome.org/)
 libraries, split out of [BPM Tagger](https://github.com/PauloJf/BPM-Tagger).
 
-**v0.3.0-dev, private, early.** Headless: a CLI and a JSON API; no web UI yet (see the roadmap). Origin and
+**v0.4.0-dev, private, early.** A CLI, a JSON API and a small web UI (playlists, queue, ambiguity inbox). Origin and
 history: [`docs/provenance.md`](docs/provenance.md), extracted from BPM Tagger v2.18.2
 (`eae3f0c2662f590ac8cf0334a282389147152d2f`). The design and the reasons for the split:
 [`docs/plans/extraction.md`](docs/plans/extraction.md).
@@ -93,6 +93,7 @@ Names match BPM Tagger's grabber settings, so an existing compose block carries 
 | `HOOK_DEBOUNCE_SECONDS` / `HOOK_MAX_WAIT_SECONDS` / `HOOK_MIN_INTERVAL_SECONDS` | `45` / `600` / `60` | hook coalescing |
 | `NTFY_NOTIFY_DONE` | `true` | a ping per finished track; ambiguity, failures and credential problems always ping |
 | `API_TOKEN` | | enables the API; 16+ characters; env only |
+| `UI_DIR` | `frontend/dist` | where the built web UI is looked for |
 | `API_HOST` / `API_PORT` | `127.0.0.1` (`0.0.0.0` in the image) / `8099` | |
 
 Secrets (`SPOTIFY_CLIENT_SECRET`, `LIBRARY_API_KEY`, `LIBRARY_PASS`, `BPM_TAGGER_PASSWORD`,
@@ -119,8 +120,20 @@ music_grabber status`), or from anywhere against a running instance with `--remo
 http://host:8099 --token ...` (or `MG_REMOTE_URL` + `API_TOKEN`). `--json` works before or after
 the command. Exit codes: 0 ok, 1 failed, 2 invalid request or configuration.
 
-When a track is ambiguous the ntfy ping carries the command to run (`inbox show <id>`); once
-the web UI exists it will also link to it.
+When a track is ambiguous the ntfy ping carries the command to run (`inbox show <id>`); with
+`UI_PUBLIC_URL` set it also links straight to that item in the web UI.
+
+## Web UI
+
+With `API_TOKEN` set, the same process serves a small web UI at `http://host:8099/`: **Inbox**
+(ambiguous matches: candidates with scores, *Download this*, search for something else, skip),
+**Queue** (active / failed / history, retry, cancel, move to front, per-item event log) and
+**Playlists** (coverage per playlist, watch toggle, sync, queue missing, track list by status),
+plus *Connect Spotify* in the header. It signs in with the API token (kept for that browser tab
+only) and talks to the JSON API below; nothing is loaded from outside the origin (strict CSP).
+The Docker image builds it; from a checkout run `cd frontend && npm ci && npm run build`
+(`npm run dev` proxies to a running instance on `:8099`). Settings and the BPM Tagger import
+stay on the command line.
 
 ## JSON API
 
@@ -217,12 +230,12 @@ See [`docs/plans/extraction.md`](docs/plans/extraction.md) section 6.
 - **0.1.0**: skeleton move, own DB, filesystem library index, ledger, tests, CI.
 - **0.2.0**: OpenSubsonic (BPM Tagger / Navidrome) library index; intake-folder and API
   analysis modes; Mediarium and Navidrome post-import hooks.
-- **0.3.0** (this): JSON API + CLI (`sync`, `queue`, `inbox`, `status`, `settings`), settings
+- **0.3.0**: JSON API + CLI (`sync`, `queue`, `inbox`, `status`, `settings`), settings
   persistence, ntfy, and an import tool for existing BPM Tagger `grab_*` data.
-- **0.4.0**: minimal web UI (playlists, queue, ambiguity inbox).
+- **0.4.0** (this): minimal web UI (playlists, queue, ambiguity inbox).
 - **0.5.0**: docs polish, compose examples, migration guide.
 
-Until the web UI lands, resolve ambiguous tracks with `inbox` on the command line.
+Prefer a browser? The web UI does the same.
 
 ## Development
 

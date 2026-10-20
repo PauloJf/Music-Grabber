@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- **Web UI** (React + TypeScript + Vite + Tailwind-as-utilities, BPM Tagger's tokens and
+  conventions), served by the API process: Inbox (candidates, scores, choose / search / skip),
+  Queue (active / failed / history, retry, cancel, priority, event log), Playlists (coverage,
+  watch, sync, queue missing, tracks by status), *Connect Spotify*. Token sign-in, strict
+  same-origin CSP, stacked-card tables on phones. The Docker image builds it in a separate stage;
+  CI runs `tsc`, `vitest` and the build.
 - **CLI** over a shared operations layer: `status`, `sync`, `playlist`, `queue`, `inbox`
   (`show` lists candidates with scores and the next commands), `settings`, `library refresh`;
   `--json` before or after any command; `--remote URL --token T` drives a running instance.

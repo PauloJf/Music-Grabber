@@ -54,6 +54,7 @@ live in `docs/plans/extraction.md`, the origin in `docs/provenance.md`.
 | `music_grabber/matching.py`, `text.py` | scoring and normalizers (`text.py` is a pinned duplicate of BPM Tagger's) |
 | `music_grabber/providers/` | Deezer (streamrip) and yt-dlp, lazily imported |
 | `music_grabber/spotify.py` | Spotify Web API client (Authorization Code flow) |
+| `frontend/` | the web UI: Vite + React 18 + TS + react-query + Tailwind (utilities only, preflight off) + `src/styles/design-system.css` tokens (same names as BPM Tagger's). Talks only to `/api`; `npm run typecheck|test|build` |
 | `tests/` | pytest; `audio_fixtures.py` builds tiny valid audio with no audio libraries; `fake_servers.py` is a loopback fake peer + a manual clock for timer tests |
 
 ## Commands
@@ -64,6 +65,9 @@ pip install -r requirements-dev.txt
 ruff check .
 pytest -q
 python -m music_grabber version
+
+# frontend (the web UI)
+cd frontend && npm ci && npm run typecheck && npm test && npm run build
 ```
 
 ## Conventions
