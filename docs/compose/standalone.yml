@@ -1,0 +1,34 @@
+# Music Grabber on its own: watches Spotify playlists, files new tracks into your library.
+# No BPM Tagger involved: the files are filed as they are (ANALYSIS=none, the default).
+#
+#   cp docs/compose/standalone.yml docker-compose.yml   # or use the one in the repo root
+#   docker compose build
+#   docker compose run --rm music-grabber python -m music_grabber spotify-login   # once
+#   docker compose up -d
+#
+# Put secrets in a .env file next to this one (never commit it); ${VAR} below reads from it.
+services:
+  music-grabber:
+    build: ../..               # path to a checkout of this repo (use "." when copied to its root)
+    container_name: music-grabber
+    restart: unless-stopped
+    environment:
+      MUSIC_DIR: /music
+      DB_PATH: /data/music_grabber.db
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
+      SPOTIFY_REDIRECT_URI: http://127.0.0.1:8099/callback
+      WATCH_PLAYLISTS: ${WATCH_PLAYLISTS:-}
+      PROVIDER_ORDER: deezer,ytdlp
+      DEEZER_ARL: ${DEEZER_ARL:-}
+      OUTPUT_FORMAT: mp3-128
+      NTFY_URL: https://ntfy.sh
+      NTFY_TOPIC: ${NTFY_TOPIC:-}
+      # The CLI works inside the container without this; it adds the web UI and `--remote`.
+      API_TOKEN: ${MG_API_TOKEN:-}
+      UI_PUBLIC_URL: http://127.0.0.1:8099
+    ports:
+      - "127.0.0.1:8099:8099"  # loopback only; put TLS in front before exposing it further
+    volumes:
+      - ./data:/data
+      - ${MUSIC_PATH:-/srv/music}:/music

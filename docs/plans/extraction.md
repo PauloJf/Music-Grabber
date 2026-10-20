@@ -1,7 +1,8 @@
 # Plan: Extract the Music Grabber from BPM Tagger
 
-Status: **Phase 0 (audit + plan)**. Written against BPM-Tagger `main` @ `eae3f0c`
-(v2.18.2). Nothing in BPM-Tagger is modified by this plan's first five phases.
+Status: **implemented through Phase 5** (see section 9 for what changed against this plan).
+Written against BPM-Tagger `main` @ `eae3f0c` (v2.18.2). Nothing in BPM-Tagger was modified by
+any of these phases.
 
 Music-Grabber becomes a standalone, optional companion to a Navidrome library: its own
 repo, own SQLite DB, own Docker image (`gatoserio/music-grabber`). Coupling to
@@ -502,3 +503,31 @@ the point.
 * **Q6.** Mediarium's `POST /api/music/import/scan` response shape (to tell "started"
   from "already running") and whether the API key can be scoped to that route only.
   Phase 2 treats any 2xx as success and does not depend on the body.
+
+## 9. Outcome (after Phase 5)
+
+What was built, and where it differs from sections 1-8 above.
+
+| Plan | Built |
+|---|---|
+| History-preserving move | `git filter-repo` on a fresh clone, merged with `--allow-unrelated-histories`; author emails rewritten to the GitHub noreply address (GitHub rejects pushes exposing the private one) |
+| `LibraryIndex` port, 2 implementations | `FilesystemSource` (Phase 1: without any index the first sync would re-queue the whole library, so it could not wait for Phase 2) and `OpenSubsonicSource` (Phase 2; BPM Tagger or Navidrome). Both load one cache table, so `library_match` is identical |
+| `PostDownloadAnalysis` port | `NoAnalysis`, `IntakeFolderAnalysis`, `ApiAnalysis`. The worker no longer detects BPM; files are placed atomically (`.part` then `os.replace`) and recovered after a crash |
+| `managed` / hash stamping | `grabbed_files` ledger; `rel_path` is **library**-relative (decided in Phase 3, the plan said filing-root-relative). In intake mode the file is deliberately *not* stamped so BPM Tagger sees it as new |
+| Mediarium hook | `POST /api/music/import/scan`, coalesced; 404 pauses for an hour, 401/403 disable with one clear line, 429/5xx/network back off. Auth header is configurable (`X-Api-Key` by default): see Q6 |
+| Navidrome hook | coalesced `startScan`, off by default, warns when combined with intake |
+| Headless first, minimal UI later | CLI + JSON API (Phase 3), UI (Phase 4), all over one `Ops` layer |
+| Export/import tool | `import-bpm-tagger` (read-only source, dry run, merge, tokens opt-in) and `import-env` (never prints secrets) |
+| Tests mock everything | socket-level guard in `tests/conftest.py`; fakes for Spotify, Deezer, yt-dlp, Mediarium, BPM Tagger, OpenSubsonic, ntfy; a golden file pins the duplicated `text.py` to BPM Tagger |
+
+**Not built, still waiting on an owner decision:** the Spotify-id file tag (Q3), the Navidrome
+playlist mirror that would keep Spotify playlists usable in BPM Tagger's player (Q5), re-homing
+the suggestions page (Q4), a lighter per-folder scan trigger in BPM Tagger for `ApiAnalysis` (Q2).
+
+**Not yet done, by design:** the BPM Tagger cleanup (section 5.2) and any release. Both wait for
+Music Grabber to be stable, and the cleanup must not ship as a `VERSION` bump to BPM Tagger's
+`main` before then.
+
+**Bug found by testing that the plan could not have predicted:** the first cut crashed on its
+second start (counter seeding used an aggregate `INSERT ... SELECT`). Fixed with regression tests in
+Phase 1's branch.

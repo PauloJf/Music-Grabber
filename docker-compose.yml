@@ -1,5 +1,5 @@
-# Music Grabber, standalone. Phase 5 adds worked examples for sharing a folder with
-# BPM Tagger and Navidrome; see README.md.
+# Music Grabber, standalone. Worked examples for sharing a folder with BPM Tagger and for the
+# full Navidrome + BPM Tagger stack are in docs/compose/; see README.md.
 services:
   music-grabber:
     build: .
