@@ -90,6 +90,8 @@ def build_config() -> dict:
         "api_token":             os.environ.get("API_TOKEN", ""),
         "api_host":              os.environ.get("API_HOST", "127.0.0.1"),
         "api_port":              int(os.environ.get("API_PORT", "8099")),
+        # Where the built web UI lives (default: frontend/dist next to the package).
+        "ui_dir":                os.environ.get("UI_DIR", ""),
 
         # Spotify (Authorization Code flow; refresh token lives in the DB).
         "spotify_client_id":     os.environ.get("SPOTIFY_CLIENT_ID", ""),

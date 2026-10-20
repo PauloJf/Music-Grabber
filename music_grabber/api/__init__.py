@@ -1,16 +1,18 @@
-"""The headless JSON API: a thin Flask shell over ``Ops``.
+"""The JSON API (a thin Flask shell over ``Ops``), and the small web UI's static files.
 
-Bearer-token auth (``API_TOKEN``, required, at least 16 characters); no cookies, so no CSRF
-surface. The one browser-facing route is the Spotify OAuth ``/callback``, which is protected
-by a single-use ``state`` instead of the token. Only this package imports Flask, so the
-engine and the CLI stay light.
+Bearer-token auth (``API_TOKEN``, required, at least 16 characters) on every ``/api/*``
+route; no cookies, so no CSRF surface. The browser-facing routes are the Spotify OAuth
+``/callback`` (protected by a single-use ``state``) and, when a built UI is present, its
+static files (public: they contain no data, and the UI asks for the token itself). Only this
+package imports Flask, so the engine and the CLI stay light.
 """
 
 import hmac
 import logging
+import os
 from html import escape
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify, request, send_from_directory
 
 from ..config import __version__
 from ..ops import Ops, OpsError
@@ -29,7 +31,22 @@ def _page(title: str, body: str, status: int = 200) -> Response:
                     mimetype="text/html")
 
 
-def create_app(ops: Ops, token: str) -> Flask:
+# The UI is same-origin only: no third-party scripts, fonts or connections. Inline styles are
+# allowed because React sets style attributes.
+CSP = ("default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; "
+       "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+
+
+def find_ui_dir(configured: str = "") -> str:
+    """The built UI (index.html present), or "" when there is none."""
+    here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    for cand in (configured, os.path.join(here, "frontend", "dist")):
+        if cand and os.path.isfile(os.path.join(cand, "index.html")):
+            return os.path.abspath(cand)
+    return ""
+
+
+def create_app(ops: Ops, token: str, ui_dir: str = "") -> Flask:
     if len(token or "") < MIN_TOKEN_LENGTH:
         raise ValueError(f"API token must be at least {MIN_TOKEN_LENGTH} characters")
     app = Flask(__name__)
@@ -38,8 +55,8 @@ def create_app(ops: Ops, token: str) -> Flask:
 
     @app.before_request
     def _auth():
-        if request.path in open_paths:
-            return None
+        if request.path in open_paths or not request.path.startswith("/api/"):
+            return None                  # open routes and the UI's static files
         header = request.headers.get("Authorization", "")
         supplied = header[7:] if header.lower().startswith("bearer ") else ""
         if not supplied or not hmac.compare_digest(supplied.encode(), token.encode()):
@@ -49,8 +66,12 @@ def create_app(ops: Ops, token: str) -> Flask:
 
     @app.after_request
     def _headers(resp):
-        resp.headers["Cache-Control"] = "no-store"
+        resp.headers.setdefault("Cache-Control", "no-store")
         resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers.setdefault("Referrer-Policy", "no-referrer")
+        if resp.mimetype == "text/html":
+            resp.headers["Content-Security-Policy"] = CSP
+            resp.headers["X-Frame-Options"] = "DENY"
         return resp
 
     @app.errorhandler(OpsError)
@@ -59,6 +80,9 @@ def create_app(ops: Ops, token: str) -> Flask:
 
     @app.errorhandler(404)
     def _404(_e):
+        if (ui_dir and request.method == "GET"
+                and not request.path.startswith(("/api/", "/assets/"))):     # a missing asset is a real 404
+            return send_from_directory(ui_dir, "index.html")      # client-side route
         return jsonify(error="not_found", message="no such route"), 404
 
     @app.errorhandler(405)
@@ -238,12 +262,26 @@ def create_app(ops: Ops, token: str) -> Flask:
     def inbox_skip(item_id):
         return jsonify(ops.inbox_skip(item_id))
 
+    # ── the UI (only when it has been built) ──────────────────────────────────
+    if ui_dir:
+        @app.get("/")
+        def ui_index():
+            return send_from_directory(ui_dir, "index.html")
+
+        @app.get("/assets/<path:name>")
+        def ui_asset(name):
+            resp = send_from_directory(os.path.join(ui_dir, "assets"), name)
+            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"   # hashed file names
+            return resp
+
     return app
 
 
 def serve(config: dict, ops: Ops) -> None:  # pragma: no cover - thin server wrapper
     from waitress import serve as waitress_serve
-    app = create_app(ops, config["api_token"])
-    log.info("API listening on %s:%s", config["api_host"], config["api_port"])
+    ui_dir = find_ui_dir(config.get("ui_dir", ""))
+    app = create_app(ops, config["api_token"], ui_dir)
+    log.info("API listening on %s:%s (web UI %s)", config["api_host"], config["api_port"],
+             "served" if ui_dir else "not built")
     waitress_serve(app, host=config["api_host"], port=int(config["api_port"]), threads=4,
                    ident="music-grabber")
