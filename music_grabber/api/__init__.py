@@ -1,0 +1,463 @@
+"""The JSON API (a thin Flask shell over ``Ops``), and the small web UI's static files.
+
+Bearer auth on every ``/api/*`` route, with two kinds of credential: the ``API_TOKEN``
+(required, at least 16 characters; the machine/bootstrap key, always an admin) and a session
+token issued by ``POST /api/auth/login`` for a user account (admin or user). No cookies, so no
+CSRF surface. The browser-facing routes are the Spotify OAuth
+``/callback`` (protected by a single-use ``state``) and, when a built UI is present, its
+static files (public: they contain no data, and the UI asks for the token itself). Only this
+package imports Flask, so the engine and the CLI stay light.
+"""
+
+import hmac
+import logging
+import os
+import threading
+import time
+from html import escape
+
+from flask import Flask, Response, g, jsonify, request, send_from_directory
+
+from ..ops import Ops, OpsError
+
+log = logging.getLogger(__name__)
+
+MIN_TOKEN_LENGTH = 16
+ADMIN_PREFIXES = ("/api/settings", "/api/users", "/api/spotify")      # administrators only
+# After this many wrong tokens inside the window, that address is refused (429) until the
+# window passes, whatever it sends. Per address, in memory.
+AUTH_MAX_FAILURES = 10
+AUTH_WINDOW_SECONDS = 60
+
+
+class AuthThrottle:
+    def __init__(self, max_failures: int = AUTH_MAX_FAILURES, window: float = AUTH_WINDOW_SECONDS,
+                 clock=time.monotonic):
+        self.max, self.window, self.clock = max_failures, window, clock
+        self._fails: dict[str, list[float]] = {}
+        self._lock = threading.Lock()
+
+    def _recent(self, who: str) -> list[float]:
+        cutoff = self.clock() - self.window
+        recent = [t for t in self._fails.get(who, []) if t > cutoff]
+        if recent: self._fails[who] = recent
+        else: self._fails.pop(who, None)
+        return recent
+
+    def retry_after(self, who: str) -> int:
+        """Seconds until ``who`` may try again; 0 when not locked out."""
+        with self._lock:
+            recent = self._recent(who)
+            if len(recent) < self.max:
+                return 0
+            return max(1, int(recent[0] + self.window - self.clock()) + 1)
+
+    def fail(self, who: str) -> None:
+        with self._lock:
+            self._recent(who)
+            if len(self._fails) > 4096:          # bound memory under a spray from many addresses
+                self._fails.clear()
+            self._fails.setdefault(who, []).append(self.clock())
+
+_PAGE = ("<!doctype html><meta charset=utf-8><title>Music Grabber</title>"
+         "<body style='font:16px system-ui;margin:3rem auto;max-width:32rem'>"
+         "<h1>{title}</h1><p>{body}</p>")
+
+
+def _page(title: str, body: str, status: int = 200) -> Response:
+    return Response(_PAGE.format(title=escape(title), body=escape(body)), status=status,
+                    mimetype="text/html")
+
+
+# The UI is same-origin only: no third-party scripts, fonts or connections. Inline styles are
+# allowed because React sets style attributes.
+# Cover art and 30-second previews come straight from Deezer's CDN (and Spotify's, for playlist
+# art); everything else is same-origin.
+CSP = ("default-src 'self'; img-src 'self' data: https://*.dzcdn.net https://i.scdn.co; "
+       "media-src https://*.dzcdn.net; style-src 'self' 'unsafe-inline'; script-src 'self'; "
+       "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+
+
+def find_ui_dir(configured: str = "") -> str:
+    """The built UI (index.html present), or "" when there is none."""
+    here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    for cand in (configured, os.path.join(here, "frontend", "dist")):
+        if cand and os.path.isfile(os.path.join(cand, "index.html")):
+            return os.path.abspath(cand)
+    return ""
+
+
+def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | None = None) -> Flask:
+    if len(token or "") < MIN_TOKEN_LENGTH:
+        raise ValueError(f"API token must be at least {MIN_TOKEN_LENGTH} characters")
+    app = Flask(__name__)
+    app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
+    open_paths = {"/healthz", "/callback", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
+    throttle = throttle or AuthThrottle()
+
+    def too_many(who: str):
+        wait = throttle.retry_after(who)
+        if not wait:
+            return None
+        return (jsonify(error="too_many_attempts", message=f"too many wrong attempts; retry in {wait}s"),
+                429, {"Retry-After": str(wait)})
+
+    @app.before_request
+    def _auth():
+        g.principal, g.bearer = None, ""
+        if request.path in open_paths or not request.path.startswith("/api/"):
+            return None                  # open routes and the UI's static files
+        who = request.remote_addr or "?"
+        locked = too_many(who)
+        if locked:
+            return locked
+        header = request.headers.get("Authorization", "")
+        supplied = header[7:] if header.lower().startswith("bearer ") else ""
+        principal = None
+        if supplied and hmac.compare_digest(supplied.encode(), token.encode()):
+            principal = {"id": None, "username": "api-token", "role": "admin", "prefs": {}}   # the machine/bootstrap key
+        elif supplied:
+            principal = ops.session_user(supplied)
+        if not principal:
+            throttle.fail(who)
+            return (jsonify(error="unauthorized", message="sign in, or send 'Authorization: Bearer <token>'"),
+                    401, {"WWW-Authenticate": "Bearer"})
+        g.principal, g.bearer = principal, supplied
+        if request.path.startswith(ADMIN_PREFIXES) and principal["role"] != "admin":
+            return jsonify(error="forbidden", message="administrators only"), 403
+        return None
+
+    @app.after_request
+    def _headers(resp):
+        resp.headers.setdefault("Cache-Control", "no-store")
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers.setdefault("Referrer-Policy", "no-referrer")
+        if resp.mimetype == "text/html":
+            resp.headers["Content-Security-Policy"] = CSP
+            resp.headers["X-Frame-Options"] = "DENY"
+        return resp
+
+    @app.errorhandler(OpsError)
+    def _ops_error(e: OpsError):
+        return jsonify(e.to_dict()), e.http
+
+    @app.errorhandler(404)
+    def _404(_e):
+        if (ui_dir and request.method == "GET"
+                and not request.path.startswith(("/api/", "/assets/"))):     # a missing asset is a real 404
+            return send_from_directory(ui_dir, "index.html")      # client-side route
+        return jsonify(error="not_found", message="no such route"), 404
+
+    @app.errorhandler(405)
+    def _405(_e):
+        return jsonify(error="method_not_allowed"), 405
+
+    @app.errorhandler(413)
+    def _413(_e):
+        return jsonify(error="too_large"), 413
+
+    @app.errorhandler(Exception)
+    def _500(e):
+        from werkzeug.exceptions import HTTPException
+        if isinstance(e, HTTPException):
+            return jsonify(error=e.name.lower().replace(" ", "_")), e.code
+        log.exception("unhandled error on %s %s", request.method, request.path)
+        return jsonify(error="internal_error", message="see the server log"), 500
+
+    def body() -> dict:
+        data = request.get_json(force=True, silent=True)
+        return data if isinstance(data, dict) else {}
+
+    # ── open routes ───────────────────────────────────────────────────────────
+    @app.get("/healthz")
+    def healthz():
+        return jsonify(ok=True)          # open: no version or other fingerprint (/api/status has it)
+
+    @app.get("/callback")
+    def callback():
+        """Spotify redirects the browser here. Never echoes request input."""
+        if request.args.get("error"):
+            return _page("Not connected", "Spotify did not grant access. Close this tab and try again.", 400)
+        try:
+            ops.spotify_callback(request.args.get("code", ""), request.args.get("state", ""))
+        except OpsError as e:
+            log.warning("Spotify callback rejected: %s", e.code)
+            return _page("Not connected", "That login link is invalid or expired. Start again.", 400)
+        return _page("Connected to Spotify", "You can close this tab.")
+
+    # ── accounts ──────────────────────────────────────────────────────────────
+    @app.get("/api/auth/state")
+    def auth_state():
+        return jsonify(ops.auth_state())
+
+    @app.post("/api/auth/login")
+    def auth_login():
+        who = request.remote_addr or "?"
+        locked = too_many(who)
+        if locked:
+            return locked
+        b = body()
+        try:
+            return jsonify(ops.login(b.get("username", ""), b.get("password", "")))
+        except OpsError as e:
+            if e.code == "bad_credentials":
+                throttle.fail(who)
+            raise
+
+    @app.post("/api/auth/setup")
+    def auth_setup():
+        """First-run only: creates the first admin. Needs the API token, so reaching the port is not enough."""
+        who = request.remote_addr or "?"
+        locked = too_many(who)
+        if locked:
+            return locked
+        b = body()
+        supplied = b.get("api_token", "")
+        if not isinstance(supplied, str) or not hmac.compare_digest(supplied.encode(), token.encode()):
+            throttle.fail(who)
+            return jsonify(error="unauthorized", message="the API token is wrong"), 401
+        ops.create_first_admin(b.get("username", ""), b.get("password", ""))
+        return jsonify(ops.login(b.get("username", ""), b.get("password", ""))), 201
+
+    @app.post("/api/auth/logout")
+    def auth_logout():
+        return jsonify(ops.logout(g.bearer)) if g.principal["id"] else jsonify(ok=True)
+
+    @app.get("/api/me")
+    def me():
+        p = g.principal
+        return jsonify(user={k: p.get(k) for k in ("id", "username", "role", "prefs", "created_at", "last_login")},
+                       via="token" if p["id"] is None else "session")
+
+    def need_account():
+        if g.principal["id"] is None:
+            raise OpsError("no_account", "you are using the API token, which has no personal profile; sign in with an account", 409)
+        return g.principal["id"]
+
+    @app.post("/api/me/password")
+    def me_password():
+        b = body()
+        return jsonify(ops.change_password(need_account(), b.get("current", ""), b.get("new", ""), g.bearer))
+
+    @app.patch("/api/me/prefs")
+    def me_prefs():
+        return jsonify(ops.prefs_update(need_account(), body()))
+
+    @app.get("/api/users")
+    def users_list():
+        return jsonify(ops.users_list())
+
+    @app.post("/api/users")
+    def users_create():
+        b = body()
+        return jsonify(ops.users_create(b.get("username", ""), b.get("password", ""), b.get("role", "user"))), 201
+
+    @app.patch("/api/users/<int:user_id>")
+    def users_update(user_id: int):
+        return jsonify(ops.users_update(user_id, body()))
+
+    @app.delete("/api/users/<int:user_id>")
+    def users_delete(user_id: int):
+        if user_id == g.principal["id"]:
+            raise OpsError("invalid_account", "you cannot delete your own account while signed in as it")
+        return jsonify(ops.users_delete(user_id))
+
+    # ── status / library / settings ───────────────────────────────────────────
+    @app.get("/api/status")
+    def status():
+        return jsonify(ops.status())
+
+    @app.post("/api/library/refresh")
+    def library_refresh():
+        return jsonify(ops.library_refresh())
+
+    @app.get("/api/settings")
+    def settings_get():
+        return jsonify(ops.settings_get())
+
+    @app.post("/api/settings")
+    def settings_update():
+        return jsonify(ops.settings_update(body()))
+
+    @app.post("/api/settings/test-deezer")
+    def test_deezer():
+        return jsonify(ops.test_deezer(body().get("deezer_arl")))
+
+    @app.post("/api/settings/test-ntfy")
+    def test_ntfy():
+        return jsonify(ops.test_ntfy())
+
+    # ── Spotify ───────────────────────────────────────────────────────────────
+    @app.get("/api/spotify/status")
+    def spotify_status():
+        return jsonify(ops.spotify_status())
+
+    @app.get("/api/spotify/authorize-url")
+    def spotify_authorize_url():
+        return jsonify(ops.spotify_authorize_url())
+
+    @app.post("/api/spotify/disconnect")
+    def spotify_disconnect():
+        return jsonify(ops.spotify_disconnect())
+
+    @app.get("/api/spotify/playlists")
+    def spotify_playlists():
+        return jsonify(ops.spotify_playlists())
+
+    @app.get("/api/spotify/search")
+    def spotify_search():
+        return jsonify(ops.spotify_search(request.args.get("q", "")))
+
+    # ── playlists ─────────────────────────────────────────────────────────────
+    @app.get("/api/playlists")
+    def playlists_list():
+        return jsonify(ops.playlists_list())
+
+    @app.post("/api/playlists")
+    def playlist_add():
+        return jsonify(ops.playlist_add(body().get("value", "")))
+
+    @app.post("/api/sync")
+    def sync_all():
+        return jsonify(ops.sync())
+
+    @app.get("/api/playlists/<int:pid>")
+    def playlist_get(pid):
+        return jsonify(ops.playlist_get(pid, request.args.get("status", "")))
+
+    @app.delete("/api/playlists/<int:pid>")
+    def playlist_remove(pid):
+        return jsonify(ops.playlist_remove(pid))
+
+    @app.patch("/api/playlists/<int:pid>")
+    def playlist_patch(pid):
+        data = body()
+        if "enabled" not in data:
+            raise OpsError("invalid_request", "only 'enabled' can be changed")
+        return jsonify(ops.playlist_enable(pid, bool(data["enabled"])))
+
+    @app.post("/api/playlists/<int:pid>/sync")
+    def playlist_sync(pid):
+        return jsonify(ops.sync(pid))
+
+    @app.post("/api/playlists/<int:pid>/enqueue-missing")
+    def playlist_enqueue_missing(pid):
+        return jsonify(ops.enqueue_missing(pid))
+
+    # ── browse Deezer + activity ──────────────────────────────────────────────
+    @app.get("/api/browse/search")
+    def browse_search():
+        return jsonify(ops.browse_search(request.args.get("q", ""), request.args.get("type", "track")))
+
+    @app.get("/api/browse/artist/<dz_id>")
+    def browse_artist(dz_id):
+        return jsonify(ops.browse_artist(dz_id))
+
+    @app.get("/api/browse/album/<dz_id>")
+    def browse_album(dz_id):
+        return jsonify(ops.browse_album(dz_id))
+
+    @app.post("/api/browse/queue")
+    def browse_queue():
+        data = body()
+        if data.get("album_id"):
+            return jsonify(ops.browse_queue_album(str(data["album_id"]), bool(data.get("force"))))
+        return jsonify(ops.browse_queue(data.get("tracks"), bool(data.get("force"))))
+
+    @app.post("/api/browse/undo")
+    def browse_undo():
+        return jsonify(ops.undo_queue(body().get("item_ids")))
+
+    @app.get("/api/activity")
+    def activity():
+        return jsonify(ops.activity())
+
+    # ── queue ─────────────────────────────────────────────────────────────────
+    @app.get("/api/queue")
+    def queue_list():
+        return jsonify(ops.queue_list(request.args.get("status", "")))
+
+    @app.post("/api/queue")
+    def queue_add():
+        return jsonify(ops.queue_add(body()))
+
+    @app.get("/api/queue/history")
+    def queue_history():
+        return jsonify(ops.queue_history())
+
+    @app.post("/api/queue/retry-failed")
+    def queue_retry_failed():
+        return jsonify(ops.queue_retry_failed())
+
+    @app.post("/api/queue/clear-completed")
+    def queue_clear_completed():
+        return jsonify(ops.queue_clear_completed())
+
+    @app.get("/api/queue/<int:item_id>")
+    def queue_item(item_id):
+        return jsonify(ops.queue_item(item_id))
+
+    @app.delete("/api/queue/<int:item_id>")
+    def queue_delete(item_id):
+        return jsonify(ops.queue_delete(item_id))
+
+    @app.post("/api/queue/<int:item_id>/retry")
+    def queue_retry(item_id):
+        return jsonify(ops.queue_retry(item_id))
+
+    @app.post("/api/queue/<int:item_id>/cancel")
+    def queue_cancel(item_id):
+        return jsonify(ops.queue_cancel(item_id))
+
+    @app.post("/api/queue/<int:item_id>/priority")
+    def queue_priority(item_id):
+        return jsonify(ops.queue_priority(item_id, body().get("priority", 0)))
+
+    # ── inbox ─────────────────────────────────────────────────────────────────
+    @app.get("/api/inbox")
+    def inbox_list():
+        return jsonify(ops.inbox_list())
+
+    @app.post("/api/inbox/research-all")
+    def inbox_research_all():
+        return jsonify(ops.inbox_research_all())
+
+    @app.post("/api/inbox/<int:item_id>/choose")
+    def inbox_choose(item_id):
+        return jsonify(ops.inbox_choose(item_id, body().get("candidate_id")))
+
+    @app.post("/api/inbox/<int:item_id>/search")
+    def inbox_search(item_id):
+        return jsonify(ops.inbox_search(item_id, body().get("query", "")))
+
+    @app.post("/api/inbox/<int:item_id>/research")
+    def inbox_research(item_id):
+        return jsonify(ops.inbox_research(item_id))
+
+    @app.post("/api/inbox/<int:item_id>/skip")
+    def inbox_skip(item_id):
+        return jsonify(ops.inbox_skip(item_id))
+
+    # ── the UI (only when it has been built) ──────────────────────────────────
+    if ui_dir:
+        @app.get("/")
+        def ui_index():
+            return send_from_directory(ui_dir, "index.html")
+
+        @app.get("/assets/<path:name>")
+        def ui_asset(name):
+            resp = send_from_directory(os.path.join(ui_dir, "assets"), name)
+            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"   # hashed file names
+            return resp
+
+    return app
+
+
+def serve(config: dict, ops: Ops) -> None:  # pragma: no cover - thin server wrapper
+    from waitress import serve as waitress_serve
+    ui_dir = find_ui_dir(config.get("ui_dir", ""))
+    app = create_app(ops, config["api_token"], ui_dir)
+    log.info("API listening on %s:%s (web UI %s)", config["api_host"], config["api_port"],
+             "served" if ui_dir else "not built")
+    waitress_serve(app, host=config["api_host"], port=int(config["api_port"]), threads=4,
+                   ident="music-grabber")

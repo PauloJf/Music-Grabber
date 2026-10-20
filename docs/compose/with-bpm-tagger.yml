@@ -1,0 +1,57 @@
+# Music Grabber + BPM Tagger sharing one music folder (intake mode).
+#
+# Music Grabber files new tracks into /music/Music-raw. BPM Tagger watches all of /music
+# (recursively), notices each new file, detects its BPM and writes the tag. Neither knows
+# about the other beyond the folder: no shared database, no Python imports.
+#
+#   mkdir -p /srv/music/Music-raw
+#   docker compose up -d
+#
+# Things that matter:
+#  * Both containers mount the SAME host folder at the SAME path (/music).
+#  * BPM Tagger's own grabber stays OFF (GRABBER_ENABLED false): this replaces it.
+#  * Music Grabber's Navidrome hook stays off: BPM Tagger triggers the rescan after tagging.
+services:
+  bpm-tagger:
+    image: gatoserio/bpm-tagger:latest
+    container_name: bpm-tagger
+    restart: unless-stopped
+    environment:
+      MODE: watch
+      MUSIC_DIR: /music
+      DB_PATH: /data/bpm_tagger.db
+      GRABBER_ENABLED: "false"
+      ENABLE_UI: "true"
+      UI_PASSWORD: ${BPM_UI_PASSWORD}
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - ./bpm-data:/data
+      - ${MUSIC_PATH:-/srv/music}:/music
+
+  music-grabber:
+    build: ../..               # path to a checkout of this repo
+    container_name: music-grabber
+    restart: unless-stopped
+    environment:
+      MUSIC_DIR: /music        # the whole library: what "already have it" is checked against
+      ANALYSIS: intake
+      INTAKE_DIR: /music/Music-raw
+      LIBRARY_INDEX: filesystem
+      DB_PATH: /data/music_grabber.db
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
+      SPOTIFY_REDIRECT_URI: http://127.0.0.1:8099/callback
+      WATCH_PLAYLISTS: ${WATCH_PLAYLISTS:-}
+      PROVIDER_ORDER: deezer,ytdlp
+      DEEZER_ARL: ${DEEZER_ARL:-}
+      OUTPUT_FORMAT: mp3-128
+      NTFY_URL: https://ntfy.sh
+      NTFY_TOPIC: ${NTFY_TOPIC:-}
+      API_TOKEN: ${MG_API_TOKEN:-}
+      UI_PUBLIC_URL: http://127.0.0.1:8099
+    ports:
+      - "127.0.0.1:8099:8099"
+    volumes:
+      - ./mg-data:/data
+      - ${MUSIC_PATH:-/srv/music}:/music

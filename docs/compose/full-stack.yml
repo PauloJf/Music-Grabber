@@ -1,0 +1,83 @@
+# The whole stack: Navidrome serves the library, BPM Tagger tags it, Music Grabber fills it.
+#
+#   Navidrome ── reads ──▶ /music ◀── watches + tags ── BPM Tagger
+#                             ▲
+#                             └──── files new tracks ── Music Grabber (intake: /music/Music-raw)
+#
+# Music Grabber learns what the library already has over BPM Tagger's OpenSubsonic API
+# (LIBRARY_INDEX=opensubsonic) instead of scanning the folder itself. Use it when Music
+# Grabber can't (or shouldn't) read the whole library; the plain folder scan in
+# with-bpm-tagger.yml is simpler when it can.
+#
+# One-time setup for the HTTP index: in BPM Tagger set SUBSONIC_ENABLED=true and create an API
+# key in its settings, then put it in .env as MG_LIBRARY_API_KEY.
+services:
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    restart: unless-stopped
+    environment:
+      ND_MUSICFOLDER: /music
+      ND_DATAFOLDER: /data
+    ports:
+      - "127.0.0.1:4533:4533"
+    volumes:
+      - ./navidrome-data:/data
+      - ${MUSIC_PATH:-/srv/music}:/music:ro
+
+  bpm-tagger:
+    image: gatoserio/bpm-tagger:latest
+    container_name: bpm-tagger
+    restart: unless-stopped
+    environment:
+      MODE: watch
+      MUSIC_DIR: /music
+      DB_PATH: /data/bpm_tagger.db
+      GRABBER_ENABLED: "false"
+      ENABLE_UI: "true"
+      UI_PASSWORD: ${BPM_UI_PASSWORD}
+      SUBSONIC_ENABLED: "true"
+      # After it tags a file, BPM Tagger asks Navidrome to rescan (debounced).
+      NAVIDROME_URL: http://navidrome:4533
+      NAVIDROME_USER: ${ND_USER}
+      NAVIDROME_PASS: ${ND_PASS}
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - ./bpm-data:/data
+      - ${MUSIC_PATH:-/srv/music}:/music
+    depends_on:
+      - navidrome
+
+  music-grabber:
+    build: ../..               # path to a checkout of this repo
+    container_name: music-grabber
+    restart: unless-stopped
+    environment:
+      MUSIC_DIR: /music        # where files are filed, with INTAKE_DIR below
+      ANALYSIS: intake
+      INTAKE_DIR: /music/Music-raw
+      ANALYSIS_WAIT_SECONDS: "0"
+      LIBRARY_INDEX: opensubsonic
+      LIBRARY_URL: http://bpm-tagger:5000
+      LIBRARY_API_KEY: ${MG_LIBRARY_API_KEY}
+      DB_PATH: /data/music_grabber.db
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
+      SPOTIFY_REDIRECT_URI: http://127.0.0.1:8099/callback
+      WATCH_PLAYLISTS: ${WATCH_PLAYLISTS:-}
+      PROVIDER_ORDER: deezer,ytdlp
+      DEEZER_ARL: ${DEEZER_ARL:-}
+      NTFY_URL: https://ntfy.sh
+      NTFY_TOPIC: ${NTFY_TOPIC:-}
+      API_TOKEN: ${MG_API_TOKEN:-}
+      UI_PUBLIC_URL: http://127.0.0.1:8099
+      # Optional: tell Mediarium to import after each album (see README: Post-import hooks).
+      # POST_IMPORT_HOOKS: mediarium
+      # MEDIARIUM_URL: http://mediarium:8080
+      # MEDIARIUM_API_KEY: ${MEDIARIUM_API_KEY}
+    ports:
+      - "127.0.0.1:8099:8099"
+    volumes:
+      - ./mg-data:/data
+      - ${MUSIC_PATH:-/srv/music}:/music

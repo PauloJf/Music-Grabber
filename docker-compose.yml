@@ -1,0 +1,59 @@
+# Music Grabber, standalone. Worked examples for sharing a folder with BPM Tagger and for the
+# full Navidrome + BPM Tagger stack are in docs/compose/; see README.md.
+services:
+  music-grabber:
+    build: .
+    # image: gatoserio/music-grabber:latest   # published to Docker Hub on each GitHub release
+    container_name: music-grabber
+    restart: unless-stopped
+    environment:
+      MUSIC_DIR: /music                 # where grabbed files are filed
+      # LIBRARY_DIR: /music             # what is scanned for tracks you already have
+      DB_PATH: /data/music_grabber.db
+
+      # Spotify: https://developer.spotify.com/dashboard (see README: Spotify setup)
+      SPOTIFY_CLIENT_ID: ""
+      SPOTIFY_CLIENT_SECRET: ""
+      SPOTIFY_REDIRECT_URI: "http://127.0.0.1:8099/callback"
+      SPOTIFY_SYNC_MINUTES: "30"
+      # Playlists to watch: URLs, URIs or ids, comma-separated
+      WATCH_PLAYLISTS: ""
+
+      # Providers, tried in order. Deezer needs your own ARL (see README).
+      PROVIDER_ORDER: deezer,ytdlp
+      DEEZER_ARL: ""
+      DEEZER_QUALITY: MP3_128
+      OUTPUT_FORMAT: mp3-128            # mp3-320 | mp3-128 | flac | opus-192
+      PATH_TEMPLATE: "{AlbumArtist}/{Album}/{TrackNo:02d} - {Title}.{ext}"
+      AUTO_ACCEPT_THRESHOLD: "0.85"
+      ASK_THRESHOLD: "0.55"
+      GRAB_WORKERS: "1"
+      GRAB_DRY_RUN: "false"             # true: search and score, never download
+
+      # --- Working with BPM Tagger (see README: Working with BPM Tagger) -----------
+      # ANALYSIS: intake                  # file into a folder BPM Tagger's watcher covers
+      # INTAKE_DIR: /music/Music-raw      # (a subfolder of BPM Tagger's MUSIC_DIR)
+      # LIBRARY_INDEX: filesystem         # or opensubsonic + LIBRARY_URL + LIBRARY_API_KEY
+
+      # --- Post-import hooks (off by default) --------------------------------------
+      # POST_IMPORT_HOOKS: mediarium      # mediarium,navidrome (not navidrome with intake)
+      # MEDIARIUM_URL: http://mediarium:8080
+      # MEDIARIUM_API_KEY: ""
+
+      # ntfy: leave empty to disable
+      NTFY_URL: https://ntfy.sh
+      NTFY_TOPIC: ""
+      NTFY_NOTIFY_DONE: "true"          # a ping per finished track; ambiguity/failures always ping
+
+      # JSON API + remote CLI. Off unless API_TOKEN is set (16+ characters):
+      #   python -c "import secrets; print(secrets.token_urlsafe(32))"
+      API_TOKEN: ""
+    # Only needed if you want the API from outside the container, or the Spotify login
+    # callback in a browser (SPOTIFY_REDIRECT_URI=http://127.0.0.1:8099/callback). Loopback
+    # only; put TLS in front before exposing it further. Management also works without it:
+    #   docker compose exec music-grabber python -m music_grabber status
+    # ports:
+    #   - "127.0.0.1:8099:8099"
+    volumes:
+      - ./data:/data
+      - /path/to/your/music:/music

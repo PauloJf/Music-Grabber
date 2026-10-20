@@ -1,0 +1,1218 @@
+{
+ "_source": "BPM Tagger bpm_tagger/text.py @ eae3f0c",
+ "titles": [
+  {
+   "in": "Blinding Lights",
+   "normalize_title": "blinding lights",
+   "extract_feat": [
+    "Blinding Lights",
+    []
+   ]
+  },
+  {
+   "in": "Blinding Lights - Remastered 2011",
+   "normalize_title": "blinding lights",
+   "extract_feat": [
+    "Blinding Lights - Remastered 2011",
+    []
+   ]
+  },
+  {
+   "in": "Song (feat. Other Artist)",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song",
+    [
+     "Other Artist"
+    ]
+   ]
+  },
+  {
+   "in": "Song [feat. A & B]",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song",
+    [
+     "A",
+     "B"
+    ]
+   ]
+  },
+  {
+   "in": "Song ft. Someone",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song",
+    [
+     ". Someone"
+    ]
+   ]
+  },
+  {
+   "in": "Song featuring Someone Else",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song",
+    [
+     "Someone Else"
+    ]
+   ]
+  },
+  {
+   "in": "Bohemian Rhapsody (Remastered Version)",
+   "normalize_title": "bohemian rhapsody",
+   "extract_feat": [
+    "Bohemian Rhapsody (Remastered Version)",
+    []
+   ]
+  },
+  {
+   "in": "Hey Jude - Single Version",
+   "normalize_title": "hey jude",
+   "extract_feat": [
+    "Hey Jude - Single Version",
+    []
+   ]
+  },
+  {
+   "in": "Track - Radio Edit",
+   "normalize_title": "track",
+   "extract_feat": [
+    "Track - Radio Edit",
+    []
+   ]
+  },
+  {
+   "in": "Track (Original Mix)",
+   "normalize_title": "track",
+   "extract_feat": [
+    "Track (Original Mix)",
+    []
+   ]
+  },
+  {
+   "in": "Track (Album Version)",
+   "normalize_title": "track",
+   "extract_feat": [
+    "Track (Album Version)",
+    []
+   ]
+  },
+  {
+   "in": "Love Me Do (Mono)",
+   "normalize_title": "love me do",
+   "extract_feat": [
+    "Love Me Do (Mono)",
+    []
+   ]
+  },
+  {
+   "in": "Title (Deluxe Edition)",
+   "normalize_title": "title",
+   "extract_feat": [
+    "Title (Deluxe Edition)",
+    []
+   ]
+  },
+  {
+   "in": "Title (Expanded Edition)",
+   "normalize_title": "title",
+   "extract_feat": [
+    "Title (Expanded Edition)",
+    []
+   ]
+  },
+  {
+   "in": "Title (2009 Remaster)",
+   "normalize_title": "title",
+   "extract_feat": [
+    "Title (2009 Remaster)",
+    []
+   ]
+  },
+  {
+   "in": "Title - 2015 Version",
+   "normalize_title": "title",
+   "extract_feat": [
+    "Title - 2015 Version",
+    []
+   ]
+  },
+  {
+   "in": "Song (Live)",
+   "normalize_title": "song live",
+   "extract_feat": [
+    "Song (Live)",
+    []
+   ]
+  },
+  {
+   "in": "Song (Kaytranada Remix)",
+   "normalize_title": "song kaytranada remix",
+   "extract_feat": [
+    "Song (Kaytranada Remix)",
+    []
+   ]
+  },
+  {
+   "in": "Song (Acoustic)",
+   "normalize_title": "song acoustic",
+   "extract_feat": [
+    "Song (Acoustic)",
+    []
+   ]
+  },
+  {
+   "in": "Song (Instrumental)",
+   "normalize_title": "song instrumental",
+   "extract_feat": [
+    "Song (Instrumental)",
+    []
+   ]
+  },
+  {
+   "in": "Song (Sped Up)",
+   "normalize_title": "song sped up",
+   "extract_feat": [
+    "Song (Sped Up)",
+    []
+   ]
+  },
+  {
+   "in": "Beyoncé - Halo",
+   "normalize_title": "beyonce halo",
+   "extract_feat": [
+    "Beyoncé - Halo",
+    []
+   ]
+  },
+  {
+   "in": "Sigur Rós – Hoppípolla",
+   "normalize_title": "sigur ros hoppipolla",
+   "extract_feat": [
+    "Sigur Rós – Hoppípolla",
+    []
+   ]
+  },
+  {
+   "in": "Mötley Crüe: Kickstart My Heart",
+   "normalize_title": "motley crue kickstart my heart",
+   "extract_feat": [
+    "Mötley Crüe: Kickstart My Heart",
+    []
+   ]
+  },
+  {
+   "in": "Ça Plane Pour Moi",
+   "normalize_title": "ca plane pour moi",
+   "extract_feat": [
+    "Ça Plane Pour Moi",
+    []
+   ]
+  },
+  {
+   "in": "Naïve",
+   "normalize_title": "naive",
+   "extract_feat": [
+    "Naïve",
+    []
+   ]
+  },
+  {
+   "in": "Über Alles",
+   "normalize_title": "uber alles",
+   "extract_feat": [
+    "Über Alles",
+    []
+   ]
+  },
+  {
+   "in": "Don't Stop Believin'",
+   "normalize_title": "don t stop believin",
+   "extract_feat": [
+    "Don't Stop Believin'",
+    []
+   ]
+  },
+  {
+   "in": "Don’t Stop Believin’",
+   "normalize_title": "don t stop believin",
+   "extract_feat": [
+    "Don’t Stop Believin’",
+    []
+   ]
+  },
+  {
+   "in": "Rock 'n' Roll",
+   "normalize_title": "rock n roll",
+   "extract_feat": [
+    "Rock 'n' Roll",
+    []
+   ]
+  },
+  {
+   "in": "Rock & Roll",
+   "normalize_title": "rock and roll",
+   "extract_feat": [
+    "Rock & Roll",
+    []
+   ]
+  },
+  {
+   "in": "Rock and Roll",
+   "normalize_title": "rock and roll",
+   "extract_feat": [
+    "Rock and Roll",
+    []
+   ]
+  },
+  {
+   "in": "AC/DC",
+   "normalize_title": "ac dc",
+   "extract_feat": [
+    "AC/DC",
+    []
+   ]
+  },
+  {
+   "in": "P!nk",
+   "normalize_title": "p nk",
+   "extract_feat": [
+    "P!nk",
+    []
+   ]
+  },
+  {
+   "in": "Ke$ha",
+   "normalize_title": "ke ha",
+   "extract_feat": [
+    "Ke$ha",
+    []
+   ]
+  },
+  {
+   "in": "Mr. Brightside",
+   "normalize_title": "mr brightside",
+   "extract_feat": [
+    "Mr. Brightside",
+    []
+   ]
+  },
+  {
+   "in": "Mr Brightside",
+   "normalize_title": "mr brightside",
+   "extract_feat": [
+    "Mr Brightside",
+    []
+   ]
+  },
+  {
+   "in": "99 Problems",
+   "normalize_title": "99 problems",
+   "extract_feat": [
+    "99 Problems",
+    []
+   ]
+  },
+  {
+   "in": "1979",
+   "normalize_title": "1979",
+   "extract_feat": [
+    "1979",
+    []
+   ]
+  },
+  {
+   "in": "#1 Crush",
+   "normalize_title": "1 crush",
+   "extract_feat": [
+    "#1 Crush",
+    []
+   ]
+  },
+  {
+   "in": "What's Going On",
+   "normalize_title": "what s going on",
+   "extract_feat": [
+    "What's Going On",
+    []
+   ]
+  },
+  {
+   "in": "Whats Going On",
+   "normalize_title": "whats going on",
+   "extract_feat": [
+    "Whats Going On",
+    []
+   ]
+  },
+  {
+   "in": "THE SONG",
+   "normalize_title": "the song",
+   "extract_feat": [
+    "THE SONG",
+    []
+   ]
+  },
+  {
+   "in": "the song",
+   "normalize_title": "the song",
+   "extract_feat": [
+    "the song",
+    []
+   ]
+  },
+  {
+   "in": "  spaced   out  ",
+   "normalize_title": "spaced out",
+   "extract_feat": [
+    "spaced   out",
+    []
+   ]
+  },
+  {
+   "in": "Title...",
+   "normalize_title": "title",
+   "extract_feat": [
+    "Title...",
+    []
+   ]
+  },
+  {
+   "in": "Title!?",
+   "normalize_title": "title",
+   "extract_feat": [
+    "Title!?",
+    []
+   ]
+  },
+  {
+   "in": "Title: Subtitle",
+   "normalize_title": "title subtitle",
+   "extract_feat": [
+    "Title: Subtitle",
+    []
+   ]
+  },
+  {
+   "in": "Title / Other",
+   "normalize_title": "title other",
+   "extract_feat": [
+    "Title / Other",
+    []
+   ]
+  },
+  {
+   "in": "Title _ Under",
+   "normalize_title": "title _ under",
+   "extract_feat": [
+    "Title _ Under",
+    []
+   ]
+  },
+  {
+   "in": "夜に駆ける",
+   "normalize_title": "夜に駆ける",
+   "extract_feat": [
+    "夜に駆ける",
+    []
+   ]
+  },
+  {
+   "in": "千本桜",
+   "normalize_title": "千本桜",
+   "extract_feat": [
+    "千本桜",
+    []
+   ]
+  },
+  {
+   "in": "Привет",
+   "normalize_title": "привет",
+   "extract_feat": [
+    "Привет",
+    []
+   ]
+  },
+  {
+   "in": "Αγάπη",
+   "normalize_title": "αγαπη",
+   "extract_feat": [
+    "Αγάπη",
+    []
+   ]
+  },
+  {
+   "in": "",
+   "normalize_title": "",
+   "extract_feat": [
+    "",
+    []
+   ]
+  },
+  {
+   "in": "   ",
+   "normalize_title": "",
+   "extract_feat": [
+    "",
+    []
+   ]
+  },
+  {
+   "in": "A",
+   "normalize_title": "a",
+   "extract_feat": [
+    "A",
+    []
+   ]
+  },
+  {
+   "in": "(Only Brackets)",
+   "normalize_title": "only brackets",
+   "extract_feat": [
+    "(Only Brackets)",
+    []
+   ]
+  },
+  {
+   "in": "[Only Square]",
+   "normalize_title": "only square",
+   "extract_feat": [
+    "[Only Square]",
+    []
+   ]
+  },
+  {
+   "in": "Song - Live at Wembley",
+   "normalize_title": "song live at wembley",
+   "extract_feat": [
+    "Song - Live at Wembley",
+    []
+   ]
+  },
+  {
+   "in": "Song (Remastered) (feat. X)",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song (Remastered)",
+    []
+   ]
+  },
+  {
+   "in": "Song - Remastered - Radio Edit",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song - Remastered - Radio Edit",
+    []
+   ]
+  },
+  {
+   "in": "Song (Bonus Track)",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song (Bonus Track)",
+    []
+   ]
+  },
+  {
+   "in": "Song (Anniversary Edition)",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song (Anniversary Edition)",
+    []
+   ]
+  },
+  {
+   "in": "Song (Reissue)",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song (Reissue)",
+    []
+   ]
+  },
+  {
+   "in": "Song (Digital Remaster)",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song (Digital Remaster)",
+    []
+   ]
+  },
+  {
+   "in": "Song (Stereo)",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song (Stereo)",
+    []
+   ]
+  },
+  {
+   "in": "Song (Original Version)",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song (Original Version)",
+    []
+   ]
+  },
+  {
+   "in": "Song (feat. A, B & C)",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song",
+    [
+     "A",
+     "B",
+     "C"
+    ]
+   ]
+  },
+  {
+   "in": "Song ft. A feat. B",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song",
+    [
+     ". A feat. B"
+    ]
+   ]
+  },
+  {
+   "in": "Song (with Someone)",
+   "normalize_title": "song",
+   "extract_feat": [
+    "Song",
+    [
+     "Someone"
+    ]
+   ]
+  },
+  {
+   "in": "Song (Cover)",
+   "normalize_title": "song cover",
+   "extract_feat": [
+    "Song (Cover)",
+    []
+   ]
+  },
+  {
+   "in": "Song (Demo)",
+   "normalize_title": "song demo",
+   "extract_feat": [
+    "Song (Demo)",
+    []
+   ]
+  },
+  {
+   "in": "Song (Karaoke Version)",
+   "normalize_title": "song karaoke version",
+   "extract_feat": [
+    "Song (Karaoke Version)",
+    []
+   ]
+  },
+  {
+   "in": "Don't You (Forget About Me) - Remastered",
+   "normalize_title": "don t you forget about me",
+   "extract_feat": [
+    "Don't You (Forget About Me) - Remastered",
+    []
+   ]
+  },
+  {
+   "in": "Comfortably Numb (2011 Remastered Version)",
+   "normalize_title": "comfortably numb",
+   "extract_feat": [
+    "Comfortably Numb (2011 Remastered Version)",
+    []
+   ]
+  }
+ ],
+ "artists": [
+  {
+   "in": "The Weeknd",
+   "normalize_artist": "the weeknd",
+   "normalize_artist_name": "the weeknd",
+   "split_artist_credits": [
+    "The Weeknd"
+   ]
+  },
+  {
+   "in": "Weeknd",
+   "normalize_artist": "weeknd",
+   "normalize_artist_name": "weeknd",
+   "split_artist_credits": [
+    "Weeknd"
+   ]
+  },
+  {
+   "in": "The Beatles",
+   "normalize_artist": "the beatles",
+   "normalize_artist_name": "the beatles",
+   "split_artist_credits": [
+    "The Beatles"
+   ]
+  },
+  {
+   "in": "Beatles, The",
+   "normalize_artist": "beatles the",
+   "normalize_artist_name": "beatles the",
+   "split_artist_credits": [
+    "Beatles",
+    "The"
+   ]
+  },
+  {
+   "in": "A & B",
+   "normalize_artist": "a b",
+   "normalize_artist_name": "a and b",
+   "split_artist_credits": [
+    "A & B"
+   ]
+  },
+  {
+   "in": "A and B",
+   "normalize_artist": "a b",
+   "normalize_artist_name": "a and b",
+   "split_artist_credits": [
+    "A and B"
+   ]
+  },
+  {
+   "in": "A, B",
+   "normalize_artist": "a b",
+   "normalize_artist_name": "a b",
+   "split_artist_credits": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "in": "A; B",
+   "normalize_artist": "a b",
+   "normalize_artist_name": "a b",
+   "split_artist_credits": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "in": "A feat. B",
+   "normalize_artist": "a b",
+   "normalize_artist_name": "a feat b",
+   "split_artist_credits": [
+    "A feat. B"
+   ]
+  },
+  {
+   "in": "A ft. B",
+   "normalize_artist": "a b",
+   "normalize_artist_name": "a ft b",
+   "split_artist_credits": [
+    "A ft. B"
+   ]
+  },
+  {
+   "in": "A featuring B",
+   "normalize_artist": "a b",
+   "normalize_artist_name": "a featuring b",
+   "split_artist_credits": [
+    "A featuring B"
+   ]
+  },
+  {
+   "in": "A x B",
+   "normalize_artist": "a b",
+   "normalize_artist_name": "a x b",
+   "split_artist_credits": [
+    "A x B"
+   ]
+  },
+  {
+   "in": "A × B",
+   "normalize_artist": "a b",
+   "normalize_artist_name": "a b",
+   "split_artist_credits": [
+    "A × B"
+   ]
+  },
+  {
+   "in": "A / B",
+   "normalize_artist": "a b",
+   "normalize_artist_name": "a b",
+   "split_artist_credits": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "in": "A vs. B",
+   "normalize_artist": "a vs b",
+   "normalize_artist_name": "a vs b",
+   "split_artist_credits": [
+    "A vs. B"
+   ]
+  },
+  {
+   "in": "A with B",
+   "normalize_artist": "a b",
+   "normalize_artist_name": "a with b",
+   "split_artist_credits": [
+    "A with B"
+   ]
+  },
+  {
+   "in": "Simon & Garfunkel",
+   "normalize_artist": "garfunkel simon",
+   "normalize_artist_name": "simon and garfunkel",
+   "split_artist_credits": [
+    "Simon & Garfunkel"
+   ]
+  },
+  {
+   "in": "Earth, Wind & Fire",
+   "normalize_artist": "earth fire wind",
+   "normalize_artist_name": "earth wind and fire",
+   "split_artist_credits": [
+    "Earth",
+    "Wind & Fire"
+   ]
+  },
+  {
+   "in": "Crosby, Stills, Nash & Young",
+   "normalize_artist": "crosby nash stills young",
+   "normalize_artist_name": "crosby stills nash and young",
+   "split_artist_credits": [
+    "Crosby",
+    "Stills",
+    "Nash & Young"
+   ]
+  },
+  {
+   "in": "Tyler, The Creator",
+   "normalize_artist": "the creator tyler",
+   "normalize_artist_name": "tyler the creator",
+   "split_artist_credits": [
+    "Tyler",
+    "The Creator"
+   ]
+  },
+  {
+   "in": "AC/DC",
+   "normalize_artist": "ac dc",
+   "normalize_artist_name": "ac dc",
+   "split_artist_credits": [
+    "AC",
+    "DC"
+   ]
+  },
+  {
+   "in": "P!nk",
+   "normalize_artist": "p nk",
+   "normalize_artist_name": "p nk",
+   "split_artist_credits": [
+    "P!nk"
+   ]
+  },
+  {
+   "in": "Ke$ha",
+   "normalize_artist": "ke ha",
+   "normalize_artist_name": "ke ha",
+   "split_artist_credits": [
+    "Ke$ha"
+   ]
+  },
+  {
+   "in": "Beyoncé",
+   "normalize_artist": "beyonce",
+   "normalize_artist_name": "beyonce",
+   "split_artist_credits": [
+    "Beyoncé"
+   ]
+  },
+  {
+   "in": "Björk",
+   "normalize_artist": "bjork",
+   "normalize_artist_name": "bjork",
+   "split_artist_credits": [
+    "Björk"
+   ]
+  },
+  {
+   "in": "Sigur Rós",
+   "normalize_artist": "sigur ros",
+   "normalize_artist_name": "sigur ros",
+   "split_artist_credits": [
+    "Sigur Rós"
+   ]
+  },
+  {
+   "in": "Mötley Crüe",
+   "normalize_artist": "motley crue",
+   "normalize_artist_name": "motley crue",
+   "split_artist_credits": [
+    "Mötley Crüe"
+   ]
+  },
+  {
+   "in": "Motley Crue",
+   "normalize_artist": "motley crue",
+   "normalize_artist_name": "motley crue",
+   "split_artist_credits": [
+    "Motley Crue"
+   ]
+  },
+  {
+   "in": "Tiësto",
+   "normalize_artist": "tiesto",
+   "normalize_artist_name": "tiesto",
+   "split_artist_credits": [
+    "Tiësto"
+   ]
+  },
+  {
+   "in": "Zoé",
+   "normalize_artist": "zoe",
+   "normalize_artist_name": "zoe",
+   "split_artist_credits": [
+    "Zoé"
+   ]
+  },
+  {
+   "in": "Jean-Michel Jarre",
+   "normalize_artist": "jean michel jarre",
+   "normalize_artist_name": "jean michel jarre",
+   "split_artist_credits": [
+    "Jean-Michel Jarre"
+   ]
+  },
+  {
+   "in": "Guns N' Roses",
+   "normalize_artist": "guns n roses",
+   "normalize_artist_name": "guns n roses",
+   "split_artist_credits": [
+    "Guns N' Roses"
+   ]
+  },
+  {
+   "in": "Guns N’ Roses",
+   "normalize_artist": "guns n roses",
+   "normalize_artist_name": "guns n roses",
+   "split_artist_credits": [
+    "Guns N’ Roses"
+   ]
+  },
+  {
+   "in": "Guns N Roses",
+   "normalize_artist": "guns n roses",
+   "normalize_artist_name": "guns n roses",
+   "split_artist_credits": [
+    "Guns N Roses"
+   ]
+  },
+  {
+   "in": "Florence + The Machine",
+   "normalize_artist": "florence the machine",
+   "normalize_artist_name": "florence the machine",
+   "split_artist_credits": [
+    "Florence + The Machine"
+   ]
+  },
+  {
+   "in": "Florence and the Machine",
+   "normalize_artist": "florence the machine",
+   "normalize_artist_name": "florence and the machine",
+   "split_artist_credits": [
+    "Florence and the Machine"
+   ]
+  },
+  {
+   "in": "Hall & Oates",
+   "normalize_artist": "hall oates",
+   "normalize_artist_name": "hall and oates",
+   "split_artist_credits": [
+    "Hall & Oates"
+   ]
+  },
+  {
+   "in": "Daryl Hall & John Oates",
+   "normalize_artist": "daryl hall john oates",
+   "normalize_artist_name": "daryl hall and john oates",
+   "split_artist_credits": [
+    "Daryl Hall & John Oates"
+   ]
+  },
+  {
+   "in": "Mr. Oizo",
+   "normalize_artist": "mr oizo",
+   "normalize_artist_name": "mr oizo",
+   "split_artist_credits": [
+    "Mr. Oizo"
+   ]
+  },
+  {
+   "in": "Mr Oizo",
+   "normalize_artist": "mr oizo",
+   "normalize_artist_name": "mr oizo",
+   "split_artist_credits": [
+    "Mr Oizo"
+   ]
+  },
+  {
+   "in": "DJ Snake",
+   "normalize_artist": "dj snake",
+   "normalize_artist_name": "dj snake",
+   "split_artist_credits": [
+    "DJ Snake"
+   ]
+  },
+  {
+   "in": "DJ  Snake",
+   "normalize_artist": "dj snake",
+   "normalize_artist_name": "dj snake",
+   "split_artist_credits": [
+    "DJ  Snake"
+   ]
+  },
+  {
+   "in": "dj snake",
+   "normalize_artist": "dj snake",
+   "normalize_artist_name": "dj snake",
+   "split_artist_credits": [
+    "dj snake"
+   ]
+  },
+  {
+   "in": "Jay-Z",
+   "normalize_artist": "jay z",
+   "normalize_artist_name": "jay z",
+   "split_artist_credits": [
+    "Jay-Z"
+   ]
+  },
+  {
+   "in": "JAY Z",
+   "normalize_artist": "jay z",
+   "normalize_artist_name": "jay z",
+   "split_artist_credits": [
+    "JAY Z"
+   ]
+  },
+  {
+   "in": "Jay Z",
+   "normalize_artist": "jay z",
+   "normalize_artist_name": "jay z",
+   "split_artist_credits": [
+    "Jay Z"
+   ]
+  },
+  {
+   "in": "宇多田ヒカル",
+   "normalize_artist": "宇多田ヒカル",
+   "normalize_artist_name": "宇多田ヒカル",
+   "split_artist_credits": [
+    "宇多田ヒカル"
+   ]
+  },
+  {
+   "in": "YOASOBI",
+   "normalize_artist": "yoasobi",
+   "normalize_artist_name": "yoasobi",
+   "split_artist_credits": [
+    "YOASOBI"
+   ]
+  },
+  {
+   "in": "Кино",
+   "normalize_artist": "кино",
+   "normalize_artist_name": "кино",
+   "split_artist_credits": [
+    "Кино"
+   ]
+  },
+  {
+   "in": "",
+   "normalize_artist": "",
+   "normalize_artist_name": "",
+   "split_artist_credits": []
+  },
+  {
+   "in": "  ",
+   "normalize_artist": "",
+   "normalize_artist_name": "",
+   "split_artist_credits": []
+  },
+  {
+   "in": "Various Artists",
+   "normalize_artist": "various artists",
+   "normalize_artist_name": "various artists",
+   "split_artist_credits": [
+    "Various Artists"
+   ]
+  },
+  {
+   "in": "Unknown Artist",
+   "normalize_artist": "unknown artist",
+   "normalize_artist_name": "unknown artist",
+   "split_artist_credits": [
+    "Unknown Artist"
+   ]
+  },
+  {
+   "in": "Artist One, Artist Two, Artist Three",
+   "normalize_artist": "artist one artist three artist two",
+   "normalize_artist_name": "artist one artist two artist three",
+   "split_artist_credits": [
+    "Artist One",
+    "Artist Two",
+    "Artist Three"
+   ]
+  },
+  {
+   "in": "Artist One & Artist Two feat. Artist Three",
+   "normalize_artist": "artist one artist three artist two",
+   "normalize_artist_name": "artist one and artist two feat artist three",
+   "split_artist_credits": [
+    "Artist One & Artist Two feat. Artist Three"
+   ]
+  },
+  {
+   "in": "Kaytranada, Aaliyah",
+   "normalize_artist": "aaliyah kaytranada",
+   "normalize_artist_name": "kaytranada aaliyah",
+   "split_artist_credits": [
+    "Kaytranada",
+    "Aaliyah"
+   ]
+  },
+  {
+   "in": "Calvin Harris, Dua Lipa",
+   "normalize_artist": "calvin harris dua lipa",
+   "normalize_artist_name": "calvin harris dua lipa",
+   "split_artist_credits": [
+    "Calvin Harris",
+    "Dua Lipa"
+   ]
+  },
+  {
+   "in": "Lil Nas X",
+   "normalize_artist": "lil nas",
+   "normalize_artist_name": "lil nas x",
+   "split_artist_credits": [
+    "Lil Nas X"
+   ]
+  },
+  {
+   "in": "Lil Nas X, Jack Harlow",
+   "normalize_artist": "jack harlow lil nas",
+   "normalize_artist_name": "lil nas x jack harlow",
+   "split_artist_credits": [
+    "Lil Nas X",
+    "Jack Harlow"
+   ]
+  },
+  {
+   "in": "The Chemical Brothers",
+   "normalize_artist": "the chemical brothers",
+   "normalize_artist_name": "the chemical brothers",
+   "split_artist_credits": [
+    "The Chemical Brothers"
+   ]
+  },
+  {
+   "in": "Chemical Brothers",
+   "normalize_artist": "chemical brothers",
+   "normalize_artist_name": "chemical brothers",
+   "split_artist_credits": [
+    "Chemical Brothers"
+   ]
+  },
+  {
+   "in": "Röyksopp",
+   "normalize_artist": "royksopp",
+   "normalize_artist_name": "royksopp",
+   "split_artist_credits": [
+    "Röyksopp"
+   ]
+  },
+  {
+   "in": "Royksopp",
+   "normalize_artist": "royksopp",
+   "normalize_artist_name": "royksopp",
+   "split_artist_credits": [
+    "Royksopp"
+   ]
+  },
+  {
+   "in": "Ólafur Arnalds",
+   "normalize_artist": "olafur arnalds",
+   "normalize_artist_name": "olafur arnalds",
+   "split_artist_credits": [
+    "Ólafur Arnalds"
+   ]
+  },
+  {
+   "in": "Sébastien Tellier",
+   "normalize_artist": "sebastien tellier",
+   "normalize_artist_name": "sebastien tellier",
+   "split_artist_credits": [
+    "Sébastien Tellier"
+   ]
+  },
+  {
+   "in": "Mylène Farmer",
+   "normalize_artist": "mylene farmer",
+   "normalize_artist_name": "mylene farmer",
+   "split_artist_credits": [
+    "Mylène Farmer"
+   ]
+  },
+  {
+   "in": "Céline Dion",
+   "normalize_artist": "celine dion",
+   "normalize_artist_name": "celine dion",
+   "split_artist_credits": [
+    "Céline Dion"
+   ]
+  },
+  {
+   "in": "Édith Piaf",
+   "normalize_artist": "edith piaf",
+   "normalize_artist_name": "edith piaf",
+   "split_artist_credits": [
+    "Édith Piaf"
+   ]
+  },
+  {
+   "in": "Nick Cave & the Bad Seeds",
+   "normalize_artist": "nick cave the bad seeds",
+   "normalize_artist_name": "nick cave and the bad seeds",
+   "split_artist_credits": [
+    "Nick Cave & the Bad Seeds"
+   ]
+  },
+  {
+   "in": "Bob Marley & The Wailers",
+   "normalize_artist": "bob marley the wailers",
+   "normalize_artist_name": "bob marley and the wailers",
+   "split_artist_credits": [
+    "Bob Marley & The Wailers"
+   ]
+  },
+  {
+   "in": "Prince and The Revolution",
+   "normalize_artist": "prince the revolution",
+   "normalize_artist_name": "prince and the revolution",
+   "split_artist_credits": [
+    "Prince and The Revolution"
+   ]
+  },
+  {
+   "in": "Prince & The New Power Generation",
+   "normalize_artist": "prince the new power generation",
+   "normalize_artist_name": "prince and the new power generation",
+   "split_artist_credits": [
+    "Prince & The New Power Generation"
+   ]
+  }
+ ]
+}

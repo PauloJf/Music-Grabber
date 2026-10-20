@@ -1,0 +1,15 @@
+# Runtime dependencies (what the Docker image installs).
+
+# HTTP client: Spotify, Deezer catalogue, LRCLIB, ntfy, post-import hooks
+requests>=2.31.0
+# Fuzzy track matching (library reconciliation, provider candidate scoring)
+rapidfuzz>=3.9.0
+# Tag reading/writing and cover embedding; the filesystem library index
+mutagen>=1.47.0
+pillow>=10.0.0,<11
+# Headless JSON API (API_TOKEN); only music_grabber/api imports these
+flask>=3.0
+waitress>=3.0
+# Download providers. Imported lazily, so tests never need them installed.
+yt-dlp>=2024.8.0
+streamrip>=2.1.0
