@@ -1,4 +1,4 @@
-"""Source-agnostic grab enqueue (Phase 5, docs/plans/phase5-player-users.md §8).
+"""Source-agnostic grab enqueue.
 
 `enqueue_grab` (db.py) dedupes on ``spotify_track_id``. A track from a non-Spotify
 source — a missing Navidrome playlist track, a Deezer suggestion — carries no
@@ -64,7 +64,7 @@ def enqueue_track(db, grabber, meta: dict, *, playlist_track_id: Optional[int] =
 
     if not adopted and dz_track_id and not meta.get("isrc"):
         try:
-            from ..integrations import deezer_catalog as dz
+            from .. import deezer_catalog as dz
             meta["isrc"] = dz.track_isrc(dz_track_id)
         except Exception as exc:
             log.debug("Deezer ISRC lookup failed for %s: %s", dz_track_id, exc)

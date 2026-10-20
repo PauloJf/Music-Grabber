@@ -1,11 +1,12 @@
-"""Grab queue, candidates, audit events, OAuth tokens, managed tracks."""
+"""Grab queue, candidates, audit events, OAuth tokens, counters."""
 
 from datetime import datetime, timezone
 from typing import Optional
 
 from .constants import GRAB_NONTERMINAL, GRAB_TERMINAL
 
-class GrabberMixin:
+
+class QueueMixin:
     # Audit events kept per queue item. grab_queue rows persist indefinitely, so
     # the per-item log is capped to keep it from growing without bound.
     _EVENTS_PER_ITEM_CAP = 100
@@ -319,7 +320,7 @@ class GrabberMixin:
     def reset_inflight_grabs(self) -> int:
         """Startup recovery: return in-flight (non-terminal, non-awaiting) items to
         'pending'. Leaves awaiting_user (needs the human) alone."""
-        inflight = ("searching", "downloading", "transcoding", "tagging", "analyzing_bpm")
+        inflight = ("searching", "downloading", "transcoding", "tagging", "placing")
         now = datetime.now(timezone.utc).isoformat()
         with self._connect() as conn:
             cur = conn.execute(
@@ -328,42 +329,3 @@ class GrabberMixin:
                 (now, *inflight))
             conn.commit()
             return cur.rowcount
-
-    def record_managed_track(self, file_path: str, file_hash: str, meta: dict,
-                             bpm: Optional[float], bpm_dr, bpm_es, bpm_lb,
-                             confidence, detector: str, spotify_track_id: str,
-                             loudness_lufs: Optional[float] = None,
-                             loudness_source: Optional[str] = None) -> None:
-        """Insert/replace a downloaded, tagged, BPM-analyzed track as managed=1.
-        file_hash MUST be computed AFTER the BPM tag write (watcher anti-loop)."""
-        now = datetime.now(timezone.utc).isoformat()
-        with self._connect() as conn:
-            conn.execute("""
-                INSERT INTO tracks
-                    (file_path, file_hash, bpm, bpm_dr, bpm_es, bpm_lb, bpm_confidence,
-                     detector, analyzed_at, status, needs_review, managed, spotify_track_id,
-                     title, artist, album, album_artist, track_no, disc_no, year, isrc,
-                     duration_ms, norm_title, norm_artist, tags_indexed_hash,
-                     loudness_lufs, loudness_source)
-                VALUES (?,?,?,?,?,?,?,?,?, 'done', 0, 1, ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                ON CONFLICT(file_path) DO UPDATE SET
-                    file_hash=excluded.file_hash, bpm=excluded.bpm, bpm_dr=excluded.bpm_dr,
-                    bpm_es=excluded.bpm_es, bpm_lb=excluded.bpm_lb,
-                    bpm_confidence=excluded.bpm_confidence, detector=excluded.detector,
-                    analyzed_at=excluded.analyzed_at, status='done', managed=1,
-                    spotify_track_id=excluded.spotify_track_id, title=excluded.title,
-                    artist=excluded.artist, album=excluded.album,
-                    album_artist=excluded.album_artist, track_no=excluded.track_no,
-                    disc_no=excluded.disc_no, year=excluded.year, isrc=excluded.isrc,
-                    duration_ms=excluded.duration_ms, norm_title=excluded.norm_title,
-                    norm_artist=excluded.norm_artist, tags_indexed_hash=excluded.tags_indexed_hash,
-                    loudness_lufs=COALESCE(excluded.loudness_lufs, loudness_lufs),
-                    loudness_source=COALESCE(excluded.loudness_source, loudness_source)
-            """, (file_path, file_hash, bpm, bpm_dr, bpm_es, bpm_lb, confidence, detector, now,
-                  spotify_track_id, meta.get("title"), meta.get("artist"), meta.get("album"),
-                  meta.get("album_artist"), meta.get("track_no"), meta.get("disc_no"),
-                  meta.get("year"), meta.get("isrc"), meta.get("duration_ms"),
-                  meta.get("norm_title"), meta.get("norm_artist"), file_hash,
-                  loudness_lufs, loudness_source))
-            self._sync_track_artists(conn, file_path, meta.get("artist"), meta.get("album_artist"))
-            conn.commit()

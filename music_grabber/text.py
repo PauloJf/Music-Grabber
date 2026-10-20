@@ -1,9 +1,10 @@
-"""Text normalization for track/artist identity — pure stdlib, no I/O.
+"""Text normalization for track/artist identity: pure stdlib, no I/O.
 
-Lives outside ``grabber`` on purpose: the core (``db``, ``scan``) needs these
-keys for the tag index and artist browsing, and must import without the
-grabber's dependencies (``rapidfuzz``). ``grabber.matching`` re-exports every
-name here, so existing imports keep working.
+DUPLICATED from BPM Tagger's ``bpm_tagger/text.py`` (v2.18.2, eae3f0c) on purpose, so
+Music Grabber's matching and BPM Tagger's tag index speak the same dialect without a
+runtime dependency between the repos (docs/plans/extraction.md §1.1). Keep behaviour
+identical; ``tests/test_text_golden.py`` pins it. ``split_genres`` / ``normalize_genre``
+are carried along verbatim but unused here.
 """
 
 import re

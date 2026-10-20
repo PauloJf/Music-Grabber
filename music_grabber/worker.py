@@ -1,10 +1,13 @@
-"""GrabWorker — the download→transcode→tag→BPM pipeline (§5).
+"""GrabWorker: the download → transcode → tag → place pipeline.
 
-One GrabPipeline runs a claimed queue item end to end; GrabPool runs N worker
-threads that claim pending items via DB CAS. Auto-accept (score ≥ threshold or
-ISRC) downloads immediately; ambiguous/failed matches route to awaiting_user for
-the M5 inbox. The BPM tag is written last and the DB hash is taken *after* that
-write so the library watcher never re-analyzes a freshly grabbed file.
+One GrabPipeline runs a claimed queue item end to end; GrabPool runs N worker threads
+that claim pending items via DB CAS. Auto-accept (score ≥ threshold or ISRC) downloads
+immediately; ambiguous/failed matches route to awaiting_user for the inbox.
+
+BPM analysis is not done here (docs/plans/extraction.md §2.2): the finished file is
+placed atomically, recorded in the ledger, and handed to the configured
+``PostDownloadAnalysis``. Nothing touches the file after placement, so a BPM Tagger
+watcher that picks it up sees a stable file.
 """
 
 import logging
@@ -12,21 +15,24 @@ import os
 import shutil
 import threading
 import time
+from pathlib import PurePosixPath
 
-from ..bpm.loudness import analyze_loudness
-from ..bpm.lyrics import is_synced, write_lyrics
-from ..bpm.pipeline import detect_bpm
-from ..bpm.tags import get_file_hash, write_bpm_tag
-from ..integrations.lrclib import fetch_lyrics
-from ..integrations.navidrome import _trigger_navidrome_rescan
-from .matching import normalize_artist, normalize_title, score
+from .analysis import NoAnalysis, PlacedFile
+from .library import file_token
+from .lrclib import fetch_lyrics
+from .lyrics import write_lyrics
 from .path_template import render, unique_path
 from .providers import build_providers
 from .providers.base import ProviderAuthError, ProviderCandidate, TrackMeta, exc_text
 from .tagging import embed_cover, fetch_cover, write_track_tags
+from .text import normalize_artist, normalize_title
+from .matching import score
 from .transcode import profile_ext, transcode
 
 log = logging.getLogger(__name__)
+
+# Serializes unique_path + os.replace so two workers can't pick the same final path.
+_PLACE_LOCK = threading.Lock()
 
 
 def _meta_from_item(item: dict) -> dict:
@@ -41,17 +47,20 @@ class GrabPipeline:
     # fresh ARL that also fails alerts again straight away.
     AUTH_ALERT_INTERVAL = 6 * 3600
 
-    def __init__(self, config, db, tagger, providers=None, notifier=None):
+    def __init__(self, config, db, providers=None, notifier=None, analysis=None, on_placed=None):
         self.config = config
         self.db = db
-        self.tagger = tagger
         self.providers = providers if providers is not None else build_providers(config)
         self.notifier = notifier
         self.auto_accept = float(config.get("auto_accept_threshold", 0.85))
         self.ask = float(config.get("ask_threshold", 0.55))
         self.output_format = config.get("output_format", "mp3-320")
         self.path_template = config.get("path_template", "{AlbumArtist}/{Album}/{TrackNo:02d} - {Title}.{ext}")
-        self.music_dir = config["music_dir"]
+        self.analysis = analysis if analysis is not None else NoAnalysis()
+        self.dest_root = self.analysis.destination_root(config)
+        # Callbacks fired after a file is placed and recorded (post-import hooks).
+        # Each is wrapped: a hook can never fail a finished grab.
+        self.on_placed = list(on_placed or [])
         self.dry_run = bool(config.get("grab_dry_run", False))
         self.grab_tmp = os.path.join(os.path.dirname(os.path.abspath(config["db_path"])), "grab_tmp")
         self._auth_lock = threading.Lock()  # GrabPool threads share one pipeline
@@ -257,62 +266,88 @@ class GrabPipeline:
                 self.db.add_grab_event(item_id, "warning", cover_warn)
         # Lyrics (opt-in via lyrics_enabled): fetched from LRCLIB and embedded
         # while the file is still staged. Grabbed files always embed — a sidecar
-        # would need its own move into music_dir. Non-fatal like tags/cover.
+        # would need its own move into the filing root. Non-fatal like tags/cover.
         lyrics_text = ""
         if self.config.get("lyrics_enabled"):
             try:
                 lyr = fetch_lyrics(meta.get("artist") or "", meta.get("title") or "",
                                    meta.get("album") or "", meta.get("duration_ms"))
                 lyrics_text = (lyr or {}).get("synced") or (lyr or {}).get("plain") or ""
-                if lyrics_text and not write_lyrics(out_path, lyrics_text, mode="embed"):
+                if lyrics_text and not write_lyrics(out_path, lyrics_text):
                     lyrics_text = ""
             except Exception as exc:
                 self.db.add_grab_event(item_id, "warning", f"lyrics fetch failed: {exc}")
                 lyrics_text = ""
 
-        # 5 — BPM: detect + write tag on the *staged* file (still in tmp_dir).
-        #     Doing this before the file enters music_dir means a crash can't
-        #     leave an untagged, DB-orphaned file in the library that would be
-        #     re-grabbed as a duplicate on restart.
-        self.db.transition(item_id, "analyzing_bpm")
-        result = detect_bpm(out_path, self.config)
-        if self.config.get("write_tags", True) and result.get("bpm"):
-            write_bpm_tag(out_path, result["bpm"], self.config.get("preserve_mtime", True))
-        # Loudness too, while the staged file is still warm. Measured (not read from
-        # a tag) — we just transcoded, so any provider ReplayGain tag is stale.
-        lufs = loudness_source = None
-        if self.config.get("measure_loudness", True):
-            lufs, loudness_source = analyze_loudness(out_path, prefer_tag=False)
-
-        # 6 — render path + atomically place under music_dir (copy-then-replace:
-        #     /data and /music may be different filesystems), then record the DB
-        #     row immediately. copy2 preserves mtime so the hash taken here still
-        #     matches the tagged file the watcher will later see (anti-loop).
+        # 5 — place. Atomic: copy to a non-audio temp name next to the target (so a
+        #     watcher never schedules it), then os.replace. /data and the music dir may
+        #     be different filesystems, hence copy rather than rename. copy2 keeps the
+        #     mtime of the staged file; nothing rewrites the file after this point.
+        self.db.transition(item_id, "placing")
         ext = profile_ext(self.output_format)
-        final = unique_path(self.music_dir, render(self.path_template, meta, ext))
-        os.makedirs(os.path.dirname(final), exist_ok=True)
-        part = os.path.join(os.path.dirname(final), f".mg_part_{item_id}.{ext}")
-        shutil.copy2(out_path, part)
-        os.replace(part, final)
-        fresh_hash = get_file_hash(final)
-        self.db.record_managed_track(
-            final, fresh_hash, meta, result.get("bpm"), result.get("bpm_dr"),
-            result.get("bpm_es"), result.get("bpm_lb"), result.get("confidence"),
-            result.get("detector"), meta.get("spotify_track_id") or "",
-            loudness_lufs=lufs, loudness_source=loudness_source)
-        if lyrics_text:
-            self.db.set_lyrics_state(final, "fetched", is_synced(lyrics_text))
+        rel = render(self.path_template, meta, ext)
+        with _PLACE_LOCK:
+            final = unique_path(self.dest_root, rel)
+            os.makedirs(os.path.dirname(final), exist_ok=True)
+            self.db.update_grab(item_id, final_path=final)  # lets startup recovery finish a crash
+            part = os.path.join(os.path.dirname(final), f".mg_part_{item_id}.part")
+            shutil.copy2(out_path, part)
+            os.replace(part, final)
+        self._record_placed(item_id, final, meta, chosen.provider)
 
-        # 7 — done + notify + debounced Navidrome rescan
+        # 6 — done + notify + post-import hooks
         self.db.update_grab(item_id, progress=1.0, final_path=final)
         self.db.transition(item_id, "done", os.path.basename(final))
         self.db.bump_grabbed_total()   # all-time tally (survives queue cleanup)
         self._notify_done(item)
-        try:
-            _trigger_navidrome_rescan(self.config)
-        except Exception:
-            pass
+        self._after_placed(item_id, final, meta)
         return "done"
+
+    def _rel_to_root(self, path: str) -> str:
+        return PurePosixPath(*os.path.relpath(path, self.dest_root).split(os.sep)).as_posix()
+
+    def _record_placed(self, item_id: int, final: str, meta: dict, provider: str) -> None:
+        """Ledger row for the placed file (the replacement for ``tracks.managed`` +
+        the Spotify-id stamp). Written before analysis/hooks run."""
+        self.db.record_grabbed_file(
+            spotify_track_id=meta.get("spotify_track_id") or "", isrc=meta.get("isrc") or "",
+            rel_path=self._rel_to_root(final), abs_path=final, queue_item_id=item_id,
+            provider=provider or "", output_format=self.output_format,
+            placed_hash=file_token(final))
+
+    def _after_placed(self, item_id: int, final: str, meta: dict) -> None:
+        placed = PlacedFile(path=final, rel_path=self._rel_to_root(final), meta=meta,
+                            queue_item_id=item_id)
+        try:
+            res = self.analysis.after_place(placed)
+            if res and res.detail:
+                self.db.add_grab_event(item_id, "analysis", res.detail)
+        except Exception as exc:  # implementations shouldn't raise; belt and braces
+            log.warning("Post-download analysis failed for item %s: %s", item_id, exc_text(exc))
+        for hook in self.on_placed:
+            try:
+                hook(placed)
+            except Exception as exc:
+                log.warning("Post-import hook failed for item %s: %s", item_id, exc_text(exc))
+
+    def recover_placed(self, item: dict) -> bool:
+        """Startup recovery for an item left in 'placing' by a crash: if its final file
+        is already there (os.replace is atomic, so it is complete) finish the item instead
+        of re-downloading it. Returns True when the item was completed."""
+        final = item.get("final_path") or ""
+        if not final or not os.path.isfile(final):
+            return False
+        meta = _meta_from_item(item)
+        try:
+            self._record_placed(item["id"], final, meta, item.get("provider") or "")
+        except Exception as exc:
+            log.warning("Recovery could not record %s: %s", final, exc_text(exc))
+            return False
+        self.db.update_grab(item["id"], progress=1.0)
+        self.db.transition(item["id"], "done", f"recovered: {os.path.basename(final)}")
+        self.db.bump_grabbed_total()
+        self._after_placed(item["id"], final, meta)
+        return True
 
     # ── notifications (ntfy never fails the pipeline) ──────────────────────────
     def _click_url(self, path):
@@ -389,18 +424,23 @@ class GrabPipeline:
 
 class GrabPool:
     """N worker threads claiming pending items. Own stop event (separate from the
-    scanner's). Started from main() in watch modes when the grabber is enabled."""
+    scanner's). Started from main()."""
 
-    def __init__(self, config, db, tagger, notifier=None):
+    def __init__(self, config, db, notifier=None, analysis=None, on_placed=None):
         self.config = config
         self.db = db
-        self.pipeline = GrabPipeline(config, db, tagger, notifier=notifier)
+        self.pipeline = GrabPipeline(config, db, notifier=notifier, analysis=analysis,
+                                     on_placed=on_placed)
         self.n = max(1, min(3, int(config.get("grab_workers", 1))))
         self._stop = threading.Event()
         self._threads: list[threading.Thread] = []
 
     def start(self):
-        # Startup recovery: return in-flight rows to pending, wipe the temp area.
+        # Startup recovery: finish items that crashed after placing their file, return
+        # the other in-flight rows to pending, wipe the temp area.
+        for item in self.db.get_queue("placing"):
+            if self.pipeline.recover_placed(item):
+                log.info("Grab recovery: completed item %s from its placed file", item["id"])
         reset = self.db.reset_inflight_grabs()
         if reset:
             log.info("Grab recovery: reset %d in-flight item(s) to pending", reset)

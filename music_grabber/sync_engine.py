@@ -1,28 +1,29 @@
-"""SpotifySync — background playlist→library reconciliation (§5).
+"""SpotifySync: background playlist→library reconciliation.
 
-Modeled on the scanner's drain loop: a 2s-tick thread that runs a full sync
-every SPOTIFY_SYNC_MINUTES or when nudged via ``request_sync()``. Per enabled
-playlist: refresh token → compare snapshot_id → (rebuild playlist_tracks) →
-library-match every track. Auth failure marks disconnected and never crashes
-the loop. GrabberService wraps the client + thread for the web layer to use.
+A 2s-tick thread that runs a full sync every SPOTIFY_SYNC_MINUTES or when nudged via
+``request_sync()``. Per enabled playlist: refresh token → compare snapshot_id →
+(rebuild playlist_tracks) → library-match every track. Auth failure marks disconnected
+and never crashes the loop. GrabberService wraps the client, the library index, the
+sync thread and the worker pool for the API/CLI layer to use.
 """
 
 import logging
 import threading
 import time
 
+from .library import FilesystemSource, LibraryIndex
 from .matching import library_match
-from .spotify import SpotifyAuthError, SpotifyClient, SpotifyError
+from .spotify import SpotifyAuthError, SpotifyClient, SpotifyError, parse_playlist_id
 
 log = logging.getLogger(__name__)
 
 
 class SpotifySync(threading.Thread):
-    def __init__(self, config, db, tagger, client, notifier=None):
+    def __init__(self, config, db, index, client, notifier=None):
         super().__init__(daemon=True, name="SpotifySync")
         self.config = config
         self.db = db
-        self.tagger = tagger
+        self.index = index
         self.client = client
         self.notifier = notifier
         self._stop = threading.Event()
@@ -60,10 +61,8 @@ class SpotifySync(threading.Thread):
         if not self.client.is_connected():
             return
         with self._lock:
-            self.tagger.index_tags()
-            # Spotify-sourced rows only: Navidrome and Local playlists have no
-            # spotify_id, and PeriodicSync already syncs them by their own route.
-            playlists = self.db.get_enabled_playlists(source="spotify")
+            self._refresh_index()
+            playlists = self.db.get_enabled_playlists()
             for pl in playlists:
                 if self._stop.is_set():
                     break
@@ -71,24 +70,26 @@ class SpotifySync(threading.Thread):
             self.last_synced_epoch = time.time()
             self.last_error = ""
 
+    def _refresh_index(self):
+        """Reload the library cache. A failing source leaves the cache as it was, so a
+        refresh problem degrades to slightly stale matching rather than a dead sync."""
+        try:
+            self.index.refresh()
+        except Exception as exc:
+            log.warning("Library index refresh failed (using cached index): %s", exc)
+
     def sync_playlist(self, playlist_id: int) -> dict:
-        """Manual single-playlist sync (used by the API, works without the thread)."""
+        """Manual single-playlist sync (used by the API/CLI, works without the thread)."""
         pl = self.db.get_playlist(playlist_id)
         if not pl:
             raise SpotifyError("Playlist not found")
         with self._lock:
-            self.tagger.index_tags()
+            self._refresh_index()
             self._sync_one(pl)
         return self.db.get_playlist(playlist_id)
 
     def _sync_one(self, pl: dict):
-        # Belt and braces: a row without a Spotify id can only produce
-        # GET /playlists/None -> 400 "Invalid base62 id". Skip it rather than
-        # burning a request and parking the error in last_error, where the UI
-        # would show it as a Spotify problem.
         if not pl.get("spotify_id"):
-            log.debug("Skipping '%s': not a Spotify playlist (source=%s)",
-                      pl.get("name"), pl.get("source"))
             return
         try:
             meta = self.client.get_playlist_meta(pl["spotify_id"])
@@ -122,7 +123,7 @@ class SpotifySync(threading.Thread):
     def _match_playlist(self, playlist_id: int):
         rows = self.db.get_playlist_track_rows(playlist_id)
         for pt in rows:
-            path = library_match(pt, self.db)
+            path = library_match(pt, self.index)
             new_status = "have" if path else "missing"
             if new_status != pt.get("match_status") or path != pt.get("matched_file_path"):
                 self.db.set_playlist_track_match(pt["id"], new_status, path)
@@ -142,20 +143,33 @@ def _grab_meta(pt: dict) -> dict:
 
 
 class GrabberService:
-    """Owns the Spotify client + sync thread; the web layer reaches grabber
-    features through this. Present whenever grabber is enabled, regardless of
-    MODE; the background thread only runs in watch modes."""
+    """Owns the Spotify client, the library index, the sync thread and the worker pool.
+    The API/CLI layer reaches grabber features through this."""
 
-    def __init__(self, config, db, tagger, notifier=None):
+    def __init__(self, config, db, notifier=None, index=None, analysis=None, on_placed=None):
         self.config = config
         self.db = db
         self.client = SpotifyClient(config, db)
-        self.sync = SpotifySync(config, db, tagger, self.client, notifier)
+        library_dir = config.get("library_dir") or config["music_dir"]
+        self.index = index if index is not None else LibraryIndex(
+            db, FilesystemSource(library_dir), root=library_dir)
+        self.sync = SpotifySync(config, db, self.index, self.client, notifier)
         from .worker import GrabPool
-        self.pool = GrabPool(config, db, tagger, notifier)
-        from .suggestions import SuggestionsEngine
-        self.suggestions = SuggestionsEngine(config, db)
+        self.pool = GrabPool(config, db, notifier, analysis=analysis, on_placed=on_placed)
         self._thread_started = False
+
+    def seed_playlists(self) -> int:
+        """Register WATCH_PLAYLISTS (URLs/URIs/ids). No network: names are filled in by
+        the first sync. Returns how many were newly added."""
+        added = 0
+        for raw in self.config.get("watch_playlists") or []:
+            sid = parse_playlist_id(raw)
+            if not sid:
+                continue
+            if self.db.get_playlist_by_spotify_id(sid) is None:
+                added += 1
+            self.db.add_playlist(sid, name=sid)
+        return added
 
     def start_background(self):
         if not self._thread_started:
@@ -170,12 +184,8 @@ class GrabberService:
 
     def enqueue_missing(self, playlist_id: int) -> int:
         """Manually enqueue every missing (non-tombstone) track of a playlist
-        (re-attempts failed ones, unlike the sync auto-enqueue). Source-agnostic
-        (Phase 5): routes through the shared enrich+enqueue helper so a NON-Spotify
-        playlist's missing tracks queue too — a Spotify-sourced row keeps its sid and
-        dedupes on it; a Navidrome row adopts a confident Spotify match's sid when
-        connected, else falls back to a normalized (title, artist) dedupe. Returns how
-        many were enqueued."""
+        (re-attempts failed ones, unlike the sync auto-enqueue). Routes through the
+        shared enrich+enqueue helper. Returns how many were enqueued."""
         from .enqueue import enqueue_track
         n = 0
         for pt in self.db.get_playlist_tracks(playlist_id, "missing"):

@@ -1,34 +1,15 @@
-"""Track normalization + fuzzy match scoring (§5).
+"""Fuzzy match scoring + library matching.
 
-Used both for library matching (does this Spotify track already exist on disk?)
-and, from M4, for ranking download-provider candidates. Pure functions +
-rapidfuzz; no I/O.
+Used both for library matching (does this Spotify track already exist on disk?) and
+for ranking download-provider candidates. ``score`` is pure (rapidfuzz, no I/O);
+``library_match`` asks a ``LibraryIndex`` (see library.py).
 """
 
 from typing import Optional
 
 from rapidfuzz import fuzz
 
-# Normalizers live in bpm_tagger.text (stdlib-only, importable by the core);
-# re-exported so every existing `from ...grabber.matching import X` still works.
-from ..text import (  # noqa: F401
-    _ARTIST_SPLIT,
-    _CREDIT_SPLIT,
-    _FEAT,
-    _NAME_LIST_SPLIT,
-    _NOISE,
-    _NOISE_BRACKET,
-    _NOISE_DASH,
-    _PUNCT,
-    _WS,
-    _base_normalize,
-    _strip_diacritics,
-    extract_feat,
-    normalize_artist,
-    normalize_artist_name,
-    normalize_title,
-    split_artist_credits,
-)
+from .text import _base_normalize, normalize_artist, normalize_title
 
 # Tokens that mark a different recording; penalized if present on one side only.
 _VARIANT_TOKENS = ("live", "remix", "cover", "acoustic", "instrumental",
@@ -97,29 +78,30 @@ def score(a: dict, b: dict) -> tuple[float, dict]:
     }
 
 
-def library_match(sp: dict, db, threshold: float = 0.80) -> Optional[str]:
-    """Return the file_path of a library track matching this Spotify track, or None.
+def library_match(sp: dict, index, threshold: float = 0.80) -> Optional[str]:
+    """Return the path of a library track matching this Spotify track, or None.
 
     `sp` needs title/artist/album/duration_ms/isrc (+ norm_title/norm_artist for the
-    SQL prefilter). A stamped spotify_track_id wins outright (a grabbed file we
-    filed ourselves), then ISRC-equal, then the best fuzzy score must reach
-    `threshold`.
+    SQL prefilter). A ledger-stamped spotify_track_id wins outright (a file we filed
+    ourselves and that still exists), then ISRC-equal, then the best fuzzy score must
+    reach `threshold`. `index` is a LibraryIndex (or anything with the same three
+    lookups).
     """
     sid = (sp.get("spotify_track_id") or "").strip()
     if sid:
-        hits = db.find_by_spotify_id(sid)
+        hits = index.find_by_spotify_id(sid)
         if hits:
             return hits[0]["file_path"]
 
     isrc = (sp.get("isrc") or "").strip()
     if isrc:
-        hits = db.find_by_isrc(isrc)
+        hits = index.find_by_isrc(isrc)
         if hits:
             return hits[0]["file_path"]
 
     norm_artist = sp.get("norm_artist") or normalize_artist(sp.get("artist"))
     norm_title = sp.get("norm_title") or normalize_title(sp.get("title"))
-    candidates = db.find_candidates_by_norm(norm_artist, norm_title)
+    candidates = index.find_candidates(norm_artist, norm_title)
 
     best_path, best_score = None, 0.0
     for cand in candidates:
