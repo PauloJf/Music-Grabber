@@ -44,9 +44,11 @@ class _DBBase:
             self._create_tables(conn)
             # Start the lifetime "tracks grabbed" tally at the ledger size when the
             # counter row is missing (a fresh or imported database).
+            # (A scalar subquery, not `SELECT COUNT(*) ... WHERE`: an aggregate returns one
+            # row even when the WHERE excludes everything, which broke every reopen.)
             conn.execute(
                 "INSERT INTO app_counters (key, value) "
-                "SELECT 'grabbed_total', COUNT(*) FROM grabbed_files "
+                "SELECT 'grabbed_total', (SELECT COUNT(*) FROM grabbed_files) "
                 "WHERE NOT EXISTS (SELECT 1 FROM app_counters WHERE key='grabbed_total')")
             conn.commit()
 
