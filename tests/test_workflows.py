@@ -12,15 +12,27 @@ def _on(path):
     return data.get(True, data.get("on"))   # YAML parses a bare `on:` key as boolean True
 
 
-def test_publish_workflow_is_manual_dispatch_only():
+def test_publish_runs_only_on_a_published_release_or_a_confirmed_manual_run():
     trig = _on(WF / "docker-publish.yml")
-    assert set(trig) == {"workflow_dispatch"}, trig
+    assert set(trig) == {"release", "workflow_dispatch"}, trig          # never push/tag/schedule/PR
+    assert trig["release"]["types"] == ["published"]
     assert trig["workflow_dispatch"]["inputs"]["confirm"]["required"] is True
 
 
-def test_publish_job_requires_the_typed_confirmation():
+def test_publish_is_gated_on_verification_and_the_confirmation():
     data = yaml.safe_load((WF / "docker-publish.yml").read_text(encoding="utf-8"))
-    assert data["jobs"]["push"]["if"] == "inputs.confirm == 'publish'"
+    verify, push = data["jobs"]["verify"], data["jobs"]["push"]
+    assert verify["if"] == "github.event_name == 'release' || inputs.confirm == 'publish'"
+    assert push["needs"] == "verify"                                    # a skipped verify skips the push
+    text = (WF / "docker-publish.yml").read_text(encoding="utf-8")
+    assert "pytest -q" in text and "does not match VERSION" in text     # tests + tag/VERSION check
+    assert data["permissions"] == {"contents": "read"}                  # the token cannot write the repo
+
+
+def test_publish_uses_only_the_two_registry_secrets():
+    import re
+    text = (WF / "docker-publish.yml").read_text(encoding="utf-8")
+    assert set(re.findall(r"secrets\.(\w+)", text)) == {"DOCKERHUB_USERNAME", "DOCKERHUB_TOKEN"}
 
 
 def test_only_the_publish_workflow_touches_registry_secrets():

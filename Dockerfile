@@ -1,5 +1,5 @@
 # Music Grabber: Spotify playlist watcher + downloader companion for a Navidrome library.
-# Image: gatoserio/music-grabber (published manually only; see .github/workflows/docker-publish.yml)
+# Image: gatoserio/music-grabber (published on GitHub releases; see .github/workflows/docker-publish.yml)
 
 # ── Web UI bundle (frontend/dist), served by the API process ────────────────────────────
 FROM node:22-alpine AS frontend

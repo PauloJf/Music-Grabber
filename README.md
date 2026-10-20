@@ -11,7 +11,7 @@ v2.18.2 (`eae3f0c2662f590ac8cf0334a282389147152d2f`) with its history kept, see
 
 > **Legal / ToS.** This tool can download from Deezer using *your own* ARL and from YouTube via
 > yt-dlp. Those uses may breach those services' terms and local law. That exposure is the reason
-> this lives in its own private repo and its image is never published by automation. Use it only
+> this lives in its own private repo and its image is published only when you create a GitHub release. Use it only
 > on your own account, for music you are entitled to have, at your own risk.
 
 **Contents:** [How it works](#how-it-works) · [Quick start](#quick-start) ·
@@ -317,3 +317,15 @@ credentials; Spotify, Deezer, yt-dlp, Mediarium, BPM Tagger and ntfy are faked. 
 ## Licence
 
 AGPL-3.0-or-later, same as BPM Tagger. See [`LICENSE`](LICENSE).
+
+## Releasing
+
+1. Set `VERSION`, add a `## <version>` section to `CHANGELOG.md`, merge to `main`.
+2. One-time: add the repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (a Docker Hub
+   access token with write access to `gatoserio/music-grabber`).
+3. Create a GitHub release with the tag `v<VERSION>` (mark it *pre-release* for a beta).
+   `docker-publish.yml` then verifies tag, version, changelog and tests, builds amd64 + arm64 and pushes
+   `<version>` (plus `<major>.<minor>`, `<major>` and `latest` for stable releases).
+
+Nothing else publishes an image: not a push, a plain tag, a schedule or a pull request. *Actions →
+Publish Docker image → Run workflow* (type `publish`) republishes the current `VERSION` by hand.

@@ -7,7 +7,7 @@
 | Name | Music Grabber |
 | Version | see `VERSION` (single source of truth) |
 | Repo | `PauloJf/Music-Grabber` (**private**; never make it public) |
-| Image | `gatoserio/music-grabber`, published **manually only** |
+| Image | `gatoserio/music-grabber`, published to Docker Hub by `docker-publish.yml` **when a GitHub release is published** (or a confirmed manual run) |
 | Licence | AGPL-3.0-or-later (same as BPM Tagger) |
 | Git identity | `Paulo <PauloJf@users.noreply.github.com>` (GitHub rejects pushes exposing `paulo@gatoserio.dev`, error GH007) |
 
@@ -26,8 +26,9 @@ live in `docs/plans/extraction.md`, the origin in `docs/provenance.md`.
   `tests/test_isolation.py` enforces it.
 - **No real network in tests**, no credentials anywhere in the repo. `tests/conftest.py`
   fails any non-loopback connection. Mock Spotify, Deezer, yt-dlp, Mediarium, ntfy.
-- **Never publish an image from automation.** `docker-publish.yml` is `workflow_dispatch`
-  only (guarded by `tests/test_workflows.py`).
+- **An image is published only from a GitHub release** (tag `v<VERSION>`) or a typed-confirmation
+  manual run of `docker-publish.yml`; never from a push, a plain tag, a schedule or a PR (guarded by
+  `tests/test_workflows.py`). Don't create releases or the Docker Hub secrets from here.
 - Don't touch the BPM Tagger repo from here. Removing its grabber is a separate, later step
   that must not ship as a `VERSION` bump to BPM Tagger's `main` until Music Grabber is stable.
 - Secrets (`SPOTIFY_CLIENT_SECRET`, `DEEZER_ARL`) are never logged, never echoed; the Spotify
