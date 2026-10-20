@@ -18,7 +18,10 @@ from urllib.parse import parse_qs, urlparse
 from .config import __version__, build_config, load_settings_override
 from .db import Database
 from .notify import Notifier
+from .hooks import build_hooks
+from .library import LibraryIndex
 from .sync_engine import GrabberService
+from .wiring import ConfigError, build_analysis, build_library_source
 
 log = logging.getLogger("music_grabber")
 
@@ -29,8 +32,18 @@ def _setup_logging(level: str) -> None:
 
 
 def build_service(config: dict) -> GrabberService:
+    """Wire the configured library index, analysis mode and hooks. Raises ConfigError
+    when the configuration names something that cannot work."""
     db = Database(config["db_path"])
-    return GrabberService(config, db, notifier=Notifier.from_config(config))
+    index = LibraryIndex(db, build_library_source(config),
+                         root=config.get("library_dir") or config["music_dir"])
+    analysis = build_analysis(config)
+    hooks = build_hooks(config)
+    service = GrabberService(config, db, notifier=Notifier.from_config(config), index=index,
+                             analysis=analysis, on_placed=[hooks.on_placed])
+    service.hooks = hooks
+    service.analysis = analysis
+    return service
 
 
 def parse_callback(pasted: str, expected_state: str) -> str:
@@ -48,7 +61,11 @@ def parse_callback(pasted: str, expected_state: str) -> str:
 
 
 def cmd_spotify_login(config: dict) -> int:
-    service = build_service(config)
+    try:
+        service = build_service(config)
+    except ConfigError as exc:
+        print(f"Configuration error: {exc}", file=sys.stderr)
+        return 2
     state = secrets.token_urlsafe(16)
     try:
         url = service.authorize_url(state)
@@ -71,14 +88,20 @@ def cmd_spotify_login(config: dict) -> int:
 
 
 def cmd_run(config: dict) -> int:
-    service = build_service(config)
+    try:
+        service = build_service(config)
+    except ConfigError as exc:
+        log.error("Configuration error: %s", exc)
+        return 2
     added = service.seed_playlists()
     if added:
         log.info("Registered %d playlist(s) from WATCH_PLAYLISTS", added)
     st = service.client.status()
-    log.info("Music Grabber %s: spotify configured=%s connected=%s, providers=%s",
+    log.info("Music Grabber %s: spotify configured=%s connected=%s, providers=%s, "
+             "library index=%s, analysis=%s, hooks=%s",
              __version__, st["configured"], st["connected"],
-             [p.name for p in service.pool.pipeline.providers] or "none")
+             [p.name for p in service.pool.pipeline.providers] or "none",
+             service.index.source.name, service.analysis.name, service.hooks.names or "none")
     if not st["connected"]:
         log.warning("Spotify is not connected: run `python -m music_grabber spotify-login`")
     stop = threading.Event()
@@ -89,6 +112,9 @@ def cmd_run(config: dict) -> int:
     log.info("Shutting down")
     service.stop_background()
     service.pool.join(10)
+    service.hooks.close()
+    if hasattr(service.analysis, "close"):
+        service.analysis.close()
     return 0
 
 
