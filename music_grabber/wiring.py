@@ -52,3 +52,11 @@ def build_analysis(config: dict):
                        debounce=float(config.get("hook_debounce_seconds", 45)),
                        max_wait=float(config.get("hook_max_wait_seconds", 600)),
                        min_interval=float(config.get("hook_min_interval_seconds", 60)))
+
+
+def validate_api(config: dict) -> None:
+    """The API token, when set, must be long enough to resist guessing."""
+    token = config.get("api_token") or ""
+    if token and len(token) < 16:
+        raise ConfigError("API_TOKEN must be at least 16 characters "
+                          "(python -c \"import secrets; print(secrets.token_urlsafe(32))\")")

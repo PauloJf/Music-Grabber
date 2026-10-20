@@ -27,11 +27,12 @@ __version__ = _read_version()
 
 # Secrets that are only ever read from the environment (never written to settings.json).
 ENV_ONLY_KEYS = ("spotify_client_id", "spotify_client_secret", "library_api_key", "library_pass",
-                 "bpm_tagger_password", "mediarium_api_key", "navidrome_pass")
+                 "bpm_tagger_password", "mediarium_api_key", "navidrome_pass", "api_token")
 
 # Keys that carry credentials: masked in any API/CLI output.
 SECRET_KEYS = ("spotify_client_secret", "deezer_arl", "library_api_key", "library_pass",
-               "bpm_tagger_password", "mediarium_api_key", "navidrome_pass")
+               "bpm_tagger_password", "mediarium_api_key", "navidrome_pass", "api_token",
+               "ntfy_topic")
 
 
 def _bool(name: str, default: str = "false") -> bool:
@@ -85,6 +86,11 @@ def build_config() -> dict:
         "hook_max_wait_seconds": float(os.environ.get("HOOK_MAX_WAIT_SECONDS", "600")),
         "hook_min_interval_seconds": float(os.environ.get("HOOK_MIN_INTERVAL_SECONDS", "60")),
 
+        # Headless API (Phase 3). Off unless API_TOKEN is set. Bearer-token auth.
+        "api_token":             os.environ.get("API_TOKEN", ""),
+        "api_host":              os.environ.get("API_HOST", "127.0.0.1"),
+        "api_port":              int(os.environ.get("API_PORT", "8099")),
+
         # Spotify (Authorization Code flow; refresh token lives in the DB).
         "spotify_client_id":     os.environ.get("SPOTIFY_CLIENT_ID", ""),
         "spotify_client_secret": os.environ.get("SPOTIFY_CLIENT_SECRET", ""),
@@ -109,6 +115,9 @@ def build_config() -> dict:
         # Notifications.
         "ntfy_url":              os.environ.get("NTFY_URL", ""),
         "ntfy_topic":            os.environ.get("NTFY_TOPIC", ""),
+        # A ping per finished track is noisy for a big playlist; ambiguity, failures and
+        # credential problems always ping.
+        "ntfy_notify_done":      _bool("NTFY_NOTIFY_DONE", "true"),
         "ui_public_url":         os.environ.get("UI_PUBLIC_URL", ""),
     }
 

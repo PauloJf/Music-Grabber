@@ -1,13 +1,12 @@
-"""Entry point: ``python -m music_grabber [run|spotify-login|version]``.
+"""Entry point: ``python -m music_grabber <command>`` (see cli.py for the full list).
 
-``run`` (the default) starts the Spotify sync thread and the download worker pool and
-blocks until SIGINT/SIGTERM. ``spotify-login`` is the headless one-time OAuth connect:
-open the printed URL, approve, then paste back the URL Spotify redirected to (the page
-itself may fail to load; only its ``code`` matters). The fuller CLI/API arrives in a
-later release (docs/plans/extraction.md §4).
+``run`` (the default) starts the Spotify sync thread and the download worker pool, plus the
+JSON API when ``API_TOKEN`` is set, and blocks until SIGINT/SIGTERM. ``spotify-login`` is
+the headless one-time OAuth connect: open the printed URL, approve, then paste back the URL
+Spotify redirected to (the page itself may fail to load; only its ``code`` matters).
+Every other command is a management command handled by cli.py.
 """
 
-import argparse
 import logging
 import secrets
 import signal
@@ -15,13 +14,14 @@ import sys
 import threading
 from urllib.parse import parse_qs, urlparse
 
+from .cli import build_parser, run_command
 from .config import __version__, build_config, load_settings_override
 from .db import Database
 from .notify import Notifier
 from .hooks import build_hooks
 from .library import LibraryIndex
 from .sync_engine import GrabberService
-from .wiring import ConfigError, build_analysis, build_library_source
+from .wiring import ConfigError, build_analysis, build_library_source, validate_api
 
 log = logging.getLogger("music_grabber")
 
@@ -39,6 +39,7 @@ def build_service(config: dict) -> GrabberService:
                          root=config.get("library_dir") or config["music_dir"])
     analysis = build_analysis(config)
     hooks = build_hooks(config)
+    validate_api(config)
     service = GrabberService(config, db, notifier=Notifier.from_config(config), index=index,
                              analysis=analysis, on_placed=[hooks.on_placed])
     service.hooks = hooks
@@ -87,6 +88,19 @@ def cmd_spotify_login(config: dict) -> int:
     return 0
 
 
+def _start_api(config: dict, service: GrabberService):
+    """Start the JSON API in a daemon thread when API_TOKEN is set."""
+    if not config.get("api_token"):
+        log.info("API disabled (set API_TOKEN, at least 16 characters, to enable it)")
+        return None
+    from .api import serve
+    from .ops import Ops
+    ops = Ops(service, config)
+    t = threading.Thread(target=serve, args=(config, ops), daemon=True, name="api")
+    t.start()
+    return t
+
+
 def cmd_run(config: dict) -> int:
     try:
         service = build_service(config)
@@ -107,6 +121,7 @@ def cmd_run(config: dict) -> int:
     stop = threading.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stop.set())
+    _start_api(config, service)
     service.start_background()
     stop.wait()
     log.info("Shutting down")
@@ -119,16 +134,19 @@ def cmd_run(config: dict) -> int:
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(prog="music_grabber")
-    parser.add_argument("command", nargs="?", default="run",
-                        choices=("run", "spotify-login", "version"))
-    args = parser.parse_args(argv)
-    if args.command == "version":
+    args = build_parser().parse_args(argv)
+    command = args.command or "run"
+    if command == "version":
         print(__version__)
         return 0
     config = load_settings_override(build_config())
-    _setup_logging(config["log_level"])
-    return {"run": cmd_run, "spotify-login": cmd_spotify_login}[args.command](config)
+    if command == "run":
+        _setup_logging(config["log_level"])
+        return cmd_run(config)
+    if command == "spotify-login":
+        return cmd_spotify_login(config)
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+    return run_command(args, config, build_service=build_service)
 
 
 if __name__ == "__main__":

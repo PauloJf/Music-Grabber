@@ -58,6 +58,9 @@ class GrabPipeline:
         self.path_template = config.get("path_template", "{AlbumArtist}/{Album}/{TrackNo:02d} - {Title}.{ext}")
         self.analysis = analysis if analysis is not None else NoAnalysis()
         self.dest_root = self.analysis.destination_root(config)
+        # The ledger's rel_path is relative to the library root (not the filing root), so
+        # it stays the same whichever analysis mode, and intake subfolder, filed the file.
+        self.library_root = config.get("library_dir") or config["music_dir"]
         # Callbacks fired after a file is placed and recorded (post-import hooks).
         # Each is wrapped: a hook can never fail a finished grab.
         self.on_placed = list(on_placed or [])
@@ -66,6 +69,18 @@ class GrabPipeline:
         self._auth_lock = threading.Lock()  # GrabPool threads share one pipeline
         self._spotify = None  # lazy SpotifyClient for ISRC backfill (shares its token cache)
         self._spotify_lock = threading.Lock()
+
+    def reload_settings(self) -> None:
+        """Re-read the settings that can change at runtime (providers, thresholds, output
+        format, path template, dry run). The config dict is shared, so lyrics and the rest
+        are read live; ``analysis`` and ``library`` wiring need a restart."""
+        c = self.config
+        self.providers = build_providers(c)
+        self.auto_accept = float(c.get("auto_accept_threshold", 0.85))
+        self.ask = float(c.get("ask_threshold", 0.55))
+        self.output_format = c.get("output_format", "mp3-320")
+        self.path_template = c.get("path_template", self.path_template)
+        self.dry_run = bool(c.get("grab_dry_run", False))
 
     def _provider(self, name):
         return next((p for p in self.providers if p.name == name), None)
@@ -306,12 +321,19 @@ class GrabPipeline:
     def _rel_to_root(self, path: str) -> str:
         return PurePosixPath(*os.path.relpath(path, self.dest_root).split(os.sep)).as_posix()
 
+    def _ledger_rel(self, path: str) -> str:
+        """POSIX path relative to the library root; the absolute path if it is outside it."""
+        rel = os.path.relpath(path, self.library_root)
+        if rel.startswith(".."):
+            return path
+        return PurePosixPath(*rel.split(os.sep)).as_posix()
+
     def _record_placed(self, item_id: int, final: str, meta: dict, provider: str) -> None:
         """Ledger row for the placed file (the replacement for ``tracks.managed`` +
         the Spotify-id stamp). Written before analysis/hooks run."""
         self.db.record_grabbed_file(
             spotify_track_id=meta.get("spotify_track_id") or "", isrc=meta.get("isrc") or "",
-            rel_path=self._rel_to_root(final), abs_path=final, queue_item_id=item_id,
+            rel_path=self._ledger_rel(final), abs_path=final, queue_item_id=item_id,
             provider=provider or "", output_format=self.output_format,
             placed_hash=file_token(final))
 
@@ -357,8 +379,9 @@ class GrabPipeline:
     def _notify_ambiguous(self, item, best):
         if not self.notifier:
             return
-        body = (f"Best match {best.score:.2f} via {best.provider}. Resolve in the inbox."
-                if best else "No confident match found. Resolve in the inbox.")
+        hint = f"Resolve: python -m music_grabber inbox show {item['id']}"
+        body = (f"Best match {best.score:.2f} via {best.provider}. {hint}"
+                if best else f"No confident match found. {hint}")
         url = self._click_url(f"/inbox/{item['id']}")
         try:
             self.notifier.send_grabber(
@@ -412,7 +435,7 @@ class GrabPipeline:
             pass
 
     def _notify_done(self, item):
-        if not self.notifier:
+        if not self.notifier or not self.config.get("ntfy_notify_done", True):
             return
         try:
             self.notifier.send_grabber(
