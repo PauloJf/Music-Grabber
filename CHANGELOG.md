@@ -3,6 +3,19 @@
 ## Unreleased
 
 ### Added
+- **CLI** over a shared operations layer: `status`, `sync`, `playlist`, `queue`, `inbox`
+  (`show` lists candidates with scores and the next commands), `settings`, `library refresh`;
+  `--json` before or after any command; `--remote URL --token T` drives a running instance.
+- **JSON API** (set `API_TOKEN`, 16+ characters): bearer-token auth, no cookies; routes mirror the
+  CLI; typed errors; Spotify OAuth `/callback` guarded by a single-use `state`; secrets masked.
+- **Settings persistence**: validated runtime changes saved to `settings.json` (0600) and applied
+  live (providers, thresholds, output format, path template, ntfy) without a restart.
+- **ntfy**: the ambiguity ping carries the CLI command to run; `NTFY_NOTIFY_DONE` silences the
+  per-track "done" ping; `settings test-ntfy` / `test-deezer`; credential problems alert once.
+- **Import tool**: `import-bpm-tagger DB` (read-only source, `--dry-run`, `--merge`,
+  `--include-tokens`) copies Spotify playlists, queue/candidates/events, the counter and managed
+  tracks (as ledger rows); `import-env` prints a config block from BPM Tagger's settings.json
+  without ever printing secrets.
 - **OpenSubsonic library index** (`LIBRARY_INDEX=opensubsonic`, `LIBRARY_URL`, `LIBRARY_API_KEY`
   or `LIBRARY_USER` + `LIBRARY_PASS`): learns what the library has over HTTP from BPM Tagger's
   Subsonic API (`SUBSONIC_ENABLED` there) or from Navidrome. Walks every song with an empty
@@ -22,6 +35,12 @@
 
 ### Changed
 - The Navidrome rescan is no longer fired once per downloaded track; it is a coalesced hook.
+- The ledger's `rel_path` is relative to the library root (not the filing root), so it is the
+  same whichever analysis mode or intake subfolder filed the file.
+
+### Fixed
+- Reopening an existing database crashed (`UNIQUE constraint failed: app_counters.key`) while
+  seeding the lifetime counter; every second start of the app hit it.
 
 ## 0.1.0 (unreleased)
 

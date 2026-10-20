@@ -54,9 +54,11 @@ def test_settings_override_roundtrip_and_env_only_keys(tmp_path, monkeypatch):
 
 
 def test_masked_hides_secrets():
-    m = cfgmod.masked({"deezer_arl": "abc", "spotify_client_secret": "s", "ntfy_topic": "t", "deezer_quality": "x"})
+    m = cfgmod.masked({"deezer_arl": "abc", "spotify_client_secret": "s", "ntfy_topic": "t",
+                       "api_token": "tok", "deezer_quality": "x"})
     assert m["deezer_arl"] == "********" and m["spotify_client_secret"] == "********"
-    assert m["ntfy_topic"] == "t"
+    assert m["ntfy_topic"] == "********" and m["api_token"] == "********"   # a topic acts as a password
+    assert m["deezer_quality"] == "x"
     assert cfgmod.masked({"deezer_arl": ""})["deezer_arl"] == ""
 
 
