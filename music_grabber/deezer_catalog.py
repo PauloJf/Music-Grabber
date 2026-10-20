@@ -94,3 +94,98 @@ def track_by_isrc(isrc: str) -> dict:
     if not d.get("id"):
         return {}
     return {"dz_track_id": str(d["id"]), "preview_url": d.get("preview") or ""}
+
+
+# ── browsing (the web UI's Discover pages) ──────────────────────────────────────
+# Unlike the lookups above, these raise CatalogError: a browse page should say "Deezer is
+# unreachable" rather than show an empty result that looks like "no such artist".
+
+class CatalogError(Exception):
+    """Deezer could not be reached or answered with an error."""
+
+
+def _call(path: str, params: Optional[dict] = None) -> dict:
+    try:
+        d = _get(path, params)
+    except Exception as exc:
+        raise CatalogError(f"Deezer is unreachable ({type(exc).__name__})") from None
+    err = d.get("error") if isinstance(d, dict) else None
+    if err:
+        raise CatalogError(err.get("message") or "Deezer returned an error")
+    return d
+
+
+def _year(date: str) -> Optional[int]:
+    return int(date[:4]) if date and date[:4].isdigit() else None
+
+
+def _img(o: dict, *keys) -> str:
+    for k in keys:
+        if o.get(k):
+            return o[k]
+    return ""
+
+
+def track_view(t: dict, album: Optional[dict] = None) -> dict:
+    """A Deezer track object in our shape. Deezer durations are seconds; ours are ms."""
+    al = t.get("album") or album or {}
+    ar = t.get("artist") or {}
+    return {
+        "dz_id": str(t.get("id")), "title": t.get("title") or "", "artist": ar.get("name") or "",
+        "artist_id": str(ar["id"]) if ar.get("id") else "", "album": al.get("title") or "",
+        "album_id": str(al["id"]) if al.get("id") else "",
+        "duration_ms": int(t.get("duration") or 0) * 1000 or None,
+        "preview_url": t.get("preview") or "", "cover_url": _img(al, "cover_medium", "cover_big", "cover"),
+        "explicit": bool(t.get("explicit_lyrics")), "track_no": t.get("track_position"),
+        "disc_no": t.get("disk_number"), "year": _year(al.get("release_date") or t.get("release_date") or ""),
+    }
+
+
+def artist_view(a: dict) -> dict:
+    return {"dz_id": str(a.get("id")), "name": a.get("name") or "",
+            "image_url": _img(a, "picture_medium", "picture_big", "picture"),
+            "fans": a.get("nb_fan"), "album_count": a.get("nb_album")}
+
+
+def album_view(a: dict, artist: Optional[dict] = None) -> dict:
+    ar = a.get("artist") or artist or {}
+    return {"dz_id": str(a.get("id")), "title": a.get("title") or "", "artist": ar.get("name") or "",
+            "artist_id": str(ar["id"]) if ar.get("id") else "",
+            "cover_url": _img(a, "cover_medium", "cover_big", "cover"),
+            "year": _year(a.get("release_date") or ""), "track_count": a.get("nb_tracks"),
+            "kind": a.get("record_type") or "album", "explicit": bool(a.get("explicit_lyrics"))}
+
+
+def search(kind: str, query: str, limit: int = 25) -> list:
+    """kind: track | artist | album."""
+    if kind not in ("track", "artist", "album"):
+        raise CatalogError(f"cannot search for '{kind}'")
+    data = _call("search" if kind == "track" else f"search/{kind}", {"q": query, "limit": limit}).get("data", [])
+    shape = {"track": track_view, "artist": artist_view, "album": album_view}[kind]
+    return [shape(x) for x in data if x and x.get("id")]
+
+
+def artist_page(dz_id: str, top_limit: int = 10, album_limit: int = 50, related_limit: int = 12) -> dict:
+    """Everything an artist page shows. The artist call must succeed; the rest degrades to empty."""
+    info = artist_view(_call(f"artist/{dz_id}"))
+    def part(path, params, shape):
+        try:
+            return [shape(x) for x in _call(path, params).get("data", []) if x and x.get("id")]
+        except CatalogError:
+            return []
+    return {"artist": info,
+            "top": part(f"artist/{dz_id}/top", {"limit": top_limit}, track_view),
+            "albums": part(f"artist/{dz_id}/albums", {"limit": album_limit}, album_view),
+            "related": part(f"artist/{dz_id}/related", {"limit": related_limit}, artist_view)}
+
+
+def album_page(dz_id: str) -> dict:
+    d = _call(f"album/{dz_id}")
+    album = album_view(d)
+    tracks = [track_view(t, album={"id": d.get("id"), "title": d.get("title"), "cover_medium": d.get("cover_medium"),
+                                    "release_date": d.get("release_date")})
+              for t in (d.get("tracks") or {}).get("data", []) if t and t.get("id")]
+    for i, t in enumerate(tracks, 1):
+        t["track_no"] = t["track_no"] or i
+        t["artist"] = t["artist"] or album["artist"]
+    return {"album": album, "tracks": tracks}

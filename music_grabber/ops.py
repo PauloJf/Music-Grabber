@@ -11,10 +11,14 @@ import threading
 import time
 from typing import Optional
 
+from . import deezer_catalog
 from .config import SECRET_KEYS, __version__, masked, save_settings, settings_file_path
 from .db import GRAB_TERMINAL
 from .notify import Notifier
+from .enqueue import enqueue_track
+from .matching import library_match
 from .path_template import render
+from .text import normalize_artist, normalize_title
 from .spotify import SpotifyAuthError, SpotifyError, parse_playlist_id
 from .transcode import PROFILES
 
@@ -447,3 +451,112 @@ class Ops:
             raise OpsError("spotify_auth", str(exc), 401) from None
         except SpotifyError as exc:
             raise OpsError("spotify_error", str(exc), 502) from None
+
+    # ── browse Deezer's catalogue and queue from it ───────────────────────────
+    def _catalog(self, fn, *a):
+        try:
+            return fn(*a)
+        except deezer_catalog.CatalogError as exc:
+            raise OpsError("deezer_unreachable", str(exc), 502) from None
+
+    def _states(self, tracks: list) -> list:
+        """Annotate catalogue tracks with what this app already knows: in the library, queued
+        (with live progress), waiting in the inbox, or failed. Matching is by normalised title +
+        artist (catalogue results carry no ISRC), against the library index and the queue."""
+        queue: dict = {}
+        for it in self.db.get_queue():           # newest first; keep the first (most recent) per key
+            queue.setdefault((normalize_title(it.get("title")), normalize_artist(it.get("artist"))), it)
+        for t in tracks:
+            key = (normalize_title(t.get("title")), normalize_artist(t.get("artist")))
+            it, state = queue.get(key), {"kind": "none"}
+            if it and it["status"] not in GRAB_TERMINAL:
+                state = {"kind": "review" if it["status"] == "awaiting_user" else
+                         ("queued" if it["status"] == "pending" else "active"),
+                         "item_id": it["id"], "status": it["status"], "progress": it.get("progress") or 0}
+            elif library_match({"title": t.get("title"), "artist": t.get("artist"), "album": t.get("album"),
+                                "duration_ms": t.get("duration_ms"), "isrc": ""}, self.svc.index, 0.88) \
+                    or (it and it["status"] == "done"):
+                state = {"kind": "library"}
+            elif it and it["status"] in ("failed", "skipped"):
+                state = {"kind": "failed" if it["status"] == "failed" else "none", "item_id": it["id"],
+                         "error": it.get("error") or ""}
+            t["state"] = state
+        return tracks
+
+    def browse_search(self, query: str, kind: str = "track") -> dict:
+        query = (query or "").strip()
+        if not query:
+            raise OpsError("query_required", "type something to search for")
+        results = self._catalog(deezer_catalog.search, kind, query)
+        if kind == "track":
+            self._states(results)
+        return {"kind": kind, "query": query, "results": results}
+
+    def browse_artist(self, dz_id: str) -> dict:
+        page = self._catalog(deezer_catalog.artist_page, str(dz_id))
+        self._states(page["top"])
+        return page
+
+    def browse_album(self, dz_id: str) -> dict:
+        page = self._catalog(deezer_catalog.album_page, str(dz_id))
+        self._states(page["tracks"])
+        return page
+
+    MAX_QUEUE_BATCH = 100
+
+    def browse_queue(self, tracks: list, force: bool = False) -> dict:
+        """Queue catalogue tracks. Already-owned tracks are skipped unless ``force``; a track
+        already in flight is reported, not duplicated. Returns per-track outcomes and the new item
+        ids (so the UI can offer undo)."""
+        if not isinstance(tracks, list) or not tracks:
+            raise OpsError("no_tracks", "nothing to queue")
+        if len(tracks) > self.MAX_QUEUE_BATCH:
+            raise OpsError("too_many", f"queue at most {self.MAX_QUEUE_BATCH} tracks at once")
+        if not force:
+            self._states(tracks)
+        out, ids = [], []
+        for t in tracks:
+            if not (t.get("title") and t.get("dz_id")):
+                out.append({"dz_id": t.get("dz_id"), "result": "invalid"})
+                continue
+            kind = (t.get("state") or {}).get("kind")
+            if kind == "library" and not force:
+                out.append({"dz_id": t["dz_id"], "result": "in_library"})
+                continue
+            meta = {"title": t["title"], "artist": t.get("artist") or "", "album": t.get("album") or "",
+                    "album_artist": t.get("album_artist") or t.get("artist") or "",
+                    "duration_ms": t.get("duration_ms"), "cover_url": t.get("cover_url") or "",
+                    "track_no": t.get("track_no"), "disc_no": t.get("disc_no"), "year": t.get("year")}
+            item_id = enqueue_track(self.db, self.svc, meta, dz_track_id=str(t["dz_id"]))
+            if item_id is None:
+                out.append({"dz_id": t["dz_id"], "result": "already_queued"})
+            else:
+                ids.append(item_id)
+                out.append({"dz_id": t["dz_id"], "result": "queued", "item_id": item_id})
+        if ids:
+            self.svc.request_sync()
+        return {"ok": True, "queued": len(ids), "item_ids": ids, "results": out}
+
+    def browse_queue_album(self, dz_id: str, force: bool = False) -> dict:
+        page = self._catalog(deezer_catalog.album_page, str(dz_id))
+        return {**self.browse_queue(page["tracks"], force), "album": page["album"]["title"]}
+
+    def undo_queue(self, item_ids: list) -> dict:
+        """Cancel items that were just queued and are still pending (the toast's Undo)."""
+        n = 0
+        for i in item_ids or []:
+            it = self.db.get_grab_item(int(i))
+            if it and it["status"] == "pending":
+                self.db.delete_grab(it["id"])
+                n += 1
+        return {"ok": True, "removed": n}
+
+    # ── activity (the always-visible tray) ────────────────────────────────────
+    def activity(self) -> dict:
+        active = self.db.get_active_grabs()
+        recent = [i for i in self.db.get_grab_history(limit=12)]
+        return {"active": [i for i in active if i["status"] != "awaiting_user"],
+                "inbox": sum(1 for i in active if i["status"] == "awaiting_user"),
+                "recent": [{k: i.get(k) for k in ("id", "status", "title", "artist", "updated_at", "error")}
+                           for i in recent],
+                "counts": self.db.get_queue_counts()}

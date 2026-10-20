@@ -33,7 +33,10 @@ def _page(title: str, body: str, status: int = 200) -> Response:
 
 # The UI is same-origin only: no third-party scripts, fonts or connections. Inline styles are
 # allowed because React sets style attributes.
-CSP = ("default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; "
+# Cover art and 30-second previews come straight from Deezer's CDN (and Spotify's, for playlist
+# art); everything else is same-origin.
+CSP = ("default-src 'self'; img-src 'self' data: https://*.dzcdn.net https://i.scdn.co; "
+       "media-src https://*.dzcdn.net; style-src 'self' 'unsafe-inline'; script-src 'self'; "
        "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 
 
@@ -195,6 +198,34 @@ def create_app(ops: Ops, token: str, ui_dir: str = "") -> Flask:
     @app.post("/api/playlists/<int:pid>/enqueue-missing")
     def playlist_enqueue_missing(pid):
         return jsonify(ops.enqueue_missing(pid))
+
+    # ── browse Deezer + activity ──────────────────────────────────────────────
+    @app.get("/api/browse/search")
+    def browse_search():
+        return jsonify(ops.browse_search(request.args.get("q", ""), request.args.get("type", "track")))
+
+    @app.get("/api/browse/artist/<dz_id>")
+    def browse_artist(dz_id):
+        return jsonify(ops.browse_artist(dz_id))
+
+    @app.get("/api/browse/album/<dz_id>")
+    def browse_album(dz_id):
+        return jsonify(ops.browse_album(dz_id))
+
+    @app.post("/api/browse/queue")
+    def browse_queue():
+        data = body()
+        if data.get("album_id"):
+            return jsonify(ops.browse_queue_album(str(data["album_id"]), bool(data.get("force"))))
+        return jsonify(ops.browse_queue(data.get("tracks"), bool(data.get("force"))))
+
+    @app.post("/api/browse/undo")
+    def browse_undo():
+        return jsonify(ops.undo_queue(body().get("item_ids")))
+
+    @app.get("/api/activity")
+    def activity():
+        return jsonify(ops.activity())
 
     # ── queue ─────────────────────────────────────────────────────────────────
     @app.get("/api/queue")
