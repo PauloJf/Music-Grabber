@@ -486,8 +486,8 @@ the point.
   can now ship a yt-dlp bump on its own cadence.
 * **Intake race**: a user running both a BPM-Tagger scan and a grab at the same time is
   fine; BPM-Tagger's 10 s debounce plus atomic `os.replace` placement cover partial files.
-* **Legal/ToS**: the repo is private and the image is never published by automation
-  (manual `workflow_dispatch` only).
+* **Legal/ToS**: the repo is private and the image was manual-only during the extraction; from
+  phase 9 it is published only when a GitHub release is created (see README, "Releasing").
 
 ## 8. Open questions for the owner
 

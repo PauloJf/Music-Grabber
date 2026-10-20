@@ -12,6 +12,12 @@
   names, one vermilion signal colour, light/dark by system preference); no external fonts.
 - API: `/api/browse/*` and `/api/activity`; CSP allows Deezer/Spotify image CDNs and Deezer previews only.
 
+### Release
+- `docker-publish.yml` now publishes `gatoserio/music-grabber` (linux/amd64 + arm64) to Docker Hub when a
+  **GitHub release is published**, after checking that the tag is `v<VERSION>`, `CHANGELOG.md` has a
+  section for it and the tests pass. Stable releases also move `:latest`, `:<major>.<minor>` and
+  `:<major>`; pre-releases only get their exact tag. A typed-confirmation manual run remains.
+
 ### Accounts
 - **User accounts and a login page.** Username + password sign-in (scrypt hashes, server-side
   sessions that expire after 14 days of disuse), a first-run screen that creates the administrator

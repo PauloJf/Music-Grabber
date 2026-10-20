@@ -3,7 +3,7 @@
 services:
   music-grabber:
     build: .
-    # image: gatoserio/music-grabber:latest   # published manually, only when you decide to
+    # image: gatoserio/music-grabber:latest   # published to Docker Hub on each GitHub release
     container_name: music-grabber
     restart: unless-stopped
     environment:
