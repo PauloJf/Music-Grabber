@@ -1,0 +1,51 @@
+name: Publish Docker image (manual)
+
+# MANUAL ONLY. This image carries code with legal/ToS exposure (Deezer ARL, yt-dlp), so it
+# is never published by a push, a tag, a schedule or another workflow: only by someone
+# pressing "Run workflow" and typing the confirmation below.
+# tests/test_workflows.py fails if another trigger is ever added.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "publish" to push gatoserio/music-grabber to Docker Hub'
+        required: true
+        type: string
+      latest:
+        description: "Also move the :latest tag"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: docker-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  push:
+    if: inputs.confirm == 'publish'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read version
+        id: v
+        run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Tags
+        id: tags
+        run: |
+          tags="gatoserio/music-grabber:v${{ steps.v.outputs.version }}"
+          if [ "${{ inputs.latest }}" = "true" ]; then tags="${tags},gatoserio/music-grabber:latest"; fi
+          echo "tags=${tags}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}

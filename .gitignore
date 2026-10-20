@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# Local runtime state: DB, settings (may hold secrets), grab temp, trash
+data/
+*.db
+*.db-wal
+*.db-shm
+*.db.bak-*
+settings.json
+.env
+.env.*
+!.env.example
