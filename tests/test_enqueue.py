@@ -1,12 +1,12 @@
 """Phase 5 §8 — source-agnostic enqueue: normalized dedupe folded into enqueue_grab
 and the shared enqueue_track helper."""
 
-from bpm_tagger.db import BPMDatabase
-from bpm_tagger.grabber.enqueue import enqueue_track
+from music_grabber.db import Database
+from music_grabber.enqueue import enqueue_track
 
 
 def _db(tmp_path):
-    return BPMDatabase(str(tmp_path / "bpm.db"))
+    return Database(str(tmp_path / "mg.db"))
 
 
 def _meta(title, artist="Artist", **kw):
@@ -60,13 +60,13 @@ def test_enqueue_track_links_playlist_track_and_no_grabber(tmp_path):
     assert enqueue_track(db, None, _meta("navidrome track")) is None
 
 
-def test_enqueue_missing_navidrome_reflects_queued_status(tmp_path):
-    """A Navidrome (no-sid) missing track queues via GrabberService.enqueue_missing and
-    then reads as 'queued' on its playlist row, via the playlist_track_id link."""
-    from bpm_tagger.grabber.sync_engine import GrabberService
+def test_enqueue_missing_without_spotify_id_reflects_queued_status(tmp_path):
+    """A missing playlist row with no Spotify id queues via GrabberService.enqueue_missing
+    and then reads as 'queued' on its playlist row, via the playlist_track_id link."""
+    from music_grabber.sync_engine import GrabberService
 
     db = _db(tmp_path)
-    pid = db.add_navidrome_playlist("nid-1", "Nav")
+    pid = db.add_playlist("pl-1", "Mix")
     db.sync_playlist_tracks(pid, [{
         "source_track_id": "song-1", "spotify_track_id": None, "position": 0,
         "title": "Missing One", "artist": "Artist", "album": "", "album_artist": "Artist",
@@ -77,13 +77,8 @@ def test_enqueue_missing_navidrome_reflects_queued_status(tmp_path):
     assert db.get_playlist_tracks(pid, "missing")
 
     # A grabber with no Spotify client → no adoption; enqueue by metadata only.
-    class _Tagger:
-        def __init__(self, db):
-            self.db, self.notifier, self.grabber = db, None, None
-        def index_tags(self):
-            return 0
-    cfg = {"grabber_enabled": True, "db_path": db.db_path, "music_dir": str(tmp_path)}
-    service = GrabberService(cfg, db, _Tagger(db), None)
+    cfg = {"db_path": db.db_path, "music_dir": str(tmp_path)}
+    service = GrabberService(cfg, db)
 
     class _Disconnected:
         def is_connected(self):

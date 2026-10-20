@@ -5,11 +5,11 @@ retried item's event history would grow without bound. Events are capped at writ
 time, and prune_grab_events() cleans up databases that predate the cap.
 """
 
-from bpm_tagger.db import BPMDatabase
+from music_grabber.db import Database
 
 
 def _db(tmp_path):
-    return BPMDatabase(str(tmp_path / "bpm.db"))
+    return Database(str(tmp_path / "mg.db"))
 
 
 def _enqueue(db, title="song"):
@@ -19,7 +19,7 @@ def _enqueue(db, title="song"):
 def test_events_capped_per_item_at_write_time(tmp_path):
     db = _db(tmp_path)
     item_id = _enqueue(db)
-    cap = BPMDatabase._EVENTS_PER_ITEM_CAP
+    cap = Database._EVENTS_PER_ITEM_CAP
     # Far more transitions than the cap (statuses reused; audit-only).
     for i in range(cap + 60):
         db.add_grab_event(item_id, "warning", f"note {i}")
@@ -34,7 +34,7 @@ def test_events_capped_per_item_at_write_time(tmp_path):
 def test_prune_cleans_pre_cap_bloat(tmp_path):
     db = _db(tmp_path)
     item_id = _enqueue(db)
-    cap = BPMDatabase._EVENTS_PER_ITEM_CAP
+    cap = Database._EVENTS_PER_ITEM_CAP
     # Simulate legacy bloat by inserting straight past the cap-enforcing helper.
     with db._connect() as conn:
         conn.executemany(

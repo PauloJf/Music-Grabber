@@ -2,8 +2,8 @@
 
 import os
 
-from bpm_tagger.grabber import path_template as pt
-from bpm_tagger.grabber import transcode as tc
+from music_grabber import path_template as pt
+from music_grabber import transcode as tc
 
 
 def _meta(**kw):

@@ -5,12 +5,13 @@ row and its children in one transaction — explicitly, so it's correct on older
 databases that predate ON DELETE CASCADE.
 """
 
-from bpm_tagger.db import BPMDatabase
-from bpm_tagger.grabber import matching as m
+from music_grabber.db import Database
+from music_grabber import matching as m
+from music_grabber.library import LibraryIndex
 
 
 def _db(tmp_path):
-    return BPMDatabase(str(tmp_path / "bpm.db"))
+    return Database(str(tmp_path / "mg.db"))
 
 
 def _enqueue(db, title="song"):
@@ -73,35 +74,38 @@ def test_grabbed_total_counter_survives_clear(tmp_path):
     assert db.get_grabbed_total() == 2
 
 
-def test_grabbed_total_seeds_from_managed_on_migration(tmp_path):
-    path = str(tmp_path / "bpm.db")
-    db = BPMDatabase(path)
+def _ledger(db, i, sid=None, root="/music"):
+    db.record_grabbed_file(spotify_track_id=sid or f"sp{i}", isrc="", rel_path=f"g{i}.mp3",
+                           abs_path=f"{root}/g{i}.mp3", queue_item_id=None, provider="fake",
+                           output_format="mp3-128", placed_hash=f"h{i}")
+
+
+def test_grabbed_total_seeds_from_ledger_when_counter_is_missing(tmp_path):
+    path = str(tmp_path / "mg.db")
+    db = Database(path)
     for i in range(3):
-        db.record_managed_track(
-            f"/music/g{i}.mp3", f"h{i}",
-            {"title": f"t{i}", "artist": "a", "norm_title": f"t{i}", "norm_artist": "a"},
-            120.0, None, None, 120.0, 0.9, "librosa", f"sp{i}")
-    # Simulate a database created before the counter existed, then reopen so the
-    # migration re-seeds grabbed_total from the current managed-track count.
+        _ledger(db, i)
+    # A database whose counter row is gone (e.g. imported): reopening re-seeds
+    # grabbed_total from the ledger so the lifetime tally starts meaningful.
     with db._connect() as conn:
         conn.execute("DELETE FROM app_counters")
         conn.commit()
-    assert BPMDatabase(path).get_grabbed_total() == 3
+    assert Database(path).get_grabbed_total() == 3
 
 
 def test_grabbed_track_still_matches_after_completed_cleared(tmp_path):
-    """A grabbed file is recognised as 'have' by its stamped spotify_track_id even
-    with no ISRC and a title/artist that would never fuzzy-match — so clearing the
+    """A grabbed file is recognised as 'have' by its ledger-stamped spotify_track_id even
+    with no ISRC and a title/artist that would never fuzzy-match, so clearing the
     completed queue row can never cause the sync to re-grab it."""
+    music = tmp_path / "music"
+    music.mkdir()
+    (music / "g.mp3").write_bytes(b"x")
     db = _db(tmp_path)
-    db.record_managed_track(
-        "/music/g.mp3", "h1",
-        {"title": "weird local filename", "artist": "x", "isrc": "", "duration_ms": 123000,
-         "norm_title": m.normalize_title("weird local filename"),
-         "norm_artist": m.normalize_artist("x")},
-        128.0, None, None, 128.0, 0.9, "librosa", "sp_keep")
-
-    assert db.find_by_spotify_id("sp_keep")[0]["file_path"] == "/music/g.mp3"
+    db.record_grabbed_file(spotify_track_id="sp_keep", isrc="", rel_path="g.mp3",
+                           abs_path=str(music / "g.mp3"), queue_item_id=None, provider="fake",
+                           output_format="mp3-128", placed_hash="h1")
+    idx = LibraryIndex(db, None, root=str(music))
+    assert idx.find_by_spotify_id("sp_keep")[0]["file_path"] == "g.mp3"
 
     # The Spotify-side metadata (what a sync reconciles) differs entirely, yet the
     # stamped id still resolves it to the grabbed file.
@@ -109,7 +113,17 @@ def test_grabbed_track_still_matches_after_completed_cleared(tmp_path):
           "duration_ms": 200000, "isrc": "", "spotify_track_id": "sp_keep",
           "norm_title": m.normalize_title("Proper Title"),
           "norm_artist": m.normalize_artist("Proper Artist")}
-    assert m.library_match(sp, db) == "/music/g.mp3"
+    assert m.library_match(sp, idx) == "g.mp3"
+
+
+def test_ledger_hit_for_a_deleted_file_is_not_a_match(tmp_path):
+    """Delete a grabbed track and the next sync must see it as missing again."""
+    db = _db(tmp_path)
+    _ledger(db, 1, sid="sp_gone", root=str(tmp_path / "music"))   # file never created
+    idx = LibraryIndex(db, None, root=str(tmp_path / "music"))
+    assert idx.find_by_spotify_id("sp_gone") == []
+    sp = {"title": "Zzz", "artist": "Nobody", "spotify_track_id": "sp_gone", "isrc": ""}
+    assert m.library_match(sp, idx) is None
 
 
 def test_delete_grab_leaves_siblings_intact(tmp_path):

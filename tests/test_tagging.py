@@ -3,14 +3,12 @@
 import io
 import os
 
-import numpy as np
-import soundfile as sf
 from mutagen.flac import FLAC
 from PIL import Image
 
-from bpm_tagger.db import BPMDatabase
-from bpm_tagger.grabber.tagging import (embed_cover, read_cover, resize_cover,
-                                        write_track_tags)
+from audio_fixtures import write_flac
+from music_grabber.db import Database
+from music_grabber.tagging import embed_cover, read_cover, resize_cover, write_track_tags
 
 
 def _png(size):
@@ -35,9 +33,7 @@ def test_resize_cover_leaves_small_untouched():
 
 def test_embed_and_read_cover_flac(tmp_path):
     f = tmp_path / "song.flac"
-    sr = 22050
-    y = (0.1 * np.sin(2 * np.pi * 220 * np.arange(sr) / sr)).astype("float32")
-    sf.write(str(f), y, sr, format="FLAC")
+    write_flac(f)
     jpeg = resize_cover(_png(2000))                    # >1200 → re-encoded to JPEG
     assert jpeg[:3] == b"\xff\xd8\xff"
     embed_cover(str(f), jpeg, mime="image/jpeg")
@@ -47,17 +43,14 @@ def test_embed_and_read_cover_flac(tmp_path):
 
 
 def _flac(path):
-    sr = 22050
-    y = (0.1 * np.sin(2 * np.pi * 220 * np.arange(sr) / sr)).astype("float32")
-    sf.write(str(path), y, sr, format="FLAC")
+    write_flac(path)
     # Backdate so any bump is unmistakable.
     old = os.stat(str(path)).st_mtime - 100_000
     os.utime(str(path), (old, old))
     return old
 
 
-# PRESERVE_MTIME has to hold for UI metadata/cover edits too, not just BPM and
-# lyrics writes — see issue #5.
+# Tag and cover writes must preserve mtime (watchers and media servers key off it).
 
 def test_write_track_tags_preserves_mtime_by_default(tmp_path):
     f = tmp_path / "song.flac"
@@ -90,7 +83,7 @@ def test_embed_cover_bumps_mtime_when_disabled(tmp_path):
 
 
 def test_last_change_updates_on_enqueue(tmp_path):
-    db = BPMDatabase(str(tmp_path / "bpm.db"))
+    db = Database(str(tmp_path / "mg.db"))
     before = db.get_last_change()
     db.enqueue_grab({"spotify_track_id": "s1", "title": "X"})
     assert db.get_last_change() != before

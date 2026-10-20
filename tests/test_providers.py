@@ -1,112 +1,11 @@
-"""Provider tests — Monochrome (fake requests session) + yt-dlp (fake YoutubeDL)."""
+"""Provider tests: Deezer (fake streamrip client) + yt-dlp (fake YoutubeDL). No network."""
 
 import pytest
 
-from bpm_tagger.grabber.providers import build_providers
-from bpm_tagger.grabber.providers.base import ProviderCandidate, TrackMeta
-from bpm_tagger.grabber.providers.deezer import DeezerProvider
-from bpm_tagger.grabber.providers.monochrome import MonochromeProvider
-from bpm_tagger.grabber.providers.ytdlp import YtDlpProvider
-
-
-# ── Fake requests plumbing for Monochrome ─────────────────────────────────────
-class FakeResp:
-    def __init__(self, status=200, json_data=None, headers=None, chunks=None):
-        self.status_code = status
-        self._json = json_data or {}
-        self.headers = headers or {}
-        self._chunks = chunks or []
-
-    def json(self):
-        return self._json
-
-    def raise_for_status(self):
-        if self.status_code >= 400:
-            raise RuntimeError(f"HTTP {self.status_code}")
-
-    def iter_content(self, chunk_size=65536):
-        yield from self._chunks
-
-
-class FakeSession:
-    def __init__(self, handler):
-        self.handler = handler
-        self.calls = 0
-
-    def get(self, url, params=None, headers=None, stream=False, timeout=None):
-        self.calls += 1
-        return self.handler(url, params, stream, self.calls)
-
-
-@pytest.fixture(autouse=True)
-def _no_sleep(monkeypatch):
-    monkeypatch.setattr("bpm_tagger.grabber.providers.monochrome.time.sleep", lambda *_: None)
-
-
-def _mono():
-    return MonochromeProvider({"monochrome_base_url": "http://mono.local", "monochrome_api_key": "k"})
-
-
-SEARCH_JSON = {"items": [
-    {"id": 111, "title": "Blinding Lights", "artists": [{"name": "The Weeknd"}],
-     "album": {"title": "After Hours"}, "duration": 200, "isrc": "USUG11904206",
-     "audioQuality": "LOSSLESS"},
-    {"id": 222, "title": "Other", "artists": [{"name": "Nobody"}], "duration": 180},
-]}
-
-
-def test_monochrome_search_parses_candidates():
-    p = _mono()
-    p.session = FakeSession(lambda url, params, stream, n: FakeResp(json_data=SEARCH_JSON))
-    cands = p.search(TrackMeta(title="Blinding Lights", artist="The Weeknd"))
-    assert len(cands) == 2
-    c = cands[0]
-    assert c.provider == "monochrome" and c.provider_track_id == "111"
-    assert c.title == "Blinding Lights" and c.artist == "The Weeknd"
-    assert c.duration_ms == 200000 and c.isrc == "USUG11904206"
-
-
-def test_monochrome_download_streams_and_reports_progress(tmp_path):
-    p = _mono()
-    p.session = FakeSession(lambda url, params, stream, n: FakeResp(
-        headers={"Content-Length": "6", "Content-Type": "audio/flac"},
-        chunks=[b"abc", b"def"]))
-    seen = []
-    cand = ProviderCandidate(provider="monochrome", provider_track_id="111")
-    df = p.download(cand, str(tmp_path), progress_cb=lambda f: seen.append(f))
-    assert df.ext == "flac"
-    with open(df.path, "rb") as fh:
-        assert fh.read() == b"abcdef"
-    assert seen and seen[-1] == 1.0
-
-
-def test_monochrome_429_then_success():
-    p = _mono()
-
-    def handler(url, params, stream, n):
-        if n == 1:
-            return FakeResp(status=429, headers={"Retry-After": "1"})
-        return FakeResp(json_data=SEARCH_JSON)
-
-    p.session = FakeSession(handler)
-    cands = p.search(TrackMeta(title="x", artist="y"))
-    assert len(cands) == 2  # retried after the 429
-
-
-def test_monochrome_circuit_breaker_opens_after_failures():
-    p = _mono()
-
-    def boom(url, params, stream, n):
-        import requests
-        raise requests.ConnectionError("down")
-
-    p.session = FakeSession(boom)
-    for _ in range(5):
-        assert p.search(TrackMeta(title="x", artist="y")) == []
-    assert p._breaker_open()
-    calls_before = p.session.calls
-    assert p.search(TrackMeta(title="x", artist="y")) == []  # short-circuited
-    assert p.session.calls == calls_before  # breaker skipped the network entirely
+from music_grabber.providers import build_providers
+from music_grabber.providers.base import ProviderCandidate, TrackMeta
+from music_grabber.providers.deezer import DeezerProvider
+from music_grabber.providers.ytdlp import YtDlpProvider
 
 
 # ── yt-dlp fake ───────────────────────────────────────────────────────────────
@@ -258,7 +157,7 @@ def _rejected_deezer():
 
 
 def test_deezer_rejected_arl_raises_clear_error_and_closes_session(tmp_path):
-    from bpm_tagger.grabber.providers.base import ProviderAuthError
+    from music_grabber.providers.base import ProviderAuthError
     cand = ProviderCandidate(provider="deezer", provider_track_id="1")
     with pytest.raises(ProviderAuthError, match="rejected the ARL"):
         _rejected_deezer().download(cand, str(tmp_path))
@@ -277,13 +176,10 @@ def test_deezer_verify_explains_failure():
 
 
 # ── ordering ──────────────────────────────────────────────────────────────────
-def test_build_providers_monochrome_on_hold():
-    # Monochrome is on hold: skipped even when it's in the order AND configured.
-    provs = build_providers({"provider_order": "monochrome,ytdlp"})
+def test_build_providers_ignores_unknown_and_monochrome():
+    # Monochrome was dropped in the extraction: treated as an unknown provider.
+    provs = build_providers({"provider_order": "monochrome,ytdlp,bogus"})
     assert [p.name for p in provs] == ["ytdlp"]
-    provs = build_providers({"provider_order": "ytdlp,monochrome",
-                             "monochrome_base_url": "http://m"})
-    assert [p.name for p in provs] == ["ytdlp"]  # monochrome on hold
 
 
 def test_build_providers_deezer_gated_on_arl():
@@ -303,7 +199,7 @@ def _isrc_track(**over):
 
 
 def test_deezer_isrc_hit_leads_and_text_hits_follow(monkeypatch):
-    from bpm_tagger.integrations import deezer_catalog
+    from music_grabber import deezer_catalog
     seen = []
     monkeypatch.setattr(deezer_catalog, "track_detail_by_isrc",
                         lambda i: seen.append(i) or _isrc_track())
@@ -315,7 +211,7 @@ def test_deezer_isrc_hit_leads_and_text_hits_follow(monkeypatch):
 
 
 def test_deezer_isrc_hit_not_duplicated_in_text_hits(monkeypatch):
-    from bpm_tagger.integrations import deezer_catalog
+    from music_grabber import deezer_catalog
     monkeypatch.setattr(deezer_catalog, "track_detail_by_isrc",
                         lambda i: _isrc_track(id=3380574911))
     cands = _deezer().search(TrackMeta(title="Voices In My Head", artist="Anyma",
@@ -324,7 +220,7 @@ def test_deezer_isrc_hit_not_duplicated_in_text_hits(monkeypatch):
 
 
 def test_deezer_isrc_hit_survives_a_failing_text_search(monkeypatch):
-    from bpm_tagger.integrations import deezer_catalog
+    from music_grabber import deezer_catalog
     monkeypatch.setattr(deezer_catalog, "track_detail_by_isrc", lambda i: _isrc_track())
 
     def boom(arl):
@@ -337,7 +233,7 @@ def test_deezer_isrc_hit_survives_a_failing_text_search(monkeypatch):
 
 @pytest.mark.parametrize("detail", [{}, _isrc_track(readable=False)])
 def test_deezer_isrc_miss_or_unreadable_falls_back_to_text(monkeypatch, detail):
-    from bpm_tagger.integrations import deezer_catalog
+    from music_grabber import deezer_catalog
     monkeypatch.setattr(deezer_catalog, "track_detail_by_isrc", lambda i: detail)
     cands = _deezer().search(TrackMeta(title="Voices In My Head", artist="Anyma",
                                        isrc="USUG12500914"))
@@ -345,7 +241,7 @@ def test_deezer_isrc_miss_or_unreadable_falls_back_to_text(monkeypatch, detail):
 
 
 def test_deezer_no_isrc_skips_the_lookup(monkeypatch):
-    from bpm_tagger.integrations import deezer_catalog
+    from music_grabber import deezer_catalog
     called = []
     monkeypatch.setattr(deezer_catalog, "track_detail_by_isrc",
                         lambda i: called.append(i) or {})
@@ -355,7 +251,7 @@ def test_deezer_no_isrc_skips_the_lookup(monkeypatch):
 
 # ── Deezer: the note explaining why the title search ran ──────────────────────
 def test_deezer_isrc_miss_sets_note(monkeypatch):
-    from bpm_tagger.integrations import deezer_catalog
+    from music_grabber import deezer_catalog
     monkeypatch.setattr(deezer_catalog, "track_detail_by_isrc", lambda i: {})
     res = _deezer().search(TrackMeta(title="Voices In My Head", artist="Anyma", isrc="usug12500914"))
     assert res.note == "ISRC USUG12500914 isn't in Deezer's catalogue; searched by title instead"
@@ -363,7 +259,7 @@ def test_deezer_isrc_miss_sets_note(monkeypatch):
 
 
 def test_deezer_isrc_unreadable_note_names_the_country_cause(monkeypatch):
-    from bpm_tagger.integrations import deezer_catalog
+    from music_grabber import deezer_catalog
     monkeypatch.setattr(deezer_catalog, "track_detail_by_isrc",
                         lambda i: _isrc_track(readable=False))
     res = _deezer().search(TrackMeta(title="Voices In My Head", artist="Anyma", isrc="USUG12500914"))
@@ -371,21 +267,21 @@ def test_deezer_isrc_unreadable_note_names_the_country_cause(monkeypatch):
 
 
 def test_deezer_isrc_lookup_failure_note_is_distinct_from_a_miss(monkeypatch):
-    from bpm_tagger.integrations import deezer_catalog
+    from music_grabber import deezer_catalog
     monkeypatch.setattr(deezer_catalog, "track_detail_by_isrc", lambda i: None)
     res = _deezer().search(TrackMeta(title="Voices In My Head", artist="Anyma", isrc="USUG12500914"))
     assert res.note.startswith("Couldn't reach Deezer's ISRC lookup")
 
 
 def test_deezer_no_note_on_hit_or_without_isrc(monkeypatch):
-    from bpm_tagger.integrations import deezer_catalog
+    from music_grabber import deezer_catalog
     monkeypatch.setattr(deezer_catalog, "track_detail_by_isrc", lambda i: _isrc_track())
     assert _deezer().search(TrackMeta(title="x", artist="y", isrc="USUG12500914")).note == ""
     assert _deezer().search(TrackMeta(title="Voices In My Head", artist="Anyma")).note == ""
 
 
 def test_catalog_isrc_detail_distinguishes_miss_from_failure(monkeypatch):
-    from bpm_tagger.integrations import deezer_catalog as dc
+    from music_grabber import deezer_catalog as dc
     monkeypatch.setattr(dc, "_get", lambda path, params=None: {"error": {"code": 800}})
     assert dc.track_detail_by_isrc("XX1") == {}
     monkeypatch.setattr(dc, "_get", lambda path, params=None: {"id": 5, "title": "t"})
