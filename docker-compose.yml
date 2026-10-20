@@ -30,6 +30,16 @@ services:
       GRAB_WORKERS: "1"
       GRAB_DRY_RUN: "false"             # true: search and score, never download
 
+      # --- Working with BPM Tagger (see README: Working with BPM Tagger) -----------
+      # ANALYSIS: intake                  # file into a folder BPM Tagger's watcher covers
+      # INTAKE_DIR: /music/Music-raw      # (a subfolder of BPM Tagger's MUSIC_DIR)
+      # LIBRARY_INDEX: filesystem         # or opensubsonic + LIBRARY_URL + LIBRARY_API_KEY
+
+      # --- Post-import hooks (off by default) --------------------------------------
+      # POST_IMPORT_HOOKS: mediarium      # mediarium,navidrome (not navidrome with intake)
+      # MEDIARIUM_URL: http://mediarium:8080
+      # MEDIARIUM_API_KEY: ""
+
       # ntfy: leave empty to disable
       NTFY_URL: https://ntfy.sh
       NTFY_TOPIC: ""

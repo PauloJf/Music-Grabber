@@ -241,9 +241,9 @@ set of tests) and keeps Spotify sync from making an HTTP call per track.
    admin password, unaffected by TOTP). BPM-Tagger's songs carry `path`, `duration`,
    `isrc` (list), `title/artist/album/albumArtist/track/discNumber/year`. The walk is
    `search3` with `query=""` paged by `songCount` (<=1000) / `songOffset`, falling back
-   to `getAlbumList2` + `getAlbum` if a server rejects the empty query. To be verified
-   against BPM-Tagger's `subsonic_search_songs("")` at the start of Phase 2; if it does
-   not return everything, the album walk is the primary path. Change token = a hash of
+   to `getAlbumList2` + `getAlbum` if a server rejects the empty query. **Verified in
+   BPM Tagger's source (Phase 2):** `subsonic_search_songs("")` pages through the whole
+   library ordered by id (its docstring says Symfonium syncs that way). Change token = a hash of
    the fields we store (the API gives no mtime), so deletes are detected by
    "not seen in this pass" with a safety valve: a pass that returns zero tracks, or
    fewer than half the cache, is treated as a failed refresh and prunes nothing.

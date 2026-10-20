@@ -3,7 +3,7 @@
 Spotify playlist watcher + downloader companion for [Navidrome](https://www.navidrome.org/)
 libraries, split out of [BPM Tagger](https://github.com/PauloJf/BPM-Tagger).
 
-**v0.1.0, private, early.** Headless for now: no web UI yet (see the roadmap). Origin and
+**v0.2.0-dev, private, early.** Headless for now: no web UI yet (see the roadmap). Origin and
 history: [`docs/provenance.md`](docs/provenance.md), extracted from BPM Tagger v2.18.2
 (`eae3f0c2662f590ac8cf0334a282389147152d2f`). The design and the reasons for the split:
 [`docs/plans/extraction.md`](docs/plans/extraction.md).
@@ -28,8 +28,8 @@ history: [`docs/provenance.md`](docs/provenance.md), extracted from BPM Tagger v
 4. **Finish.** ffmpeg transcodes to one `OUTPUT_FORMAT`, tags and cover art are written,
    then the file is filed by `PATH_TEMPLATE` (atomically) and recorded in the ledger.
 
-It does **not** detect BPM. That belongs to BPM Tagger: point this tool at a folder BPM
-Tagger watches and it will tag the new files itself (intake mode, coming in 0.2.0).
+It does **not** detect BPM. That belongs to BPM Tagger: file into a folder BPM Tagger
+watches and it tags the new files itself (see *Working with BPM Tagger* below).
 
 ## Quick start (Docker)
 
@@ -81,13 +81,69 @@ Names match BPM Tagger's grabber settings, so an existing compose block carries 
 | `NTFY_URL`, `NTFY_TOPIC` | | empty topic disables |
 | `UI_PUBLIC_URL` | | used for click-through links in pings |
 | `LOG_LEVEL` | `INFO` | |
+| `LIBRARY_INDEX` | `filesystem` | `filesystem` \| `opensubsonic` |
+| `LIBRARY_URL`, `LIBRARY_API_KEY` (or `LIBRARY_USER` + `LIBRARY_PASS`) | | for `opensubsonic`: BPM Tagger's Subsonic API or Navidrome |
+| `ANALYSIS` | `none` | `none` \| `intake` \| `api` |
+| `INTAKE_DIR` | | for `intake`/`api`: a directory BPM Tagger's watcher covers |
+| `ANALYSIS_WAIT_SECONDS` | `0` | `intake`/`api`: wait up to this long for the BPM tag (blocks one worker) |
+| `BPM_TAGGER_URL`, `BPM_TAGGER_USERNAME`, `BPM_TAGGER_PASSWORD` | | for `api`: BPM Tagger's admin login |
+| `POST_IMPORT_HOOKS` | | comma list: `mediarium`, `navidrome` |
+| `MEDIARIUM_URL`, `MEDIARIUM_API_KEY`, `MEDIARIUM_API_KEY_HEADER` | | header defaults to `X-Api-Key` (`Authorization` sends a Bearer token) |
+| `NAVIDROME_URL`, `NAVIDROME_USER`, `NAVIDROME_PASS` | | for the `navidrome` hook |
+| `HOOK_DEBOUNCE_SECONDS` / `HOOK_MAX_WAIT_SECONDS` / `HOOK_MIN_INTERVAL_SECONDS` | `45` / `600` / `60` | hook coalescing |
+
+Secrets (`SPOTIFY_CLIENT_SECRET`, `LIBRARY_API_KEY`, `LIBRARY_PASS`, `BPM_TAGGER_PASSWORD`,
+`MEDIARIUM_API_KEY`, `NAVIDROME_PASS`) are read from the environment only and never written
+to `settings.json`. A configuration that cannot work (unknown index, `intake` without
+`INTAKE_DIR`, a listed hook with no URL) makes `run` exit with code 2 and say what to set.
+
+## Working with BPM Tagger
+
+Music Grabber never imports BPM Tagger and shares no database with it. The coupling is a
+folder and, optionally, HTTP.
+
+**Intake (recommended).** Mount the same music folder into both containers, then file new
+tracks into a subfolder BPM Tagger watches:
+
+```yaml
+# Music Grabber
+MUSIC_DIR: /music                 # BPM Tagger's MUSIC_DIR (the whole library)
+ANALYSIS: intake
+INTAKE_DIR: /music/Music-raw      # a subfolder; BPM Tagger's watcher is recursive
+LIBRARY_INDEX: filesystem         # scans /music, so intake and library are both covered
+```
+
+BPM Tagger's watcher sees each placed file (it is written under a `.part` name and renamed
+into place, so it never sees a half-written file), detects the BPM, writes the tag and, if
+configured, asks Navidrome to rescan *after* tagging. So leave the `navidrome` hook off in
+this mode: a rescan before the BPM tag exists is one Navidrome's quick scan never revisits.
+Music Grabber never touches a file after placing it, so BPM Tagger analyses it exactly once.
+
+**Library index over HTTP.** If Music Grabber cannot see the library files, let it ask
+BPM Tagger (or Navidrome) instead: `LIBRARY_INDEX=opensubsonic`, `LIBRARY_URL=http://bpm-tagger:5000`,
+`LIBRARY_API_KEY=<an OpenSubsonic API key>`. On BPM Tagger turn on `SUBSONIC_ENABLED` and
+create the key in its settings. Newly grabbed tracks only show up there once BPM Tagger has
+indexed them; meanwhile the ledger (matching by Spotify id) keeps them from being grabbed
+twice.
+
+**`ANALYSIS=api`.** For a BPM Tagger that runs one-shot scans instead of watching: also asks it
+to scan (coalesced). It logs in with the admin password, so it does not work with admin
+two-factor; prefer `intake` with the watcher.
+
+## Post-import hooks
+
+`POST_IMPORT_HOOKS=mediarium` calls Mediarium's `POST /api/music/import/scan` after files are
+filed. An album of twelve tracks is one request (trailing debounce, a max wait so a long run
+still fires, a minimum interval between scans). If Mediarium's music module is off it
+answers 404 and the hook pauses for an hour; if the key is wrong or not allowed to call that
+route (401/403) it logs one clear line and disables itself until restart. Off by default.
 
 ## Roadmap
 
 See [`docs/plans/extraction.md`](docs/plans/extraction.md) section 6.
 
-- **0.1.0** (this): skeleton move, own DB, filesystem library index, ledger, tests, CI.
-- **0.2.0**: OpenSubsonic (BPM Tagger / Navidrome) library index; intake-folder and API
+- **0.1.0**: skeleton move, own DB, filesystem library index, ledger, tests, CI.
+- **0.2.0** (this): OpenSubsonic (BPM Tagger / Navidrome) library index; intake-folder and API
   analysis modes; Mediarium and Navidrome post-import hooks.
 - **0.3.0**: JSON API + CLI (`sync`, `queue`, `inbox`, `status`), settings persistence, ntfy,
   and an import tool for existing BPM Tagger `grab_*` data.
