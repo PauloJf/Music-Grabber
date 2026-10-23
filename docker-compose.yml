@@ -41,6 +41,13 @@ services:
       # MEDIARIUM_URL: http://mediarium:8080
       # MEDIARIUM_API_KEY: ""
 
+      # --- Spotify playlists as Navidrome playlists (off by default; see README: the mirror) ---
+      # PLAYLIST_MIRROR: navidrome
+      # NAVIDROME_URL: http://navidrome:4533
+      # NAVIDROME_USER: ""
+      # NAVIDROME_PASS: ""
+      # MIRROR_PREFIX: "Spotify: "
+
       # ntfy: leave empty to disable
       NTFY_URL: https://ntfy.sh
       NTFY_TOPIC: ""

@@ -82,6 +82,9 @@ def build_config() -> dict:
         "navidrome_url":         os.environ.get("NAVIDROME_URL", ""),
         "navidrome_user":        os.environ.get("NAVIDROME_USER", ""),
         "navidrome_pass":        os.environ.get("NAVIDROME_PASS", ""),
+        # Navidrome playlist mirror (Q5): off unless PLAYLIST_MIRROR=navidrome; reuses NAVIDROME_*.
+        "playlist_mirror":       os.environ.get("PLAYLIST_MIRROR", "").strip().lower(),
+        "mirror_prefix":         os.environ.get("MIRROR_PREFIX", "Spotify: "),
         "hook_debounce_seconds": float(os.environ.get("HOOK_DEBOUNCE_SECONDS", "45")),
         "hook_max_wait_seconds": float(os.environ.get("HOOK_MAX_WAIT_SECONDS", "600")),
         "hook_min_interval_seconds": float(os.environ.get("HOOK_MIN_INTERVAL_SECONDS", "60")),

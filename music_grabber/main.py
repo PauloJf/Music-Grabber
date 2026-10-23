@@ -21,7 +21,7 @@ from .notify import Notifier
 from .hooks import build_hooks
 from .library import LibraryIndex
 from .sync_engine import GrabberService
-from .wiring import ConfigError, build_analysis, build_library_source, validate_api
+from .wiring import ConfigError, build_analysis, build_library_source, build_mirror, validate_api
 
 log = logging.getLogger("music_grabber")
 
@@ -39,10 +39,15 @@ def build_service(config: dict) -> GrabberService:
                          root=config.get("library_dir") or config["music_dir"])
     analysis = build_analysis(config)
     hooks = build_hooks(config)
+    mirror = build_mirror(config, db)
     validate_api(config)
     service = GrabberService(config, db, notifier=Notifier.from_config(config), index=index,
-                             analysis=analysis, on_placed=[hooks.on_placed])
+                             analysis=analysis,
+                             on_placed=[hooks.on_placed] + ([mirror.on_placed] if mirror else []))
     service.hooks = hooks
+    if mirror:
+        service.mirror = mirror
+        service.sync.on_synced = mirror.request
     service.analysis = analysis
     return service
 
@@ -128,6 +133,8 @@ def cmd_run(config: dict) -> int:
     service.stop_background()
     service.pool.join(10)
     service.hooks.close()
+    if service.mirror:
+        service.mirror.close()
     if hasattr(service.analysis, "close"):
         service.analysis.close()
     return 0

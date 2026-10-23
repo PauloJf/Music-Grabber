@@ -16,9 +16,11 @@ minutes; nothing in BPM Tagger is modified, so you can back out at any point.
 | **Navidrome and Local playlists** | stay in BPM Tagger |
 | BPM detection, the player, Run mode | stay in BPM Tagger |
 
-**What you lose for now:** Spotify playlists as sources for BPM Tagger's Run/Listen pages and
-its playlist diff/merge/split (those rows live in BPM Tagger's table and stop syncing once its
-grabber is off), the Suggestions page, and the Spotify search page. Everything else has a
+**What you lose for now:** BPM Tagger's playlist diff/merge/split on Spotify playlists (those rows
+live in BPM Tagger's table and stop syncing once its grabber is off), the Suggestions page, and the
+Spotify search page. Spotify playlists as sources for Run/Listen come back through Music Grabber's
+opt-in **Navidrome mirror** (`PLAYLIST_MIRROR=navidrome`, see the README): it writes them to
+Navidrome, which BPM Tagger already imports. Everything else has a
 Music Grabber equivalent (Inbox, Queue, Playlists in the web UI; `queue add` for a manual grab).
 
 ## 1. Stop the grabber in BPM Tagger

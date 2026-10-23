@@ -55,6 +55,19 @@ class LibraryMixin:
             return [dict(r) for r in conn.execute(
                 "SELECT * FROM library_tracks WHERE spotify_track_id = ? ORDER BY path", (spotify_track_id,))]
 
+    def library_tags(self, paths: list) -> dict:
+        """{path: {isrc, norm_artist, norm_title, duration_ms}} for the paths the cache knows."""
+        out: dict = {}
+        paths = list(dict.fromkeys(paths))
+        with self._connect() as conn:
+            for i in range(0, len(paths), 500):
+                chunk = paths[i:i + 500]
+                for r in conn.execute(
+                        "SELECT path, isrc, norm_artist, norm_title, duration_ms FROM library_tracks "
+                        f"WHERE path IN ({','.join('?' * len(chunk))})", chunk):
+                    out[r["path"]] = dict(r)
+        return out
+
     def library_tagged(self) -> list[dict]:
         """Library files that carry a Spotify id tag."""
         with self._connect() as conn:

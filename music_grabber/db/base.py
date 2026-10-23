@@ -258,6 +258,24 @@ class _DBBase:
         if "spotify_track_id" not in {r[1] for r in conn.execute("PRAGMA table_info(library_tracks)")}:
             conn.execute("ALTER TABLE library_tracks ADD COLUMN spotify_track_id TEXT")   # pre-Q3 database
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lt_spotify_id ON library_tracks(spotify_track_id)")
+        # Navidrome playlist mirror (Q5): a per-playlist switch and what we last wrote.
+        if "mirror" not in {r[1] for r in conn.execute("PRAGMA table_info(playlists)")}:
+            conn.execute("ALTER TABLE playlists ADD COLUMN mirror INTEGER DEFAULT 1")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS playlist_mirrors (
+                playlist_id  INTEGER PRIMARY KEY REFERENCES playlists(id) ON DELETE CASCADE,
+                remote_id    TEXT,
+                remote_name  TEXT,
+                paths_hash   TEXT,
+                content_hash TEXT,
+                matched      INTEGER DEFAULT 0,
+                unresolved   INTEGER DEFAULT 0,
+                state        TEXT,
+                note         TEXT,
+                last_error   TEXT,
+                synced_at    TEXT
+            )
+        """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lt_isrc ON library_tracks(isrc)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lt_norm_artist ON library_tracks(norm_artist)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lt_norm_title ON library_tracks(norm_title)")

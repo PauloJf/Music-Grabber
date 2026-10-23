@@ -6,6 +6,7 @@ from .library_opensubsonic import OpenSubsonicSource
 from .subsonic import has_credentials
 
 LIBRARY_INDEXES = ("filesystem", "opensubsonic")
+MIRRORS = ("navidrome",)
 ANALYSES = ("none", "intake", "api")
 
 
@@ -52,6 +53,21 @@ def build_analysis(config: dict):
                        debounce=float(config.get("hook_debounce_seconds", 45)),
                        max_wait=float(config.get("hook_max_wait_seconds", 600)),
                        min_interval=float(config.get("hook_min_interval_seconds", 60)))
+
+
+def build_mirror(config: dict, db):
+    """The Navidrome playlist mirror, or None when PLAYLIST_MIRROR is empty."""
+    kind = (config.get("playlist_mirror") or "").lower()
+    if not kind:
+        return None
+    if kind not in MIRRORS:
+        raise ConfigError(f"unknown PLAYLIST_MIRROR '{kind}' (known: {', '.join(MIRRORS)}; empty = off)")
+    if not (config.get("navidrome_url")
+            and has_credentials(config.get("navidrome_user", ""), config.get("navidrome_pass", ""))):
+        raise ConfigError("PLAYLIST_MIRROR=navidrome needs NAVIDROME_URL, NAVIDROME_USER and NAVIDROME_PASS")
+    from .mirror import PlaylistMirror
+    return PlaylistMirror(db, config["navidrome_url"], config["navidrome_user"], config["navidrome_pass"],
+                          prefix=config.get("mirror_prefix", "Spotify: "))
 
 
 def validate_api(config: dict) -> None:

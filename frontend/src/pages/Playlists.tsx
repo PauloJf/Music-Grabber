@@ -5,7 +5,12 @@ import { Empty, ErrorState, Pill, Skeleton } from "../components/ui";
 import { del, errorText, get, patch, post } from "../lib/api";
 import { ago, useRefreshJobs } from "../lib/hooks";
 import { useToast } from "../lib/toast";
-import type { Playlist } from "../lib/types";
+import type { MirrorInfo, Playlist } from "../lib/types";
+
+const MIRROR_TEXT: Record<MirrorInfo["state"], string> = {
+  pending: "waiting for the next sync", off: "off", ok: "mirrored", empty: "nothing to mirror yet",
+  name_taken: "name taken in Navidrome", deleted_remotely: "deleted in Navidrome", error: "error",
+};
 
 export default function Playlists() {
   const qc = useQueryClient();
@@ -21,6 +26,8 @@ export default function Playlists() {
   const toggle = useMutation({ mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) => patch(`/api/playlists/${id}`, { enabled }), onSuccess: ok("Updated"), onError: fail });
   const queueMissing = useMutation({ mutationFn: (id: number) => post<{ enqueued: number }>(`/api/playlists/${id}/enqueue-missing`), onError: fail,
     onSuccess: (r) => ok(r.enqueued ? `Queued ${r.enqueued} missing track${r.enqueued > 1 ? "s" : ""}` : "Nothing missing")() });
+  const mirror = useMutation({ mutationFn: ({ id, action }: { id: number; action: "now" | "on" | "off" | "reset" }) => post(`/api/playlists/${id}/mirror`, { action }),
+    onSuccess: ok("Updated"), onError: fail });
   const remove = useMutation({ mutationFn: (id: number) => del(`/api/playlists/${id}`), onSuccess: ok("Removed"), onError: fail });
   const submit = (e: FormEvent) => { e.preventDefault(); if (value.trim()) add.mutate(value.trim()); };
   const lists = q.data?.playlists ?? [];
@@ -51,6 +58,22 @@ export default function Playlists() {
                   {p.new_count > 0 && <Pill kind="mute">{p.new_count} new</Pill>}
                   <span className="muted" style={{ fontSize: 12 }}>{p.last_synced_at ? `synced ${ago(p.last_synced_at)}` : "never synced"}</span>
                 </div>
+                {p.mirror && (
+                  <div className="row tight" style={{ margin: "0 0 8px" }}>
+                    <label className="muted" style={{ fontSize: 12 }}>
+                      <input type="checkbox" aria-label={`Mirror ${p.name} to Navidrome`} checked={p.mirror.state !== "off"}
+                        onChange={(e) => mirror.mutate({ id: p.id, action: e.target.checked ? "on" : "off" })} /> Navidrome playlist
+                    </label>
+                    <Pill kind={p.mirror.state === "ok" ? "ok" : p.mirror.state === "off" ? "mute" : "warn"}>{MIRROR_TEXT[p.mirror.state]}</Pill>
+                    {p.mirror.state === "ok" && <span className="muted" style={{ fontSize: 12 }}>
+                      {p.mirror.matched} track{p.mirror.matched === 1 ? "" : "s"}{p.mirror.unresolved ? `, ${p.mirror.unresolved} not in Navidrome yet` : ""}
+                    </span>}
+                    {(p.mirror.error || p.mirror.note) && <span className="muted" style={{ fontSize: 12 }}>{p.mirror.error || p.mirror.note}</span>}
+                    {(p.mirror.state === "deleted_remotely" || p.mirror.state === "name_taken" || p.mirror.state === "error") &&
+                      <button className="btn sm" disabled={mirror.isPending} onClick={() => mirror.mutate({ id: p.id, action: "reset" })}>Try again</button>}
+                    {p.mirror.state !== "off" && <button className="btn sm quiet" disabled={mirror.isPending} onClick={() => mirror.mutate({ id: p.id, action: "now" })}>Mirror now</button>}
+                  </div>
+                )}
                 <div className="row tight">
                   <button className="btn sm" disabled={sync.isPending} onClick={() => sync.mutate(p.id)}>Sync</button>
                   <button className="btn sm signal" disabled={p.missing_count === 0 || queueMissing.isPending} onClick={() => queueMissing.mutate(p.id)}>Queue missing</button>

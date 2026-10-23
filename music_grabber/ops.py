@@ -22,6 +22,7 @@ from .matching import library_match
 from .path_template import render
 from .text import normalize_artist, normalize_title
 from .spotify import SpotifyAuthError, SpotifyError, parse_playlist_id
+from .subsonic import SubsonicError
 from .transcode import PROFILES
 
 log = logging.getLogger(__name__)
@@ -143,6 +144,7 @@ class Ops:
                         "tracks": db.library_count(),
                         "auto_queue_paused": sync.queue_paused()},
             "analysis": getattr(self.svc, "analysis", pipe.analysis).name,
+            "mirror": {"enabled": self._mirror is not None, "disabled": bool(self._mirror and self._mirror.disabled)},
             "hooks": getattr(getattr(self.svc, "hooks", None), "names", []),
             "providers": [p.name for p in pipe.providers],
             "queue": db.get_queue_counts(),
@@ -161,7 +163,72 @@ class Ops:
 
     # ── playlists ─────────────────────────────────────────────────────────────
     def playlists_list(self) -> dict:
-        return {"playlists": self.db.list_playlists()}
+        playlists = self.db.list_playlists()
+        mirror = self._mirror_info(playlists)
+        for p in playlists:
+            p["mirror"] = mirror.get(p["id"])
+        return {"playlists": playlists}
+
+    # ── Navidrome playlist mirror (Q5) ────────────────────────────────────────
+    @property
+    def _mirror(self):
+        return getattr(self.svc, "mirror", None)
+
+    def _mirror_info(self, playlists=None) -> dict:
+        """Per playlist: {enabled, state, name, matched, unresolved, synced_at, note, error}, or
+        nothing at all when the mirror is not configured."""
+        if self._mirror is None:
+            return {}
+        states = self.db.list_mirrors()
+        out = {}
+        for p in playlists if playlists is not None else self.db.list_playlists():
+            st = states.get(p["id"]) or {}
+            on = bool(p.get("mirror", 1)) and bool(p.get("enabled"))
+            out[p["id"]] = {"enabled": on, "state": st.get("state") or ("pending" if on else "off"),
+                            "name": st.get("remote_name"), "matched": st.get("matched") or 0,
+                            "unresolved": st.get("unresolved") or 0, "synced_at": st.get("synced_at"),
+                            "note": st.get("note") or "", "error": st.get("last_error") or ""}
+        return out
+
+    def mirror_status(self) -> dict:
+        m = self._mirror
+        return {"enabled": m is not None, "target": "navidrome" if m else None,
+                "disabled": bool(m and m.disabled), "prefix": m.prefix if m else None,
+                "playlists": self._mirror_info()}
+
+    def mirror_run(self, pid=None) -> dict:
+        """Mirror now: one playlist, or every enabled one. Runs in the calling thread."""
+        m = self._mirror
+        if m is None:
+            raise OpsError("mirror_disabled", "the playlist mirror is off: set PLAYLIST_MIRROR=navidrome", 409)
+        if pid is not None:
+            self._playlist(pid)
+        try:
+            m.run_pass(only=int(pid) if pid is not None else None, retry_unresolved=True)
+        except SubsonicError as exc:
+            raise OpsError("navidrome_error", str(exc), 502) from None
+        return {"ok": True, **self.mirror_status()}
+
+    def playlist_mirror(self, pid: int, action: str = "now") -> dict:
+        """now | on | off | reset | remove for one playlist (see music_grabber/mirror.py)."""
+        self._playlist(pid)
+        pid = int(pid)
+        if action in ("on", "off"):
+            self.db.set_playlist_mirror(pid, action == "on")
+            return {"ok": True, "enabled": action == "on"}
+        m = self._mirror
+        if action not in ("now", "reset", "remove"):
+            raise OpsError("invalid_action", "action must be now, on, off, reset or remove")
+        if m is None:
+            raise OpsError("mirror_disabled", "the playlist mirror is off: set PLAYLIST_MIRROR=navidrome", 409)
+        try:
+            if action == "remove":
+                return {"ok": True, "removed": m.remove(pid)}
+            if action == "reset":
+                m.reset(pid)
+            return self.mirror_run(pid)
+        except SubsonicError as exc:
+            raise OpsError("navidrome_error", str(exc), 502) from None
 
     def _playlist(self, pid: int) -> dict:
         p = self.db.get_playlist(int(pid), with_counts=True)

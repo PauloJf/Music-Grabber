@@ -51,7 +51,7 @@ Details: [`docs/provenance.md`](docs/provenance.md) (exactly what moved and how)
 
 **Contents:** [Where it comes from](#where-it-comes-from) · [How it works](#how-it-works) ·
 [Quick start](#quick-start) · [Spotify](#spotify-setup) · [Deezer](#deezer-arl) ·
-[Compose examples](#compose-examples) · [Using it](#using-it) · [Library and ledger](#library-and-the-ledger) ·
+[Compose examples](#compose-examples) · [Using it](#using-it) · [Library and ledger](#library-and-the-ledger) · [Playlist mirror](#spotify-playlists-in-navidrome-the-mirror) ·
 [BPM Tagger, Navidrome, Mediarium](#working-with-bpm-tagger-navidrome-and-mediarium) ·
 [Moving from BPM Tagger](#moving-from-bpm-tagger) · [Configuration](#configuration) ·
 [Stability](#stability) · [Troubleshooting](#troubleshooting) · [Development](#development) · [Releasing](#releasing)
@@ -229,6 +229,41 @@ reading the tags (it only adds rows; it never changes a file or an existing row)
 Files that already existed are never rewritten, so the ones from a BPM Tagger import stay untagged and
 keep the ledger rows the import made. `WRITE_SPOTIFY_ID_TAG=false` stops tagging new files.
 
+## Spotify playlists in Navidrome (the mirror)
+
+Off by default. With `PLAYLIST_MIRROR=navidrome` (and `NAVIDROME_URL`, `NAVIDROME_USER`,
+`NAVIDROME_PASS`) every watched playlist is written to Navidrome as `Spotify: <name>` (`MIRROR_PREFIX`),
+holding the tracks Music Grabber matched in your library, in Spotify order. BPM Tagger imports Navidrome
+playlists, so they are usable in its Run and Listen pages again: they appear in its list of importable
+Navidrome playlists (they belong to the Navidrome user you configured, and are private), and you import
+them there once.
+
+It writes to your Navidrome, so it stays within narrow rules:
+
+- **One-way, and only its own playlists.** Edits you make to a mirrored playlist in Navidrome are replaced
+  the next time the Spotify side changes. A playlist is ours only if Music Grabber created it (it records
+  the id and writes `music-grabber:<spotify id>` into its comment); anything else in your Navidrome is
+  never updated or deleted. A same-named playlist that is not ours is left alone and reported as *name taken*.
+- **No needless writes.** Contents are replaced in one request, and only when the list differs from what was
+  written last time. A mirror you deleted in Navidrome is not recreated until you ask (`--reset`).
+- **Tracks not in Navidrome yet are left out** until its next scan, then added; Spotify local files and
+  unmatched tracks are never mirrored. Paths are matched by their ends, so Navidrome's library root may
+  differ from yours; an ambiguous match is skipped rather than guessed.
+- **Nothing is deleted** unless you run `playlist mirror ID --remove` (our own playlist only). Unwatching a
+  playlist or turning the mirror off leaves what was written where it is.
+
+```bash
+python -m music_grabber playlist mirror            # mirror every watched playlist now
+python -m music_grabber playlist mirror 3 --off    # leave playlist 3 out (--on to include it again)
+python -m music_grabber playlist mirror 3 --reset  # try again after "deleted in Navidrome" / "name taken"
+python -m music_grabber playlist mirror 3 --remove # delete our Navidrome playlist and stop
+```
+
+The Playlists page shows the state of each mirror with a switch and *Mirror now*. It runs after each
+sync and a few minutes after new files are placed (so Navidrome has scanned them); BPM Tagger picks the
+playlists up on its own Navidrome sync schedule, so a change can take a while to reach its player.
+Writing playlists needs an administrator in the web UI/API.
+
 ## Working with BPM Tagger, Navidrome and Mediarium
 
 **BPM Tagger, intake mode (recommended).** Mount the same music folder into both containers at the
@@ -284,8 +319,9 @@ python -m music_grabber import-bpm-tagger /path/to/bpm_tagger.db --source-music-
 
 It copies Spotify playlists and tracks, the queue with candidates and events, the lifetime counter
 and every `managed` track (as a ledger row). Navidrome and Local playlists, BPM detection and the
-player stay in BPM Tagger. What you lose for now (Spotify playlists as Run/Listen sources, the
-Suggestions page) is listed in the guide.
+player stay in BPM Tagger. Spotify playlists reach BPM Tagger's Run/Listen pages again through the
+[Navidrome mirror](#spotify-playlists-in-navidrome-the-mirror) (opt-in). What you still lose (playlist
+diff/merge/split on them, the Suggestions page) is listed in the guide.
 
 ## Configuration
 
@@ -319,7 +355,9 @@ an environment variable; a few can also be changed at runtime ([Settings](#setti
 | `BPM_TAGGER_URL`, `BPM_TAGGER_USERNAME`, `BPM_TAGGER_PASSWORD` | | for `api`: BPM Tagger's admin login |
 | `POST_IMPORT_HOOKS` | | comma list: `mediarium`, `navidrome` |
 | `MEDIARIUM_URL`, `MEDIARIUM_API_KEY`, `MEDIARIUM_API_KEY_HEADER` | `` / `` / `X-Api-Key` | |
-| `NAVIDROME_URL`, `NAVIDROME_USER`, `NAVIDROME_PASS` | | for the `navidrome` hook |
+| `NAVIDROME_URL`, `NAVIDROME_USER`, `NAVIDROME_PASS` | | for the `navidrome` hook and the playlist mirror |
+| `PLAYLIST_MIRROR` | | `navidrome` writes watched playlists to Navidrome (off when empty); see [the mirror](#spotify-playlists-in-navidrome-the-mirror) |
+| `MIRROR_PREFIX` | `Spotify: ` | prefix of the mirrored playlists' names |
 | `HOOK_DEBOUNCE_SECONDS` / `HOOK_MAX_WAIT_SECONDS` / `HOOK_MIN_INTERVAL_SECONDS` | `45` / `600` / `60` | hook coalescing |
 | `NTFY_URL`, `NTFY_TOPIC` | | an empty topic disables ntfy |
 | `NTFY_NOTIFY_DONE` | `true` | a ping per finished track; ambiguity, failures and credential problems always ping |

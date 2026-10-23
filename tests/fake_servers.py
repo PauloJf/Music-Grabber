@@ -8,8 +8,9 @@ from urllib.parse import parse_qs, urlparse
 
 
 class Request:
-    def __init__(self, method, path, query, headers, body):
+    def __init__(self, method, path, query, headers, body, query_all=None):
         self.method, self.path, self.query, self.headers, self.body = method, path, query, headers, body
+        self.query_all = query_all or {k: [v] for k, v in query.items()}     # repeated keys (songId=1&songId=2)
 
     def json(self):
         return json.loads(self.body or b"{}")
@@ -31,8 +32,9 @@ class FakeServer:
             def _do(self):
                 u = urlparse(self.path)
                 length = int(self.headers.get("Content-Length") or 0)
-                req = Request(self.command, u.path, {k: v[0] for k, v in parse_qs(u.query, keep_blank_values=True).items()},
-                              dict(self.headers), self.rfile.read(length) if length else b"")
+                allq = parse_qs(u.query, keep_blank_values=True)
+                req = Request(self.command, u.path, {k: v[0] for k, v in allq.items()},
+                              dict(self.headers), self.rfile.read(length) if length else b"", allq)
                 outer.requests.append(req)
                 rep = handler(req)
                 if not isinstance(rep, Reply):
