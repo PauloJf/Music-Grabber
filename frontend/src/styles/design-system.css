@@ -40,6 +40,7 @@ h2 { font-size: 22px; } h3 { font-size: 17px; }
 .muted { color: var(--ink-3); } .ink2 { color: var(--ink-2); }
 .eyebrow { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-3); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.wrap { min-width: 0; overflow-wrap: anywhere; }   /* a choice you must judge by its title: wrap, never ellipsise */
 .clamp { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
 /* layout */
