@@ -20,6 +20,8 @@ image: the Deezer path needs an ARL and is not covered by the automated tests.
   `pip install -r requirements-pillow.txt` (README, "Development").
 
 ### Fixed
+- **Inbox candidates** wrap long titles and album names instead of cutting them with an ellipsis, so on a phone
+  you can tell the versions apart before choosing.
 - **iOS zoomed the page when you tapped a text field.** Form controls are now at least 16px, which stops
   Safari's focus zoom (the page itself is unchanged and can still be pinch-zoomed).
 - **`status` no longer says `Last sync never` from the CLI.** The last Spotify sync time is persisted

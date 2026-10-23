@@ -34,8 +34,8 @@ function ItemCard({ item }: { item: InboxItem }) {
             <li key={c.id} className="item" style={{ gridTemplateColumns: "44px 1fr auto" }}>
               <span className={`score ${grade(c.score)}`} aria-label={`Match ${c.score?.toFixed(2)}`}>{c.score?.toFixed(2)}</span>
               <div style={{ minWidth: 0 }}>
-                <div className="t clamp">{c.artist} – {c.title}</div>
-                <div className="s clamp mono">{[c.provider, c.quality, c.album, fmtDuration(c.duration_ms)].filter(Boolean).join(" · ")}</div>
+                <div className="t wrap">{c.artist} – {c.title}</div>
+                <div className="s wrap mono">{[c.provider, c.quality, c.album, fmtDuration(c.duration_ms)].filter(Boolean).join(" · ")}</div>
               </div>
               <button className="btn signal sm" disabled={busy} onClick={() => choose.mutate(c.id)}>Download this</button>
             </li>
