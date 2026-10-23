@@ -61,6 +61,26 @@ web pages visited from the owner's browser.
 - Plain HTTP exposes the token on the wire. Use TLS (reverse proxy) beyond loopback/LAN.
 - The lockout is per source address; behind a reverse proxy all clients share the proxy's address,
   so a flood of wrong tokens also locks out the owner for a minute. Authenticate at the proxy too.
-- The container runs as root by default; mount only the music, config and data folders.
+- **The container runs as root** and the image has **no `HEALTHCHECK`** (the API is off unless `API_TOKEN` is
+  set, so a check would have to be conditional). Mount only the music, config and data folders. If you
+  want a non-root user, run it with `user:` / `--user` and make the data and music folders writable by
+  that uid; the app only writes to `/data` and the music folder.
 - The Deezer ARL is a session credential for your own account and is stored in `settings.json`
   (mode 0600). Anyone with filesystem access to the data volume can read it.
+
+## Dependency audit (2026-10-23, before 1.0)
+
+- **`pip-audit -r requirements.txt`: Pillow 10.4.0, 63 advisories, fixed in 12.1.1 and later.** It cannot
+  be upgraded: `streamrip` 2.1.0 (the latest release) requires `Pillow<11`, and `requirements.txt`
+  repeats the bound. The mitigation in finding 3 above still applies (only JPEG/PNG/WEBP are decoded,
+  decompression bombs are capped, input comes only from the size-capped cover fetch), but it is a
+  mitigation, not a fix. Open decision before 1.0: keep it as a documented residual risk, or install
+  `streamrip` without its Pillow bound (`pip install --no-deps`) and test the Deezer path with
+  Pillow 12+; or drop Pillow's use for covers. Nothing else in `requirements.txt` has an advisory.
+- **`npm audit` (frontend): 13 findings (2 critical, 6 high, 5 moderate), all in build and test
+  tooling**: `vitest`/`tinypool` (critical), `vite`/`esbuild`, `tailwindcss` and their transitive
+  packages (`braces`, `micromatch`, `chokidar`, `fast-glob`, `postcss-*`). None of it ships in the
+  bundle (the runtime dependencies are React, react-router and react-query, with no advisories) or runs
+  in the container (it only serves the built files). The fixes are major upgrades (vite 8, vitest 5,
+  tailwindcss 4) and `npm audit fix` without `--force` changes nothing. They affect whoever runs
+  the dev server or the tests on their own machine; plan them as their own PR.

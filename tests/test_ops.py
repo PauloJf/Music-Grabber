@@ -5,6 +5,7 @@ import os
 
 import pytest
 
+from conftest import posix_only
 from music_grabber.db import Database
 from music_grabber.ops import MASK, Ops, OpsError
 from music_grabber.spotify import SpotifyAuthError, SpotifyError
@@ -231,6 +232,7 @@ def test_choosing_a_candidate_of_another_item_is_refused(ops):
 
 
 # ── settings ──────────────────────────────────────────────────────────────────
+@posix_only
 def test_settings_update_validates_persists_and_applies_live(ops, tmp_path):
     pipe = ops.svc.pool.pipeline
     r = ops.settings_update({"output_format": "flac", "auto_accept_threshold": "0.9",

@@ -126,6 +126,16 @@ def test_managed_tracks_become_ledger_rows_rerooted(src, target, tmp_path):
     assert target.find_grabbed_by_spotify_id("s9") == []                 # deleted track not carried over
 
 
+def test_final_paths_are_rerooted_into_this_library_or_cleared(src, target, tmp_path):
+    imp(src, target, tmp_path, source_music_dir="/music")
+    one = next(i for i in target.get_queue() if i["title"] == "Song One")
+    assert one["final_path"] == str(tmp_path / "lib" / "Band" / "LP" / "01 - Song One.mp3")
+    assert next(i for i in target.get_queue() if i["title"] == "Song Three")["final_path"] is None
+    other = Database(str(tmp_path / "other.db"))
+    imp(src, other, tmp_path, source_music_dir="/srv/elsewhere")          # a path from the other side
+    assert next(i for i in other.get_queue() if i["title"] == "Song One")["final_path"] is None
+
+
 def test_a_wrong_source_music_dir_is_called_out(src, target, tmp_path):
     rep = imp(src, target, tmp_path, source_music_dir="/srv/elsewhere")
     assert any("1 of 1 managed files are not under" in w and "--source-music-dir" in w for w in rep.warnings)
