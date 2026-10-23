@@ -29,6 +29,7 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.45 var(--sans); }
+html { min-height: 100%; } body { min-height: 100vh; min-height: 100dvh; }
 body { padding-bottom: calc(var(--tab-h) + var(--safe-b)); }
 a { color: inherit; }
 button { font: inherit; color: inherit; }
@@ -44,7 +45,7 @@ h2 { font-size: 22px; } h3 { font-size: 17px; }
 
 /* layout */
 .shell { max-width: 980px; margin: 0 auto; padding: 0 16px 40px; }
-.topbar { position: sticky; top: 0; z-index: 20; background: var(--paper); border-bottom: 2px solid var(--rule-strong); }
+.topbar { position: sticky; top: 0; z-index: 20; background: var(--paper); border-bottom: 2px solid var(--rule-strong); padding-top: env(safe-area-inset-top, 0px); }
 .topbar-in { max-width: 980px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 14px; }
 .wordmark { font: 700 19px var(--serif); letter-spacing: -0.02em; text-decoration: none; white-space: nowrap; }
 .wordmark i { color: var(--signal); font-style: normal; }

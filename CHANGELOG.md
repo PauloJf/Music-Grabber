@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+- **Installing the web UI as an app (PWA) on a phone.** The home-screen icon was missing and the bottom
+  tab bar sat below the visible area until you scrolled. The UI now ships a web app manifest
+  (`display: standalone`), real PNG icons (192, 512, maskable, and the 180 px `apple-touch-icon` iOS needs),
+  `favicon.ico` and `favicon.svg`, all served from the root: they used to fall through to `index.html`.
+  The page also declares `viewport-fit=cover`, pads the top bar for the notch and sizes the body to the
+  dynamic viewport. Already-installed copies need to be removed and added again to pick up the icon.
+
 ### Release
 - CI and the publish workflow install ffmpeg through `scripts/ci-install-ffmpeg.sh` (apt retries, per-attempt timeouts, three
   attempts) and every job has a `timeout-minutes`, so a stuck apt mirror fails fast instead of stalling for 25+ minutes.
