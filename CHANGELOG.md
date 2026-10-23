@@ -28,6 +28,8 @@ image: the Deezer path needs an ARL and is not covered by the automated tests.
   `pip install -r requirements-pillow.txt` (README, "Development").
 
 ### Fixed
+- **Inbox candidates** wrap long titles and album names instead of cutting them with an ellipsis, so on a phone
+  you can tell the versions apart before choosing.
 - **`status` no longer says `Last sync never` from the CLI.** The last Spotify sync time is persisted
   (`app_counters.last_sync_epoch`) and reported together with the running server's own, so
   `python -m music_grabber status`, `--remote` and `GET /api/status` all agree. The sync loop still syncs
