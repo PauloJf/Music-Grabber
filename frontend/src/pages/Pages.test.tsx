@@ -110,6 +110,24 @@ describe("library", () => {
     expect(confirm).toHaveBeenCalledTimes(2);
   });
 
+  it("shows the Navidrome mirror only when it is configured, and controls it", async () => {
+    const mirror = { enabled: true, state: "ok", name: "Spotify: Road Trip", matched: 5, unresolved: 2, synced_at: null, note: "", error: "" };
+    const calls = mockApi({ ...base, "GET /api/playlists": { playlists: [{ ...pl(1), mirror }] }, "POST /api/playlists/1/mirror": { ok: true } });
+    renderApp(<Playlists />);
+    await screen.findByText("5 tracks, 2 not in Navidrome yet");
+    fireEvent.click(screen.getByRole("button", { name: "Mirror now" }));
+    await waitFor(() => expect(calls.find((c) => c.path === "/api/playlists/1/mirror")?.body).toEqual({ action: "now" }));
+    fireEvent.click(screen.getByLabelText("Mirror Road Trip to Navidrome"));
+    await waitFor(() => expect(calls.filter((c) => c.path === "/api/playlists/1/mirror").pop()?.body).toEqual({ action: "off" }));
+  });
+
+  it("has no mirror controls when the mirror is off", async () => {
+    mockApi({ ...base, "GET /api/playlists": { playlists: [{ ...pl(1), mirror: null }] } });
+    renderApp(<Playlists />);
+    await screen.findByText("Road Trip");
+    expect(screen.queryByText(/navidrome playlist/i)).toBeNull();
+  });
+
   it("adds a playlist and says when Spotify isn't connected", async () => {
     const calls = mockApi({ ...base, "GET /api/playlists": { playlists: [] }, "POST /api/playlists": { ok: true, connected: false } });
     renderApp(<Playlists />);

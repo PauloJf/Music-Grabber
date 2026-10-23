@@ -32,6 +32,7 @@ class SpotifySync(threading.Thread):
         self.last_error = ""
         self.last_synced_epoch = 0.0
         self.auto_queue_paused = False         # the library index is empty: see _match_playlist
+        self.on_synced = None                  # called after playlists were matched (the mirror)
 
     # ── control ───────────────────────────────────────────────────────────────
     def request_sync(self):
@@ -70,6 +71,7 @@ class SpotifySync(threading.Thread):
                 self._sync_one(pl)
             self.last_synced_epoch = time.time()
             self.last_error = ""
+        self._synced()
 
     def _refresh_index(self):
         """Reload the library cache. A failing source leaves the cache as it was, so a
@@ -87,7 +89,15 @@ class SpotifySync(threading.Thread):
         with self._lock:
             self._refresh_index()
             self._sync_one(pl)
+        self._synced()
         return self.db.get_playlist(playlist_id)
+
+    def _synced(self):
+        if self.on_synced:
+            try:
+                self.on_synced()
+            except Exception as exc:
+                log.warning("after-sync callback failed: %s", exc)
 
     def _sync_one(self, pl: dict):
         if not pl.get("spotify_id"):
@@ -174,6 +184,7 @@ class GrabberService:
         from .worker import GrabPool
         self.pool = GrabPool(config, db, notifier, analysis=analysis, on_placed=on_placed)
         self._thread_started = False
+        self.mirror = None                       # set by main.build_service (PLAYLIST_MIRROR)
 
     def seed_playlists(self) -> int:
         """Register WATCH_PLAYLISTS (URLs/URIs/ids). No network: names are filled in by

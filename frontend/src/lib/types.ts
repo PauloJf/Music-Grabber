@@ -14,7 +14,20 @@ export interface Status {
   dry_run: boolean;
 }
 
+/** The Navidrome mirror of a playlist; null/absent when the mirror is not configured. */
+export interface MirrorInfo {
+  enabled: boolean;
+  state: "pending" | "off" | "ok" | "empty" | "name_taken" | "deleted_remotely" | "error";
+  name: string | null;
+  matched: number;
+  unresolved: number;
+  synced_at: string | null;
+  note: string;
+  error: string;
+}
+
 export interface Playlist {
+  mirror?: MirrorInfo | null;
   id: number;
   spotify_id: string;
   name: string;

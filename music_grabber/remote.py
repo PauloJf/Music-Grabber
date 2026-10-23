@@ -41,6 +41,12 @@ class RemoteOps:
     # status / library / settings
     def status(self): return self._get("/api/status")
     def library_refresh(self): return self._post("/api/library/refresh")
+    def mirror_status(self): return self._get("/api/mirror")
+    def mirror_run(self, pid=None):
+        return self._post("/api/mirror/run" if pid is None else f"/api/playlists/{int(pid)}/mirror",
+                          {"action": "now"} if pid is not None else None)
+    def playlist_mirror(self, pid, action="now"):
+        return self._post(f"/api/playlists/{int(pid)}/mirror", {"action": action})
     def ledger_rebuild(self): return self._post("/api/ledger/rebuild")
     def settings_get(self): return self._get("/api/settings")
     def settings_update(self, changes): return self._post("/api/settings", changes)

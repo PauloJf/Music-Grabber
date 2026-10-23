@@ -18,7 +18,7 @@ run                       start the sync thread, the download workers and (with 
 spotify-login             one-time Spotify connect
 status                    what is going on
 sync [PLAYLIST_ID]        reconcile now
-playlist list|show|add|remove|enable|disable|queue-missing
+playlist list|show|add|remove|enable|disable|queue-missing|mirror
 queue [list|history|show|add|retry|retry-failed|cancel|delete|clear-completed|priority]
 inbox [list|show|choose|search|research|research-all|skip]
 settings [show|set|test-deezer|test-ntfy]
@@ -72,6 +72,13 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("value", help="Spotify playlist URL, URI or id")
     for a in ("remove", "enable", "disable", "queue-missing"):
         pl.add(a).add_argument("id", type=int)
+    x = pl.add("mirror")
+    x.add_argument("id", type=int, nargs="?", help="a playlist id (default: every watched playlist)")
+    g = x.add_mutually_exclusive_group()
+    g.add_argument("--on", action="store_true", help="include this playlist in the mirror")
+    g.add_argument("--off", action="store_true", help="leave this playlist out (what was written stays)")
+    g.add_argument("--reset", action="store_true", help="try again after 'deleted remotely' / 'name taken'")
+    g.add_argument("--remove", action="store_true", help="delete our Navidrome playlist and stop mirroring it")
 
     q = top.nested(top.add("queue"))
     x = q.add("list")
@@ -171,7 +178,9 @@ def fmt_status(d: dict) -> str:
         + (f"  last error: {sp['last_error']}" if sp.get("last_error") else ""),
         f"Library     {d['library']['tracks']} tracks via {d['library']['index']}"
         + ("  EMPTY: auto-queueing paused, check the library mount" if d['library'].get("auto_queue_paused") else ""),
-        f"Analysis    {d['analysis']}   hooks: {', '.join(d['hooks']) or 'none'}",
+        f"Analysis    {d['analysis']}   hooks: {', '.join(d['hooks']) or 'none'}"
+        + ("\nMirror      navidrome" + ("  DISABLED (Navidrome rejected the credentials)" if d['mirror']['disabled'] else "")
+           if d.get("mirror", {}).get("enabled") else ""),
         f"Providers   {', '.join(d['providers']) or 'none (set DEEZER_ARL or PROVIDER_ORDER)'}",
         f"Playlists   {pl['watched']}/{pl['total']} watched: {pl['have']} have, {pl['missing']} missing, "
         f"{pl['queued']} queued",
@@ -275,8 +284,26 @@ def _playlist(args, a, ops, emit):
     elif a == "queue-missing":
         d = ops.enqueue_missing(args.id)
         emit(d, f"Queued {d['enqueued']} missing track(s) from playlist #{args.id}")
+    elif a == "mirror":
+        _mirror(args, ops, emit)
     elif a in ("enable", "disable"):
         emit(ops.playlist_enable(args.id, a == "enable"), f"Playlist #{args.id} {a}d")
+
+
+def _mirror(args, ops, emit):
+    act = next((n for n in ("on", "off", "reset", "remove") if getattr(args, n)), "now")
+    if args.id is None and act != "now":
+        raise OpsError("invalid_action", f"--{act} needs a playlist id")
+    d = ops.mirror_run() if args.id is None else ops.playlist_mirror(args.id, act)
+    if act in ("on", "off"):
+        emit(d, f"Playlist #{args.id} mirror {act}")
+    elif act == "remove":
+        emit(d, "Removed our Navidrome playlist" if d["removed"] else "No playlist of ours in Navidrome")
+    else:
+        rows = [{"id": i, **m} for i, m in (d.get("playlists") or {}).items()
+                if args.id is None or int(i) == args.id]
+        emit(d, _table(rows, [("id", "id"), ("state", "state"), ("tracks", "matched"),
+                              ("not in Navidrome", "unresolved"), ("note", lambda r: r["error"] or r["note"])]))
 
 
 def _queue(args, a, ops, emit):

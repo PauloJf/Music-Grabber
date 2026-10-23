@@ -24,6 +24,8 @@ log = logging.getLogger(__name__)
 
 MIN_TOKEN_LENGTH = 16
 ADMIN_PREFIXES = ("/api/settings", "/api/users", "/api/spotify")      # administrators only
+# Writes that reach outside this app (Navidrome) or rebuild its ledger: administrators only too.
+ADMIN_WRITE_PREFIXES = ("/api/mirror", "/api/ledger")
 # After this many wrong tokens inside the window, that address is refused (429) until the
 # window passes, whatever it sends. Per address, in memory.
 AUTH_MAX_FAILURES = 10
@@ -123,7 +125,10 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
             return (jsonify(error="unauthorized", message="sign in, or send 'Authorization: Bearer <token>'"),
                     401, {"WWW-Authenticate": "Bearer"})
         g.principal, g.bearer = principal, supplied
-        if request.path.startswith(ADMIN_PREFIXES) and principal["role"] != "admin":
+        admin_only = request.path.startswith(ADMIN_PREFIXES) or (
+            request.method != "GET" and (request.path.startswith(ADMIN_WRITE_PREFIXES)
+                                         or request.path.endswith("/mirror")))
+        if admin_only and principal["role"] != "admin":
             return jsonify(error="forbidden", message="administrators only"), 403
         return None
 
@@ -270,6 +275,19 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
     @app.post("/api/library/refresh")
     def library_refresh():
         return jsonify(ops.library_refresh())
+
+    @app.get("/api/mirror")
+    def mirror_status():
+        return jsonify(ops.mirror_status())
+
+    @app.post("/api/mirror/run")
+    def mirror_run():
+        return jsonify(ops.mirror_run())
+
+    @app.post("/api/playlists/<int:pid>/mirror")
+    def playlist_mirror(pid):
+        body = request.get_json(silent=True) or {}
+        return jsonify(ops.playlist_mirror(pid, str(body.get("action") or "now")))
 
     @app.post("/api/ledger/rebuild")
     def ledger_rebuild():

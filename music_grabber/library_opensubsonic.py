@@ -65,6 +65,10 @@ class OpenSubsonicSource:
         return call(self.url, endpoint, params, user=self.user, password=self.password,
                     api_key=self.api_key, timeout=self.timeout, session=self.session)
 
+    def songs(self) -> Iterator[dict]:
+        """Every song the server has, as the raw OpenSubsonic dicts (id, path, ...)."""
+        yield from self._songs()
+
     def scan(self, known: Mapping[str, str]) -> Iterator[LibraryEntry]:
         try:
             yield from self._entries(known, self._songs())

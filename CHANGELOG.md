@@ -3,6 +3,16 @@
 ## Unreleased
 
 ### Added
+- **Navidrome playlist mirror (Q5).** `PLAYLIST_MIRROR=navidrome` writes each watched playlist to
+  Navidrome as `Spotify: <name>` with the tracks matched in the library, so BPM Tagger's Run/Listen pages
+  can use them again. Off by default; one-way; only touches playlists it created (recorded id +
+  `music-grabber:<id>` comment); never overwrites a same-named playlist, never recreates one you deleted,
+  never deletes unless asked; no write when nothing changed. CLI `playlist mirror [ID] [--on|--off|--reset|--remove]`,
+  `GET /api/mirror`, `POST /api/mirror/run`, `POST /api/playlists/<id>/mirror` (administrators), a switch
+  and state on the Playlists page. New env vars `PLAYLIST_MIRROR`, `MIRROR_PREFIX`. Tracks are matched to
+  Navidrome songs by path, then ISRC, then artist + title (+ duration): newer Navidrome reports a display
+  path instead of the real one. Checked against a real Navidrome container (create, replace, empty,
+  adoption, rename, collision, remove).
 - **Spotify id tag (Q3).** Grabbed files carry the Spotify track id in a `SPOTIFY_TRACK_ID` tag (ID3
   `TXXX`, Vorbis comment). The filesystem index reads it, so a moved or renamed grabbed file is still
   "have", and `ledger rebuild` (CLI, `POST /api/ledger/rebuild`) restores the ledger from the tags
