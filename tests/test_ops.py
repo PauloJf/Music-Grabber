@@ -80,6 +80,16 @@ def test_status_summarises_everything(ops):
     json.dumps(s)                                   # JSON-able
 
 
+def test_status_last_sync_is_the_newer_of_memory_and_the_db(ops):
+    assert ops.status()["last_synced_epoch"] is None
+    ops.db.set_last_sync(1000)
+    assert ops.status()["last_synced_epoch"] == 1000
+    ops.svc.sync.last_synced_epoch = 2000.5
+    assert ops.status()["last_synced_epoch"] == 2000.5
+    ops.db.set_last_sync(3000)
+    assert ops.status()["last_synced_epoch"] == 3000
+
+
 # ── playlists ─────────────────────────────────────────────────────────────────
 def test_playlist_add_uses_spotify_meta_when_connected(ops):
     d = ops.playlist_add("https://open.spotify.com/playlist/PL1?si=x")

@@ -112,8 +112,8 @@ def resize_cover(image_bytes: bytes, max_px: int = 1200) -> bytes:
         import io
 
         from PIL import Image
-        # streamrip pins Pillow<11 (known CVEs in rarely used decoders), so only the three formats
-        # a cover really is get decoded, and decompression bombs are capped.
+        # Only the three formats a cover really is get decoded (a GIF comes back untouched), and
+        # decompression bombs are capped: defence in depth next to the current Pillow (docs/security.md).
         Image.MAX_IMAGE_PIXELS = 40_000_000
         img = Image.open(io.BytesIO(image_bytes), formats=["JPEG", "PNG", "WEBP"])
         if max(img.size) <= max_px:

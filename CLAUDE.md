@@ -64,6 +64,7 @@ live in `docs/plans/extraction.md`, the origin in `docs/provenance.md`.
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
+pip install -r requirements-pillow.txt   # a current Pillow over streamrip's pin (pip prints a conflict note: expected)
 ruff check .
 pytest -q
 python -m music_grabber version

@@ -1,6 +1,7 @@
 """SpotifySync / GrabberService with a fake Spotify client and a fake index: no network."""
 
 import os
+import time
 
 import pytest
 
@@ -183,6 +184,24 @@ def test_other_spotify_errors_are_recorded_and_the_next_playlist_still_syncs(db)
     sync.sync_all()
     assert sync.last_synced_epoch > 0
     assert [q["spotify_track_id"] for q in db.get_queue()] == ["s9"]
+
+
+def test_a_finished_sync_is_persisted_for_other_processes(db, tmp_path):
+    pid = db.add_playlist("PL1", "Mix")
+    assert db.get_last_sync() == 0
+    _sync(db, FakeClient([_t("s1", "Song")])).sync_all()
+    synced = db.get_last_sync()
+    assert synced > 0
+    assert Database(str(tmp_path / "mg.db")).get_last_sync() == synced      # a fresh handle (another process)
+    db.set_last_sync(synced - 1000)
+    _sync(db, FakeClient([_t("s1", "Song")])).sync_playlist(pid)             # a manual single-playlist sync counts too
+    assert db.get_last_sync() >= synced
+
+
+def test_the_sync_loop_still_syncs_at_start_whatever_was_persisted(db):
+    db.set_last_sync(time.time())          # "just synced" by a previous run
+    sync = _sync(db, FakeClient([]))
+    assert sync.last_synced_epoch == 0.0                 # the due-time check ignores the persisted value
 
 
 def test_service_seeds_watch_playlists_without_network(tmp_path):
