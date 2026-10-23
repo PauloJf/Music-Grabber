@@ -323,7 +323,11 @@ URL, a short `API_TOKEN`) makes `run` exit with code 2 and say what to set.
 - **Every track shows as missing.** `status` → *Library*. If it says 0 tracks the index cannot see
   your files: mount the library at the path `LIBRARY_DIR`/`MUSIC_DIR` names, or switch to
   `LIBRARY_INDEX=opensubsonic`. A refresh that sees under half of a known library is treated as a
-  failure and keeps the old cache, so a briefly unmounted share does not re-queue everything.
+  failure and keeps the old cache, so a briefly unmounted share does not re-queue everything. If the
+  index holds **no files at all** on an install that has grabbed or imported before, sync still
+  matches but queues nothing by itself (`status` says so, and the log warns once): a wrong mount
+  must not turn a whole playlist into downloads. Fix the mount, or use *Queue missing* on the
+  playlist (`playlist queue-missing ID`) if the library really is empty.
 - **"Spotify is not connected".** Run `spotify-login`, or *Connect Spotify* in the UI. If Spotify
   complains about the redirect URI, it must match the dashboard entry exactly (see Spotify setup).
 - **Deezer login failed ping.** The ARL expired. Set a fresh one; downloads use yt-dlp meanwhile.

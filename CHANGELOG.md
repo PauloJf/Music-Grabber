@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Fixed (found verifying the import on a real BPM Tagger 2.18.2 database)
+- **An empty library index no longer queues a whole playlist.** A wrong or unmounted library path
+  made every watched track "missing" and sync queued all of them for download. On an install that has grabbed or
+  imported before, an index with no files at all makes sync match but queue nothing by itself;
+  `status` and the log say so.
+- CLI: `playlist queue-missing ID` (the web UI's *Queue missing*).
+- `import-env` no longer copies BPM Tagger's `ui_public_url` (it would have pointed ntfy links at
+  BPM Tagger); it reminds you to set Music Grabber's own.
+- `import-bpm-tagger` warns when managed files are not under `--source-music-dir` instead of
+  silently keeping their absolute paths in the ledger.
+
+### Release
+- CI builds the Docker image on every change (not pushed), so a broken Dockerfile shows up in the PR.
+- `docs/plans/1.0-readiness.md`: what was verified on a real database and the 1.0.0 checklist.
+
 ### Redesign
 - **The web UI is rebuilt** around browsing: Discover (search Deezer for songs, artists, albums),
   artist pages (popular, albums vs singles, related artists), album pages (queue all / missing /

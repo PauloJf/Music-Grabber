@@ -31,6 +31,7 @@ class SpotifySync(threading.Thread):
         self._lock = threading.Lock()          # serialize sync_all vs manual sync
         self.last_error = ""
         self.last_synced_epoch = 0.0
+        self.auto_queue_paused = False         # the library index is empty: see _match_playlist
 
     # ── control ───────────────────────────────────────────────────────────────
     def request_sync(self):
@@ -120,8 +121,24 @@ class SpotifySync(threading.Thread):
             self.last_error = str(exc)
             log.warning("Playlist sync error (%s): %s", pl.get("name"), exc)
 
+    def queue_paused(self) -> bool:
+        """Is automatic queueing held back because the library index looks unmounted?"""
+        return bool(getattr(self.index, "is_empty", lambda: False)()
+                    and (self.db.get_grabbed_count() > 0 or self.db.get_grabbed_total() > 0))
+
     def _match_playlist(self, playlist_id: int):
         rows = self.db.get_playlist_track_rows(playlist_id)
+        # An index that sees no files at all, in an install that has grabbed or imported before,
+        # is far more likely a wrong or unmounted library path than an emptied library, and every
+        # playlist track would read as missing and be queued for download. Keep matching, but queue
+        # nothing until the index has files ("queue missing" still works). A brand-new install with
+        # an empty library has no history, so it queues as usual.
+        paused = self.queue_paused()
+        if paused and not self.auto_queue_paused:
+            log.warning("Library index is empty: not auto-queueing missing tracks. Check that the "
+                        "library is mounted where MUSIC_DIR/LIBRARY_DIR says (or LIBRARY_INDEX); "
+                        "'queue missing' on a playlist still works.")
+        self.auto_queue_paused = paused
         for pt in rows:
             path = library_match(pt, self.index)
             new_status = "have" if path else "missing"
@@ -129,7 +146,7 @@ class SpotifySync(threading.Thread):
                 self.db.set_playlist_track_match(pt["id"], new_status, path)
             # Auto-enqueue freshly-missing tracks (skip ones already tried — failed/
             # skipped items are only retried via an explicit user action).
-            if new_status == "missing" and pt.get("spotify_track_id") \
+            if new_status == "missing" and not paused and pt.get("spotify_track_id") \
                     and not self.db.has_any_grab(pt["spotify_track_id"]):
                 self.db.enqueue_grab(_grab_meta(pt))
 

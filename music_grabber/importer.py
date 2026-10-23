@@ -13,7 +13,7 @@ import logging
 import os
 import sqlite3
 from dataclasses import dataclass, field
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath, PureWindowsPath
 from urllib.parse import quote
 
 from .db import Database
@@ -28,8 +28,11 @@ ENV_MAP = {
     "grab_dry_run": "GRAB_DRY_RUN", "grab_workers": "GRAB_WORKERS",
     "auto_accept_threshold": "AUTO_ACCEPT_THRESHOLD", "ask_threshold": "ASK_THRESHOLD",
     "spotify_sync_minutes": "SPOTIFY_SYNC_MINUTES", "lyrics_enabled": "LYRICS_ENABLED",
-    "ui_public_url": "UI_PUBLIC_URL", "ntfy_url": "NTFY_URL",
+    "ntfy_url": "NTFY_URL",
 }
+# Settings that exist on both sides but mean something else here: BPM Tagger's public address
+# is not Music Grabber's, so copying it would point ntfy click-through links at the wrong app.
+OWN_ADDRESS = {"ui_public_url": "UI_PUBLIC_URL"}
 # Present in BPM Tagger's settings but never echoed: the user copies them over themselves.
 SECRET_ENV = {"deezer_arl": "DEEZER_ARL", "ntfy_topic": "NTFY_TOPIC",
               "spotify_client_secret": "SPOTIFY_CLIENT_SECRET"}
@@ -90,10 +93,10 @@ def _rel(path: str, source_root: str) -> str:
     if not path:
         return path
     try:
-        rel = os.path.relpath(path, source_root)
+        parts = os.path.relpath(path, source_root).split(os.sep)
     except ValueError:
         return path
-    return path if rel.startswith("..") else PurePosixPath(*rel.split(os.sep)).as_posix()
+    return path if parts[0] == ".." else PurePosixPath(*parts).as_posix()
 
 
 def import_bpm_tagger(source_db: str, target: Database, *, library_root: str,
@@ -244,11 +247,15 @@ def _copy(src, tables, tconn, rep, library_root, source_music_dir, include_token
         providers = {r["final_path"]: r["provider"] for r in
                      src.execute("SELECT final_path, provider FROM grab_queue WHERE final_path IS NOT NULL")}
         scols = _cols(src, "tracks")
+        outside = managed = 0
         for t in map(dict, src.execute("SELECT * FROM tracks WHERE managed = 1")):
             if t.get("status") == "deleted":
                 rep.skip("ledger_deleted")
                 continue
             rel = _rel(t["file_path"], source_music_dir)
+            managed += 1
+            if PurePosixPath(rel).is_absolute() or PureWindowsPath(rel).drive:
+                outside += 1                     # not under source_music_dir: kept as it was
             abs_path = os.path.join(library_root, *PurePosixPath(rel).parts) if not os.path.isabs(rel) \
                 else rel
             if tconn.execute("SELECT 1 FROM grabbed_files WHERE rel_path=?", (rel,)).fetchone():
@@ -260,6 +267,11 @@ def _copy(src, tables, tconn, rep, library_root, source_music_dir, include_token
                            providers.get(t["file_path"]), t.get("file_hash") if "file_hash" in scols else None,
                            t.get("analyzed_at")))
             rep.add("grabbed_files")
+        if outside:
+            rep.warnings.append(
+                f"{outside} of {managed} managed files are not under the source music dir "
+                f"'{source_music_dir}' and keep their original path in the ledger; if that is "
+                "not intended, check --source-music-dir (BPM Tagger's MUSIC_DIR as it saw it)")
 
 
 def env_from_settings(settings_path: str) -> dict:
@@ -278,4 +290,5 @@ def env_from_settings(settings_path: str) -> dict:
                 v = ",".join(p for p in str(v).split(",") if p.strip().lower() in ("deezer", "ytdlp"))
             env[var] = str(v).lower() if isinstance(v, bool) else str(v)
     present = [var for key, var in SECRET_ENV.items() if data.get(key)]
-    return {"env": env, "copy_by_hand": present}
+    own = [var for key, var in OWN_ADDRESS.items() if data.get(key)]
+    return {"env": env, "copy_by_hand": present, "set_to_your_own": own}
