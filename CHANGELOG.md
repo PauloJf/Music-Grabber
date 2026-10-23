@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Release
+- CI and the publish workflow install ffmpeg through `scripts/ci-install-ffmpeg.sh` (apt retries, per-attempt timeouts, three
+  attempts) and every job has a `timeout-minutes`, so a stuck apt mirror fails fast instead of stalling for 25+ minutes.
+
 ## 1.0.0-rc.2 (2026-10-23)
 
 Second release candidate: a current Pillow in the image (it was 10.4 with 63 advisories, held back by

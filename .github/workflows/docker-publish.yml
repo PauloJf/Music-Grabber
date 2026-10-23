@@ -31,6 +31,7 @@ jobs:
     name: Verify release
     if: github.event_name == 'release' || inputs.confirm == 'publish'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
@@ -51,7 +52,7 @@ jobs:
           cache-dependency-path: requirements-dev.txt
       - name: Tests must pass before anything is published
         run: |
-          sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+          bash scripts/ci-install-ffmpeg.sh
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
           pip install -r requirements-pillow.txt
@@ -62,6 +63,7 @@ jobs:
     name: Build and push
     needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
