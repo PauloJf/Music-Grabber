@@ -205,6 +205,19 @@ def test_html_carries_a_same_origin_only_csp_and_no_framing(ui):
     assert "Content-Security-Policy" not in ui.get("/healthz").headers      # JSON needs none
 
 
+def test_install_files_are_served_from_the_root_with_their_real_type(ui, tmp_path):
+    from music_grabber.api import UI_ROOT_FILES
+    d = tmp_path / "dist"
+    for name in UI_ROOT_FILES:
+        (d / name).write_bytes(b"x" + name.encode())
+    for name, mime in UI_ROOT_FILES.items():
+        r = ui.get("/" + name)
+        assert r.status_code == 200 and r.mimetype == mime and r.data == b"x" + name.encode(), name
+        assert "immutable" not in r.headers["Cache-Control"]
+        assert "Content-Security-Policy" not in r.headers            # not HTML
+    assert ui.get("/icon-999.png").status_code == 200 and ui.get("/icon-999.png").mimetype == "text/html"   # still the SPA fallback
+
+
 def test_path_traversal_cannot_read_outside_the_ui_dir(ui):
     for path in ("/assets/../../secret.txt", "/assets/..%2F..%2Fsecret.txt", "/..%2Fsecret.txt"):
         r = ui.get(path)

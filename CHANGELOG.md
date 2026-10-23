@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Fixed
+- **Installing the web UI as an app (PWA) on a phone.** The home-screen icon was missing and the bottom
+  tab bar sat below the visible area until you scrolled. The UI now ships a web app manifest
+  (`display: standalone`), real PNG icons (192, 512, maskable, and the 180 px `apple-touch-icon` iOS needs),
+  `favicon.ico` and `favicon.svg`, all served from the root: they used to fall through to `index.html`.
+  The page also declares `viewport-fit=cover`, pads the top bar for the notch and sizes the body to the
+  dynamic viewport. Already-installed copies need to be removed and added again to pick up the icon.
 - **iOS zoomed the page when you tapped a text field.** Form controls are now at least 16px, which stops
   Safari's focus zoom (the page itself is unchanged and can still be pinch-zoomed).
 - **Inbox candidates** wrap long titles and album names instead of cutting them with an ellipsis, so on a phone
