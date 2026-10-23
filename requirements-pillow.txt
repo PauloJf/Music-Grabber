@@ -1,0 +1,9 @@
+# Install AFTER requirements.txt:   pip install -r requirements.txt && pip install -r requirements-pillow.txt
+#
+# streamrip 2.1.0 (the latest release) requires Pillow<11, and 10.4 has dozens of known advisories
+# (docs/security.md, finding 3). Music Grabber uses Pillow for cover art, and streamrip only for its
+# Deezer client (its own Pillow code, a cover-downscale helper, is never called). Tests and the
+# Deezer client import were checked on Pillow 13. pip prints a "dependency conflict" note for
+# streamrip when installing this; that is expected and exits 0. It can't be one command: pip would
+# refuse to resolve the two requirements together.
+pillow>=12.3

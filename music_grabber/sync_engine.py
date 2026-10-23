@@ -93,6 +93,10 @@ class SpotifySync(threading.Thread):
         return self.db.get_playlist(playlist_id)
 
     def _synced(self):
+        try:
+            self.db.set_last_sync(time.time())
+        except Exception as exc:
+            log.warning("could not persist the last-sync time: %s", exc)
         if self.on_synced:
             try:
                 self.on_synced()

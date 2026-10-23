@@ -6,6 +6,25 @@
 - CI and the publish workflow install ffmpeg through `scripts/ci-install-ffmpeg.sh` (apt retries, per-attempt timeouts, three
   attempts) and every job has a `timeout-minutes`, so a stuck apt mirror fails fast instead of stalling for 25+ minutes.
 
+## 1.0.0-rc.2 (2026-10-23)
+
+Second release candidate: a current Pillow in the image (it was 10.4 with 63 advisories, held back by
+streamrip's pin) and a `status` that remembers the last sync. Please do one real Deezer download on this
+image: the Deezer path needs an ARL and is not covered by the automated tests.
+
+### Security
+- **Pillow is now 12.3 or newer** (was 10.4, with 63 advisories). streamrip 2.1.0 pins `Pillow<11`, so
+  `requirements-pillow.txt` installs a current Pillow as a second step after `requirements.txt` (the image,
+  CI and the publish workflow all do; the image build fails unless it is Pillow 12+). pip prints a
+  dependency-conflict note for streamrip; that is expected. Local development needs the same extra
+  `pip install -r requirements-pillow.txt` (README, "Development").
+
+### Fixed
+- **`status` no longer says `Last sync never` from the CLI.** The last Spotify sync time is persisted
+  (`app_counters.last_sync_epoch`) and reported together with the running server's own, so
+  `python -m music_grabber status`, `--remote` and `GET /api/status` all agree. The sync loop still syncs
+  once at server start.
+
 ## 1.0.0-rc.1 (2026-10-23)
 
 Release candidate for 1.0.0: the first image published to Docker Hub (only as `1.0.0-rc.1`, never

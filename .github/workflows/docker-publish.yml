@@ -55,6 +55,7 @@ jobs:
           bash scripts/ci-install-ffmpeg.sh
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
+          pip install -r requirements-pillow.txt
           ruff check .
           pytest -q
 
