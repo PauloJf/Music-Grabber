@@ -20,6 +20,8 @@ image: the Deezer path needs an ARL and is not covered by the automated tests.
   `pip install -r requirements-pillow.txt` (README, "Development").
 
 ### Fixed
+- **iOS zoomed the page when you tapped a text field.** Form controls are now at least 16px, which stops
+  Safari's focus zoom (the page itself is unchanged and can still be pinch-zoomed).
 - **`status` no longer says `Last sync never` from the CLI.** The last Spotify sync time is persisted
   (`app_counters.last_sync_epoch`) and reported together with the running server's own, so
   `python -m music_grabber status`, `--remote` and `GET /api/status` all agree. The sync loop still syncs
