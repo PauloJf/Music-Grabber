@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+- **iOS zoomed the page when you tapped a text field.** Form controls are now at least 16px, which stops
+  Safari's focus zoom (the page itself is unchanged and can still be pinch-zoomed).
+- **Inbox candidates** wrap long titles and album names instead of cutting them with an ellipsis, so on a phone
+  you can tell the versions apart before choosing.
+
 ### Release
 - CI and the publish workflow install ffmpeg through `scripts/ci-install-ffmpeg.sh` (apt retries, per-attempt timeouts, three
   attempts) and every job has a `timeout-minutes`, so a stuck apt mirror fails fast instead of stalling for 25+ minutes.
@@ -20,10 +26,6 @@ image: the Deezer path needs an ARL and is not covered by the automated tests.
   `pip install -r requirements-pillow.txt` (README, "Development").
 
 ### Fixed
-- **Inbox candidates** wrap long titles and album names instead of cutting them with an ellipsis, so on a phone
-  you can tell the versions apart before choosing.
-- **iOS zoomed the page when you tapped a text field.** Form controls are now at least 16px, which stops
-  Safari's focus zoom (the page itself is unchanged and can still be pinch-zoomed).
 - **`status` no longer says `Last sync never` from the CLI.** The last Spotify sync time is persisted
   (`app_counters.last_sync_epoch`) and reported together with the running server's own, so
   `python -m music_grabber status`, `--remote` and `GET /api/status` all agree. The sync loop still syncs
