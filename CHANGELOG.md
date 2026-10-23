@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Fixed
+- **Installing the web UI as an app (PWA) on a phone.** The home-screen icon was missing and the bottom
+  tab bar sat below the visible area until you scrolled. The UI now ships a web app manifest
+  (`display: standalone`), real PNG icons (192, 512, maskable, and the 180 px `apple-touch-icon` iOS needs),
+  `favicon.ico` and `favicon.svg`, all served from the root: they used to fall through to `index.html`.
+  The page also declares `viewport-fit=cover`, pads the top bar for the notch and sizes the body to the
+  dynamic viewport. Already-installed copies need to be removed and added again to pick up the icon.
+- **Inbox candidates** wrap long titles and album names instead of cutting them with an ellipsis, so on a phone
+  you can tell the versions apart before choosing.
+
 ### Release
 - CI and the publish workflow install ffmpeg through `scripts/ci-install-ffmpeg.sh` (apt retries, per-attempt timeouts, three
   attempts) and every job has a `timeout-minutes`, so a stuck apt mirror fails fast instead of stalling for 25+ minutes.
@@ -20,8 +30,6 @@ image: the Deezer path needs an ARL and is not covered by the automated tests.
   `pip install -r requirements-pillow.txt` (README, "Development").
 
 ### Fixed
-- **Inbox candidates** wrap long titles and album names instead of cutting them with an ellipsis, so on a phone
-  you can tell the versions apart before choosing.
 - **`status` no longer says `Last sync never` from the CLI.** The last Spotify sync time is persisted
   (`app_counters.last_sync_epoch`) and reported together with the running server's own, so
   `python -m music_grabber status`, `--remote` and `GET /api/status` all agree. The sync loop still syncs

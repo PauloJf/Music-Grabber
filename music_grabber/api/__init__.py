@@ -80,6 +80,11 @@ CSP = ("default-src 'self'; img-src 'self' data: https://*.dzcdn.net https://i.s
        "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 
 
+UI_ROOT_FILES = {"manifest.webmanifest": "application/manifest+json", "favicon.ico": "image/x-icon",
+                 "favicon.svg": "image/svg+xml", "apple-touch-icon.png": "image/png",
+                 "icon-192.png": "image/png", "icon-512.png": "image/png", "icon-maskable-512.png": "image/png"}
+
+
 def find_ui_dir(configured: str = "") -> str:
     """The built UI (index.html present), or "" when there is none."""
     here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -465,6 +470,18 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
         @app.get("/")
         def ui_index():
             return send_from_directory(ui_dir, "index.html")
+
+        def _root_file(name: str):
+            # Icons and the manifest live at the root (iOS and browsers ask for them there); a
+            # fixed list, one route each, so nothing else is ever a file read.
+            def view():
+                resp = send_from_directory(ui_dir, name, mimetype=UI_ROOT_FILES[name])
+                resp.headers["Cache-Control"] = "public, max-age=86400"
+                return resp
+            return view
+
+        for _name in UI_ROOT_FILES:
+            app.add_url_rule("/" + _name, endpoint="ui_root_" + _name, view_func=_root_file(_name), methods=["GET"])
 
         @app.get("/assets/<path:name>")
         def ui_asset(name):

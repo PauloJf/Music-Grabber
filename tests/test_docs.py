@@ -129,3 +129,37 @@ def test_relative_links_in_the_docs_resolve():
 def test_changelog_has_a_section_for_the_current_version():
     version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     assert re.search(rf"^## \[?{re.escape(version)}\]?", (ROOT / "CHANGELOG.md").read_text(encoding="utf-8"), re.M)
+
+
+# ── the installable web app (PWA): the page, the manifest and the icon files must agree ──────────
+def _png_size(path):
+    import struct
+    data = path.read_bytes()
+    assert data[:8] == b"\x89PNG\r\n\x1a\n", path
+    return struct.unpack(">II", data[16:24])
+
+
+def test_the_page_links_an_installable_manifest_and_icons_that_exist():
+    import json
+    public = ROOT / "frontend" / "public"
+    html = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
+    assert "viewport-fit=cover" in html and 'rel="manifest" href="/manifest.webmanifest"' in html
+    assert 'rel="apple-touch-icon" href="/apple-touch-icon.png"' in html     # iOS ignores manifest icons
+    assert 'name="apple-mobile-web-app-capable"' in html
+    assert "data:image" not in html                                          # no inline favicon standing in for the real ones
+    for href in re.findall(r'<link rel="(?:icon|apple-touch-icon)"[^>]*href="/([^"]+)"', html):
+        assert (public / href).is_file(), href
+    assert _png_size(public / "apple-touch-icon.png") == (180, 180)
+    m = json.loads((public / "manifest.webmanifest").read_text(encoding="utf-8"))
+    assert m["display"] == "standalone" and m["start_url"] == "/" and m["name"]
+    sizes = {i["sizes"]: i for i in m["icons"] if i["purpose"] == "any"}
+    assert {"192x192", "512x512"} <= set(sizes) and any(i["purpose"] == "maskable" for i in m["icons"])
+    for i in m["icons"]:
+        w, h = i["sizes"].split("x")
+        assert _png_size(public / i["src"].lstrip("/")) == (int(w), int(h)), i
+
+
+def test_every_root_file_the_server_offers_is_shipped_in_public():
+    from music_grabber.api import UI_ROOT_FILES
+    for name in UI_ROOT_FILES:
+        assert (ROOT / "frontend" / "public" / name).is_file(), name
