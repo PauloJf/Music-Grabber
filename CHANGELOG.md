@@ -73,6 +73,7 @@
   a best-effort `except`); queueing a catalogue track now resolves its ISRC.
 
 ### Documentation
+- `docs/plans/q3-q5-design.md`: design notes for the Spotify-id file tag and the Navidrome playlist mirror (no code yet).
 - README rewritten around a contents list, setup (Spotify OAuth, Deezer ARL), a troubleshooting
   section and the full configuration table; every variable the code reads is documented, and
   `tests/test_docs.py` fails if one is not.
