@@ -99,6 +99,17 @@ def _rel(path: str, source_root: str) -> str:
     return path if parts[0] == ".." else PurePosixPath(*parts).as_posix()
 
 
+def _reroot(path, source_root: str, library_root: str):
+    """``path`` as seen from this app's library, or None when it is not under BPM Tagger's
+    MUSIC_DIR (a path from the other side's filesystem would only mislead)."""
+    if not path:
+        return None
+    rel = _rel(path, source_root)
+    if PurePosixPath(rel).is_absolute() or PureWindowsPath(rel).drive:
+        return None
+    return os.path.join(library_root, *PurePosixPath(rel).parts)
+
+
 def import_bpm_tagger(source_db: str, target: Database, *, library_root: str,
                       source_music_dir: str = "/music", include_tokens: bool = False,
                       dry_run: bool = False, merge: bool = False) -> Report:
@@ -193,6 +204,7 @@ def _copy(src, tables, tconn, rep, library_root, source_music_dir, include_token
         row["playlist_track_id"] = pt_map.get(row.get("playlist_track_id"))
         row["chosen_candidate_id"] = None
         row["tmp_path"] = None
+        row["final_path"] = _reroot(row.get("final_path"), source_music_dir, library_root)
         q_map[old] = _insert(tconn, "grab_queue", row, tcols("grab_queue"))
         fresh.add(q_map[old])
         rep.add("grab_queue")

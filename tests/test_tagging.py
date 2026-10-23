@@ -7,6 +7,7 @@ from mutagen.flac import FLAC
 from PIL import Image
 
 from audio_fixtures import write_flac
+from conftest import posix_only
 from music_grabber.db import Database
 from music_grabber.tagging import embed_cover, read_cover, resize_cover, write_track_tags
 
@@ -107,6 +108,7 @@ def test_update_grab_rejects_unknown_columns(tmp_path):
         db.update_grab(1, **{"note=1, status": "x"})
 
 
+@posix_only
 def test_database_file_is_owner_only(tmp_path):
     import os
     import stat

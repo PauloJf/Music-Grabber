@@ -18,6 +18,21 @@
   "have", and `ledger rebuild` (CLI, `POST /api/ledger/rebuild`) restores the ledger from the tags
   (add-only). `WRITE_SPOTIFY_ID_TAG=false` turns it off; existing files are never rewritten.
 
+### Changed
+- `status` / the API report Spotify as **not connected** when a token exists but `SPOTIFY_CLIENT_ID` /
+  `SECRET` are unset (an imported token cannot refresh without them).
+- `import-bpm-tagger` re-roots each queue item's `final_path` into this library (or clears it when it
+  was outside BPM Tagger's `MUSIC_DIR`) instead of keeping BPM Tagger's absolute path.
+- The compose examples use `gatoserio/bpm-tagger:beta` until BPM Tagger's stable release.
+
+### Documentation
+- README "Stability": what stays compatible within 1.x. Migration guide: `inbox research-all` for
+  imported Inbox items without candidates. `docs/security.md`: root user and no HEALTHCHECK stated
+  plainly, plus the pre-1.0 `pip-audit` / `npm audit` findings.
+
+### Tests
+- The suite is green on a Windows checkout: POSIX-only tests are skipped on `win32` (CI stays the reference).
+
 ### Fixed (found verifying the import on a real BPM Tagger 2.18.2 database)
 - **An empty library index no longer queues a whole playlist.** A wrong or unmounted library path
   made every watched track "missing" and sync queued all of them for download. On an install that has grabbed or
@@ -74,6 +89,7 @@
   a best-effort `except`); queueing a catalogue track now resolves its ISRC.
 
 ### Documentation
+- `docs/plans/q3-q5-design.md`: design notes for the Spotify-id file tag and the Navidrome playlist mirror.
 - README rewritten around a contents list, setup (Spotify OAuth, Deezer ARL), a troubleshooting
   section and the full configuration table; every variable the code reads is documented, and
   `tests/test_docs.py` fails if one is not.

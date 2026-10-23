@@ -54,7 +54,7 @@ Details: [`docs/provenance.md`](docs/provenance.md) (exactly what moved and how)
 [Compose examples](#compose-examples) · [Using it](#using-it) · [Library and ledger](#library-and-the-ledger) · [Playlist mirror](#spotify-playlists-in-navidrome-the-mirror) ·
 [BPM Tagger, Navidrome, Mediarium](#working-with-bpm-tagger-navidrome-and-mediarium) ·
 [Moving from BPM Tagger](#moving-from-bpm-tagger) · [Configuration](#configuration) ·
-[Troubleshooting](#troubleshooting) · [Development](#development) · [Releasing](#releasing)
+[Stability](#stability) · [Troubleshooting](#troubleshooting) · [Development](#development) · [Releasing](#releasing)
 
 ## How it works
 
@@ -371,6 +371,15 @@ Secrets (`SPOTIFY_CLIENT_SECRET`, `LIBRARY_API_KEY`, `LIBRARY_PASS`, `BPM_TAGGER
 `MEDIARIUM_API_KEY`, `NAVIDROME_PASS`, `API_TOKEN`) are read from the environment only. A
 configuration that cannot work (unknown index, `intake` without `INTAKE_DIR`, a listed hook with no
 URL, a short `API_TOKEN`) makes `run` exit with code 2 and say what to set.
+
+## Stability
+
+From 1.0.0, within 1.x these do not change in a way that breaks an existing setup: the **CLI**
+commands and flags, the **JSON API** routes and their fields, the **environment variable names**
+and the **`settings.json` keys**. New ones may be added; one that must go is deprecated for a
+release first. The **database** migrates forward only: opening it with a newer version upgrades it
+in place, after copying the old file to `<db>.bak-<version>` (the version that is starting), so going back means restoring
+that copy. The web UI's look and its internal routes are not part of the promise.
 
 ## Troubleshooting
 

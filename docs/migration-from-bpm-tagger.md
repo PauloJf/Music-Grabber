@@ -76,7 +76,9 @@ docker compose exec music-grabber python -m music_grabber status
 
 `status` should show Spotify connected, your playlists with sensible have/missing counts, and the
 queue you had. Ambiguous items that were waiting in BPM Tagger's inbox are in Music Grabber's
-(`inbox`, or the Inbox page). If a playlist you already own shows lots of *missing*, check
+(`inbox`, or the Inbox page). Some of them have no candidates (BPM Tagger had cleared them, or the
+search found nothing); `inbox research-all` queues **every** Inbox item for a fresh search (it replaces the candidates you
+already have), so use `inbox search ITEM "query"` for single ones if you want to keep those. If a playlist you already own shows lots of *missing*, check
 `Library` in `status`: the library index must see your files (same mount path, or
 `LIBRARY_INDEX=opensubsonic`).
 

@@ -50,6 +50,13 @@ def test_exchange_code_stores_refresh_token(client, monkeypatch):
     assert client.is_connected() and client.db.get_oauth_token("spotify")["refresh_token"] == "R"
 
 
+def test_a_token_without_client_credentials_is_not_connected(client, tmp_path):
+    client.db.save_oauth_token("spotify", "A", "R", "2099-01-01", "x")
+    assert client.is_connected() and client.status()["connected"] is True
+    bare = sp.SpotifyClient({}, client.db)                # an imported token, SPOTIFY_CLIENT_ID/SECRET unset
+    assert not bare.is_connected() and bare.status()["connected"] is False
+
+
 def test_failed_exchange_is_an_auth_error(client, monkeypatch):
     monkeypatch.setattr(sp.requests, "post", lambda *a, **k: Resp(400, text="bad code"))
     with pytest.raises(sp.SpotifyAuthError):
