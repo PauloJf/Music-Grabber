@@ -251,9 +251,13 @@ class _DBBase:
                 disc_no      INTEGER,
                 year         INTEGER,
                 norm_title   TEXT,
-                norm_artist  TEXT
+                norm_artist  TEXT,
+                spotify_track_id TEXT                     -- our own file tag (Q3), filesystem source only
             )
         """)
+        if "spotify_track_id" not in {r[1] for r in conn.execute("PRAGMA table_info(library_tracks)")}:
+            conn.execute("ALTER TABLE library_tracks ADD COLUMN spotify_track_id TEXT")   # pre-Q3 database
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_lt_spotify_id ON library_tracks(spotify_track_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lt_isrc ON library_tracks(isrc)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lt_norm_artist ON library_tracks(norm_artist)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lt_norm_title ON library_tracks(norm_title)")

@@ -30,6 +30,22 @@ class LedgerMixin:
                   provider, output_format, placed_hash, now))
             conn.commit()
 
+    def add_grabbed_files_missing(self, rows: list[dict]) -> int:
+        """Insert ledger rows for files not in the ledger yet (matched by ``rel_path``); existing
+        rows are never changed. Used by ``ledger rebuild``. Returns how many were added."""
+        now = datetime.now(timezone.utc).isoformat()
+        added = 0
+        with self._connect() as conn:
+            for r in rows:
+                cur = conn.execute(
+                    "INSERT OR IGNORE INTO grabbed_files (spotify_track_id, isrc, rel_path, abs_path, "
+                    "provider, output_format, placed_hash, placed_at) VALUES (?,?,?,?,?,?,?,?)",
+                    (r["spotify_track_id"], r.get("isrc") or None, r["rel_path"], r["abs_path"], "",
+                     r.get("output_format") or "", r.get("placed_hash") or "", now))
+                added += cur.rowcount
+            conn.commit()
+        return added
+
     def find_grabbed_by_spotify_id(self, spotify_track_id: str) -> list[dict]:
         if not spotify_track_id:
             return []

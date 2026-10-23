@@ -41,6 +41,7 @@ class RemoteOps:
     # status / library / settings
     def status(self): return self._get("/api/status")
     def library_refresh(self): return self._post("/api/library/refresh")
+    def ledger_rebuild(self): return self._post("/api/ledger/rebuild")
     def settings_get(self): return self._get("/api/settings")
     def settings_update(self, changes): return self._post("/api/settings", changes)
     def test_deezer(self, arl=None): return self._post("/api/settings/test-deezer", {"deezer_arl": arl})

@@ -271,6 +271,10 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
     def library_refresh():
         return jsonify(ops.library_refresh())
 
+    @app.post("/api/ledger/rebuild")
+    def ledger_rebuild():
+        return jsonify(ops.ledger_rebuild())
+
     @app.get("/api/settings")
     def settings_get():
         return jsonify(ops.settings_get())

@@ -6,6 +6,7 @@ are ``OpsError`` with a stable ``code`` (the API maps it to an HTTP status).
 """
 
 import logging
+import os
 import secrets
 import threading
 import time
@@ -60,6 +61,7 @@ SETTINGS = {
     "ask_threshold":         ("float", (0.0, 1.0)),
     "grab_dry_run":          ("bool", None),
     "lyrics_enabled":        ("bool", None),
+    "write_spotify_id_tag":  ("bool", None),
     "spotify_sync_minutes":  ("int", (1, 24 * 60)),
     "grab_workers":          ("int", (1, 3)),
     "ntfy_url":              ("str", None),
@@ -349,6 +351,27 @@ class Ops:
             return {"ok": True, **self.svc.index.refresh()}
         except Exception as exc:
             raise OpsError("library_error", str(exc), 502) from None
+
+    def ledger_rebuild(self) -> dict:
+        """Add a ledger row for every library file that carries our Spotify id tag and has none.
+        Only adds: existing rows and the files themselves are never touched. Needs the
+        filesystem library index (the OpenSubsonic API does not expose custom tags)."""
+        index = self.svc.index
+        if not index.source or index.source.name != "filesystem":
+            raise OpsError("unsupported", "ledger rebuild reads tags from files: it needs "
+                           "LIBRARY_INDEX=filesystem", 400)
+        try:
+            index.refresh()
+        except Exception as exc:
+            raise OpsError("library_error", str(exc), 502) from None
+        root = index.root
+        tagged = self.db.library_tagged()
+        rows = [{"spotify_track_id": t["spotify_track_id"], "isrc": t["isrc"], "rel_path": t["path"],
+                 "abs_path": os.path.join(root, *t["path"].split("/")),
+                 "output_format": os.path.splitext(t["path"])[1].lstrip(".").lower(),
+                 "placed_hash": t["change_token"]} for t in tagged]
+        added = self.db.add_grabbed_files_missing(rows)
+        return {"ok": True, "tagged_files": len(rows), "added": added, "already_in_ledger": len(rows) - added}
 
     # ── accounts ──────────────────────────────────────────────────────────────
     def auth_state(self) -> dict:

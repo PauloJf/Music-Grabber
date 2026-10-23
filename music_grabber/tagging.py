@@ -15,10 +15,17 @@ import mutagen
 import requests
 from mutagen.flac import FLAC, Picture
 from mutagen.id3 import (APIC, ID3, ID3NoHeaderError, TALB, TDRC, TIT2, TPE1,
-                         TPE2, TPOS, TRCK, TSRC)
+                         TPE2, TPOS, TRCK, TSRC, TXXX)
 from mutagen.mp4 import MP4, MP4Cover
 
 log = logging.getLogger(__name__)
+
+# The Spotify track id, written into files Music Grabber grabs so the library index can answer
+# "do we have this track?" from the file itself (docs/plans/q3-q5-design.md). Other software
+# ignores unknown tags.
+# ID3 TXXX description / Vorbis comment key. The grabber only produces mp3, flac and opus
+# (transcode.PROFILES), so there is no MP4 variant.
+SPOTIFY_ID_TAG = "SPOTIFY_TRACK_ID"
 
 
 def _track_disc(n) -> str:
@@ -40,8 +47,10 @@ def sniff_image_mime(data: bytes) -> str:
     return "image/jpeg"
 
 
-def write_track_tags(file_path: str, meta: dict, preserve_mtime: bool = True) -> str | None:
-    """Write descriptive tags (title/artist/album/album_artist/track/disc/year/isrc).
+def write_track_tags(file_path: str, meta: dict, preserve_mtime: bool = True,
+                     spotify_id_tag: bool = True) -> str | None:
+    """Write descriptive tags (title/artist/album/album_artist/track/disc/year/isrc, and the
+    Spotify track id unless ``spotify_id_tag`` is off).
 
     Returns None on success, or a short warning string on failure so callers can
     surface it (the download itself still succeeded).
@@ -50,6 +59,7 @@ def write_track_tags(file_path: str, meta: dict, preserve_mtime: bool = True) ->
     bpm.tags.write_bpm_tag — editing tags from the UI shouldn't make a file look
     freshly modified to Navidrome or a backup tool."""
     ext = os.path.splitext(file_path)[1].lower()
+    sid = (meta.get("spotify_track_id") or "").strip() if spotify_id_tag else ""
     try:
         st = os.stat(file_path) if preserve_mtime else None
         if ext == ".mp3":
@@ -65,6 +75,7 @@ def write_track_tags(file_path: str, meta: dict, preserve_mtime: bool = True) ->
             if meta.get("disc_no"):      tags["TPOS"] = TPOS(encoding=3, text=_track_disc(meta["disc_no"]))
             if meta.get("year"):         tags["TDRC"] = TDRC(encoding=3, text=str(meta["year"]))
             if meta.get("isrc"):         tags["TSRC"] = TSRC(encoding=3, text=meta["isrc"])
+            if sid:                      tags[f"TXXX:{SPOTIFY_ID_TAG}"] = TXXX(encoding=3, desc=SPOTIFY_ID_TAG, text=sid)
             tags.save(file_path)
         else:
             audio = mutagen.File(file_path, easy=True)
@@ -81,6 +92,8 @@ def write_track_tags(file_path: str, meta: dict, preserve_mtime: bool = True) ->
             setk("discnumber", _track_disc(meta.get("disc_no")))
             setk("date", meta.get("year"))
             setk("isrc", meta.get("isrc"))
+            if sid:
+                audio[SPOTIFY_ID_TAG] = sid                 # Vorbis comments take any key
             audio.save()
         if st is not None:
             os.utime(file_path, (st.st_atime, st.st_mtime))

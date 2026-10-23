@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+- **Spotify id tag (Q3).** Grabbed files carry the Spotify track id in a `SPOTIFY_TRACK_ID` tag (ID3
+  `TXXX`, Vorbis comment). The filesystem index reads it, so a moved or renamed grabbed file is still
+  "have", and `ledger rebuild` (CLI, `POST /api/ledger/rebuild`) restores the ledger from the tags
+  (add-only). `WRITE_SPOTIFY_ID_TAG=false` turns it off; existing files are never rewritten.
+
 ### Fixed (found verifying the import on a real BPM Tagger 2.18.2 database)
 - **An empty library index no longer queues a whole playlist.** A wrong or unmounted library path
   made every watched track "missing" and sync queued all of them for download. On an install that has grabbed or

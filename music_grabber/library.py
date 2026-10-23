@@ -38,6 +38,7 @@ class LibraryTrack:
     track_no: Optional[int] = None
     disc_no: Optional[int] = None
     year: Optional[int] = None
+    spotify_track_id: Optional[str] = None     # from our own file tag; only the filesystem source reads it
 
 
 @dataclass(frozen=True)
@@ -104,10 +105,27 @@ def _read_isrc(file_path: str, easy) -> Optional[str]:
     return None
 
 
+def _read_spotify_id(file_path: str, easy) -> Optional[str]:
+    """The Spotify id Music Grabber wrote into a file it grabbed (tagging.SPOTIFY_ID_TAG)."""
+    ext = os.path.splitext(file_path)[1].lower()
+    try:
+        if ext == ".mp3":
+            fr = ID3(file_path).getall("TXXX:SPOTIFY_TRACK_ID")
+            raw = fr[0].text[0] if fr and fr[0].text else None
+        else:
+            raw = _first(easy.get("SPOTIFY_TRACK_ID"))        # Vorbis comments (flac/ogg/opus)
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8", "ignore")
+        return str(raw).strip() or None if raw else None
+    except Exception:
+        return None
+
+
 def read_tags(file_path: str) -> dict:
     """Best-effort metadata read. Missing fields → None."""
     out = {"title": None, "artist": None, "album": None, "album_artist": None,
-           "track_no": None, "disc_no": None, "year": None, "isrc": None, "duration_ms": None}
+           "track_no": None, "disc_no": None, "year": None, "isrc": None, "duration_ms": None,
+           "spotify_track_id": None}
     try:
         easy = mutagen.File(file_path, easy=True)
         if easy is None:
@@ -123,6 +141,7 @@ def read_tags(file_path: str) -> dict:
             digits = "".join(c for c in str(date)[:4] if c.isdigit())
             out["year"] = int(digits) if len(digits) == 4 else None
         out["isrc"] = _read_isrc(file_path, easy)
+        out["spotify_track_id"] = _read_spotify_id(file_path, easy)
         if getattr(easy, "info", None) and getattr(easy.info, "length", None):
             out["duration_ms"] = int(easy.info.length * 1000)
     except Exception as exc:
@@ -218,12 +237,15 @@ class LibraryIndex:
 
     # ── lookups used by matching.library_match ────────────────────────────────
     def find_by_spotify_id(self, spotify_track_id: str) -> list[dict]:
-        """Ledger hits whose file still exists. A deleted track is re-grabbed rather
-        than reported as 'have' forever."""
+        """Ledger hits whose file still exists, else library files carrying the id in their own
+        tag (a grabbed file that was moved, or a lost ledger). A deleted track is re-grabbed
+        rather than reported as 'have' forever."""
         out = []
         for row in self.db.find_grabbed_by_spotify_id(spotify_track_id):
             if os.path.exists(row["abs_path"]):
                 out.append({"file_path": self.display_path(row["abs_path"])})
+        if not out:
+            out = [{"file_path": r["path"]} for r in self.db.library_find_by_spotify_id(spotify_track_id)]
         return out
 
     def find_by_isrc(self, isrc: str) -> list[dict]:
@@ -249,4 +271,5 @@ def _track_row(t: LibraryTrack) -> dict:
     return {"path": t.path, "title": t.title, "artist": t.artist, "album": t.album,
             "album_artist": t.album_artist, "duration_ms": t.duration_ms, "isrc": t.isrc,
             "track_no": t.track_no, "disc_no": t.disc_no, "year": t.year,
+            "spotify_track_id": t.spotify_track_id,
             "norm_title": normalize_title(t.title), "norm_artist": normalize_artist(t.artist)}
