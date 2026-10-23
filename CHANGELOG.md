@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+- **Spotify id tag (Q3).** Grabbed files carry the Spotify track id in a `SPOTIFY_TRACK_ID` tag (ID3
+  `TXXX`, Vorbis comment). The filesystem index reads it, so a moved or renamed grabbed file is still
+  "have", and `ledger rebuild` (CLI, `POST /api/ledger/rebuild`) restores the ledger from the tags
+  (add-only). `WRITE_SPOTIFY_ID_TAG=false` turns it off; existing files are never rewritten.
+
 ### Changed
 - `status` / the API report Spotify as **not connected** when a token exists but `SPOTIFY_CLIENT_ID` /
   `SECRET` are unset (an imported token cannot refresh without them).
@@ -73,7 +79,7 @@
   a best-effort `except`); queueing a catalogue track now resolves its ISRC.
 
 ### Documentation
-- `docs/plans/q3-q5-design.md`: design notes for the Spotify-id file tag and the Navidrome playlist mirror (no code yet).
+- `docs/plans/q3-q5-design.md`: design notes for the Spotify-id file tag and the Navidrome playlist mirror.
 - README rewritten around a contents list, setup (Spotify OAuth, Deezer ARL), a troubleshooting
   section and the full configuration table; every variable the code reads is documented, and
   `tests/test_docs.py` fails if one is not.

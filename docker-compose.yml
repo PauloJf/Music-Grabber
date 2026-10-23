@@ -29,6 +29,7 @@ services:
       ASK_THRESHOLD: "0.55"
       GRAB_WORKERS: "1"
       GRAB_DRY_RUN: "false"             # true: search and score, never download
+      WRITE_SPOTIFY_ID_TAG: "true"      # Spotify track id in grabbed files (new files only)
 
       # --- Working with BPM Tagger (see README: Working with BPM Tagger) -----------
       # ANALYSIS: intake                  # file into a folder BPM Tagger's watcher covers

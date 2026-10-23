@@ -17,3 +17,9 @@ def minimal_flac_bytes(seconds: int = 1) -> bytes:
 def write_flac(path, seconds: int = 1) -> None:
     with open(path, "wb") as fh:
         fh.write(minimal_flac_bytes(seconds))
+
+
+def minimal_mp3_bytes(frames: int = 12) -> bytes:
+    """A few silent MPEG-1 Layer III frames (128 kbps, 44.1 kHz): enough for mutagen to
+    recognise an mp3 and for ID3 tags to be written in front of it."""
+    return (b"\xff\xfb\x90\x00" + b"\x00" * 413) * frames

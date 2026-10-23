@@ -24,6 +24,7 @@ inbox [list|show|choose|search|research|research-all|skip]
 settings [show|set|test-deezer|test-ntfy]
 users [list|add|passwd|role|delete]   accounts for the web UI (also the way back in after a lost password)
 library refresh           reload the library index
+ledger rebuild            re-add ledger rows for files carrying our Spotify id tag
 import-bpm-tagger DB      import grab_* data from a BPM Tagger database
 import-env SETTINGS_JSON  print a config block from a BPM Tagger settings.json
 version
@@ -122,6 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("role", choices=["user", "admin"])
 
     top.nested(top.add("library")).add("refresh")
+    top.nested(top.add("ledger")).add("rebuild")
 
     x = top.add("import-bpm-tagger")
     x.add_argument("db", help="path to BPM Tagger's SQLite database (opened read-only)")
@@ -230,6 +232,10 @@ def _dispatch(args, ops, out) -> int:
     elif c == "sync":
         d = ops.sync(args.playlist_id)
         emit(d, "Synced. Queue: " + (", ".join(f"{n} {s}" for s, n in sorted(d['queue'].items())) or "empty"))
+    elif c == "ledger":
+        d = ops.ledger_rebuild()
+        emit(d, f"{d['tagged_files']} tagged file(s): {d['added']} added to the ledger, "
+                f"{d['already_in_ledger']} already there")
     elif c == "library":
         d = ops.library_refresh()
         emit(d, f"Library: {d['seen']} files, {d['updated']} updated, {d['removed']} removed")

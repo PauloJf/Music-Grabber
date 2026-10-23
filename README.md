@@ -51,7 +51,7 @@ Details: [`docs/provenance.md`](docs/provenance.md) (exactly what moved and how)
 
 **Contents:** [Where it comes from](#where-it-comes-from) · [How it works](#how-it-works) ·
 [Quick start](#quick-start) · [Spotify](#spotify-setup) · [Deezer](#deezer-arl) ·
-[Compose examples](#compose-examples) · [Using it](#using-it) ·
+[Compose examples](#compose-examples) · [Using it](#using-it) · [Library and ledger](#library-and-the-ledger) ·
 [BPM Tagger, Navidrome, Mediarium](#working-with-bpm-tagger-navidrome-and-mediarium) ·
 [Moving from BPM Tagger](#moving-from-bpm-tagger) · [Configuration](#configuration) ·
 [Stability](#stability) · [Troubleshooting](#troubleshooting) · [Development](#development) · [Releasing](#releasing)
@@ -142,6 +142,7 @@ python -m music_grabber inbox show 12           # candidates with scores, plus t
 python -m music_grabber inbox choose 12 41      # download candidate 41 for item 12
 python -m music_grabber inbox search 12 "weeknd blinding lights"   # try another search
 python -m music_grabber settings set output_format flac
+python -m music_grabber ledger rebuild          # re-add ledger rows for files carrying our Spotify id tag
 ```
 
 In Docker run them inside the container (`docker compose exec music-grabber python -m
@@ -207,12 +208,26 @@ python -m music_grabber users passwd alice              # also the way back afte
 
 `settings show` / `settings set KEY VALUE ...` (or `POST /api/settings`) change what makes sense at
 runtime: `output_format`, `path_template`, `provider_order`, `deezer_quality`, `deezer_arl`,
-`auto_accept_threshold`, `ask_threshold`, `grab_dry_run`, `lyrics_enabled`,
+`auto_accept_threshold`, `ask_threshold`, `grab_dry_run`, `lyrics_enabled`, `write_spotify_id_tag`,
 `spotify_sync_minutes`, `grab_workers`, `ntfy_url`, `ntfy_topic`, `ntfy_notify_done`,
 `ui_public_url`. Values are validated, saved to `settings.json` (mode 0600, next to the database)
 and applied to the running instance without a restart (`grab_workers` and `spotify_sync_minutes`
 need one). Settings saved this way override the environment from then on. Credentials that come
 from the environment (Spotify secret, API token, library/hook keys) are never written to the file.
+
+## Library and the ledger
+
+"Do we already have it?" is answered, in order, by the **ledger** (files Music Grabber filed, by
+Spotify id, as long as the file is still there), by the **Spotify id tag** inside a file, by an equal
+**ISRC**, then by a fuzzy title + artist + duration score.
+
+Files Music Grabber grabs carry the Spotify track id in a `SPOTIFY_TRACK_ID` tag (ID3 `TXXX`, or a
+Vorbis comment in flac/opus). Other software ignores it. It means a grabbed file that you move or
+rename is still "have", and `ledger rebuild` can restore the ledger after a lost or fresh database by
+reading the tags (it only adds rows; it never changes a file or an existing row). Only
+`LIBRARY_INDEX=filesystem` can read the tag: the OpenSubsonic API does not expose custom tags.
+Files that already existed are never rewritten, so the ones from a BPM Tagger import stay untagged and
+keep the ledger rows the import made. `WRITE_SPOTIFY_ID_TAG=false` stops tagging new files.
 
 ## Working with BPM Tagger, Navidrome and Mediarium
 
@@ -295,6 +310,7 @@ an environment variable; a few can also be changed at runtime ([Settings](#setti
 | `GRAB_WORKERS` | `1` | 1 to 3 |
 | `GRAB_DRY_RUN` | `false` | search and score, never download |
 | `LYRICS_ENABLED` | `false` | embed LRCLIB lyrics |
+| `WRITE_SPOTIFY_ID_TAG` | `true` | write the Spotify track id into files it grabs (`SPOTIFY_TRACK_ID` tag; never into existing files); see [Library and the ledger](#library-and-the-ledger) |
 | `LIBRARY_INDEX` | `filesystem` | `filesystem` \| `opensubsonic` |
 | `LIBRARY_URL`, `LIBRARY_API_KEY` (or `LIBRARY_USER` + `LIBRARY_PASS`) | | for `opensubsonic`: BPM Tagger's Subsonic API or Navidrome |
 | `ANALYSIS` | `none` | `none` \| `intake` \| `api` |

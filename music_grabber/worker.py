@@ -271,7 +271,8 @@ class GrabPipeline:
         #     is fine), but record any failure as a warning event so it's visible
         #     instead of buried in the logs.
         self.db.transition(item_id, "tagging")
-        tag_warn = write_track_tags(out_path, meta)
+        tag_warn = write_track_tags(out_path, meta,
+                                    spotify_id_tag=bool(self.config.get("write_spotify_id_tag", True)))
         if tag_warn:
             self.db.add_grab_event(item_id, "warning", tag_warn)
         cover = fetch_cover(meta.get("cover_url"))

@@ -5,7 +5,8 @@ from typing import Iterable, Optional
 
 class LibraryMixin:
     _LT_COLS = ("path", "change_token", "source", "title", "artist", "album", "album_artist",
-                "duration_ms", "isrc", "track_no", "disc_no", "year", "norm_title", "norm_artist")
+                "duration_ms", "isrc", "track_no", "disc_no", "year", "norm_title", "norm_artist",
+                "spotify_track_id")
 
     def library_tokens(self, source: str) -> dict:
         """{path: change_token} for rows this source loaded."""
@@ -46,6 +47,20 @@ class LibraryMixin:
         with self._connect() as conn:
             return conn.execute("SELECT 1 FROM library_tracks WHERE path = ? LIMIT 1",
                                 (path,)).fetchone() is not None
+
+    def library_find_by_spotify_id(self, spotify_track_id: str) -> list[dict]:
+        if not spotify_track_id:
+            return []
+        with self._connect() as conn:
+            return [dict(r) for r in conn.execute(
+                "SELECT * FROM library_tracks WHERE spotify_track_id = ? ORDER BY path", (spotify_track_id,))]
+
+    def library_tagged(self) -> list[dict]:
+        """Library files that carry a Spotify id tag."""
+        with self._connect() as conn:
+            return [dict(r) for r in conn.execute(
+                "SELECT path, spotify_track_id, isrc, change_token FROM library_tracks "
+                "WHERE spotify_track_id IS NOT NULL AND spotify_track_id != '' ORDER BY path")]
 
     def library_find_by_isrc(self, isrc: str) -> list[dict]:
         if not isrc:

@@ -113,6 +113,8 @@ def build_config() -> dict:
         "auto_accept_threshold": float(os.environ.get("AUTO_ACCEPT_THRESHOLD", "0.85")),
         "ask_threshold":         float(os.environ.get("ASK_THRESHOLD", "0.55")),
         "lyrics_enabled":        _bool("LYRICS_ENABLED"),
+        # Write the Spotify track id into grabbed files (never into existing ones).
+        "write_spotify_id_tag":  _bool("WRITE_SPOTIFY_ID_TAG", "true"),
 
         # Notifications.
         "ntfy_url":              os.environ.get("NTFY_URL", ""),
