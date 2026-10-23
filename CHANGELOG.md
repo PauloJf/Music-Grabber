@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.0.0-rc.1 (2026-10-23)
+
+Release candidate for 1.0.0: the first image published to Docker Hub (only as `1.0.0-rc.1`, never
+`latest`). It exercises the publish workflow and the multi-arch build; please report anything that
+behaves differently from the README. The stability promise in the README applies from 1.0.0.
+
 ### Added
 - **Navidrome playlist mirror (Q5).** `PLAYLIST_MIRROR=navidrome` writes each watched playlist to
   Navidrome as `Spotify: <name>` with the tracks matched in the library, so BPM Tagger's Run/Listen pages
@@ -144,7 +150,7 @@
 - Reopening an existing database crashed (`UNIQUE constraint failed: app_counters.key`) while
   seeding the lifetime counter; every second start of the app hit it.
 
-## 0.1.0 (unreleased)
+## 0.1.0 (extraction, never published)
 
 First cut of the Music Grabber as its own project, extracted from BPM Tagger v2.18.2
 (see `docs/provenance.md` and `docs/plans/extraction.md`).
