@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.0.0-rc.2 (2026-10-23)
+
+Second release candidate: a current Pillow in the image (it was 10.4 with 63 advisories, held back by
+streamrip's pin) and a `status` that remembers the last sync. Please do one real Deezer download on this
+image: the Deezer path needs an ARL and is not covered by the automated tests.
+
 ### Security
 - **Pillow is now 12.3 or newer** (was 10.4, with 63 advisories). streamrip 2.1.0 pins `Pillow<11`, so
   `requirements-pillow.txt` installs a current Pillow as a second step after `requirements.txt` (the image,
