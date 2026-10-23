@@ -4,6 +4,7 @@ Coupling to BPM Tagger is HTTP and/or the shared music folder (docs/plans/extrac
 """
 
 import ast
+import os
 import subprocess
 import sys
 import textwrap
@@ -69,6 +70,6 @@ def test_imports_without_bpm_tagger_detectors_or_download_libraries():
     blocked = ",".join(FORBIDDEN + ("streamrip", "yt_dlp", "flask", "waitress"))
     proc = subprocess.run([sys.executable, "-c", _PROBE, blocked], cwd=str(ROOT),
                           capture_output=True, text=True, timeout=60,
-                          env={"PYTHONPATH": str(ROOT), "PATH": ""})
+                          env={"PYTHONPATH": str(ROOT), "PATH": "", **{k: os.environ[k] for k in ("SYSTEMROOT",) if k in os.environ}})
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "OK" in proc.stdout

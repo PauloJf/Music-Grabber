@@ -87,7 +87,7 @@ def test_full_cycle_then_restart_never_regrabs(tmp_path):
 
     assert drain(svc) == 3
     assert sorted(prov.downloads) == ["Song 2", "Song 3", "Song 4"]
-    placed = sorted(os.path.relpath(os.path.join(d, f), c["music_dir"])
+    placed = sorted(os.path.relpath(os.path.join(d, f), c["music_dir"]).replace(os.sep, "/")
                     for d, _s, fs in os.walk(c["music_dir"]) for f in fs if f.endswith(".mp3"))
     assert len(placed) == 3 and all(p.startswith("The Band/") for p in placed)
     assert db.get_grabbed_count() == 3 and db.get_grabbed_total() == 3

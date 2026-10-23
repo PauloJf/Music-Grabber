@@ -97,6 +97,13 @@ def test_shared_folder_examples_really_share_one_folder(name):
     assert "navidrome" not in str(env.get("POST_IMPORT_HOOKS", "")), "BPM Tagger triggers the rescan after tagging"
 
 
+@pytest.mark.parametrize("name", ["with-bpm-tagger.yml", "full-stack.yml"])
+def test_examples_use_the_bpm_tagger_beta_channel_until_its_stable_release(name):
+    """:latest is still the old BPM Tagger with the grabber built in. When BPM Tagger's stable
+    release ships, change both examples to :latest and update this test."""
+    assert _services(COMPOSE_DIR / name)["bpm-tagger"]["image"] == "gatoserio/bpm-tagger:beta"
+
+
 def test_full_stack_index_points_at_bpm_taggers_subsonic_api():
     s = _services(COMPOSE_DIR / "full-stack.yml")
     env = s["music-grabber"]["environment"]
