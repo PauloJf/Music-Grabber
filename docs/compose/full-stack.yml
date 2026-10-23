@@ -26,7 +26,9 @@ services:
       - ${MUSIC_PATH:-/srv/music}:/music:ro
 
   bpm-tagger:
-    image: gatoserio/bpm-tagger:latest
+    # Use the :beta channel (BPM Tagger without its own grabber) until BPM Tagger's stable release:
+    # :latest is still the older image that has the grabber built in. Switch to :latest after that.
+    image: gatoserio/bpm-tagger:beta
     container_name: bpm-tagger
     restart: unless-stopped
     environment:

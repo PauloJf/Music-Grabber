@@ -61,14 +61,16 @@ class SpotifyClient:
         return bool(self.client_id and self.client_secret and self.redirect_uri)
 
     def is_connected(self) -> bool:
+        """A refresh token *and* the client credentials to use it: a token without a client
+        (an imported one, before SPOTIFY_CLIENT_ID/SECRET are set) cannot refresh."""
         tok = self.db.get_oauth_token(SERVICE)
-        return bool(tok and tok.get("refresh_token"))
+        return bool(tok and tok.get("refresh_token")) and self.is_configured()
 
     def status(self) -> dict:
         tok = self.db.get_oauth_token(SERVICE)
         return {
             "configured": self.is_configured(),
-            "connected": bool(tok and tok.get("refresh_token")),
+            "connected": self.is_connected(),
             "scope": (tok or {}).get("scope", ""),
             "redirect_uri": self.redirect_uri,
         }

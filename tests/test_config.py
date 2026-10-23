@@ -1,6 +1,7 @@
 import json
 import os
 
+from conftest import posix_only
 from music_grabber import config as cfgmod
 
 
@@ -12,6 +13,7 @@ def _clean_env(monkeypatch):
             monkeypatch.delenv(k, raising=False)
 
 
+@posix_only
 def test_defaults(monkeypatch):
     _clean_env(monkeypatch)
     c = cfgmod.build_config()
@@ -36,6 +38,7 @@ def test_env_names_match_bpm_tagger_and_library_dir_follows_music_dir(monkeypatc
     assert cfgmod.build_config()["library_dir"] == "/m"
 
 
+@posix_only
 def test_settings_override_roundtrip_and_env_only_keys(tmp_path, monkeypatch):
     _clean_env(monkeypatch)
     monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "from-env")

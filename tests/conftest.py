@@ -7,8 +7,12 @@ open so tests can run a throwaway local HTTP server as a fake peer.
 
 import ipaddress
 import socket
+import sys
 
 import pytest
+
+# For tests that assert POSIX file modes or separators; CI (Linux) is the reference.
+posix_only = pytest.mark.skipif(sys.platform == "win32", reason="POSIX file modes / paths")
 
 _real_connect = socket.socket.connect
 _real_getaddrinfo = socket.getaddrinfo
