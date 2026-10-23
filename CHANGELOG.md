@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Release
+- CI and the publish workflow install ffmpeg through `scripts/ci-install-ffmpeg.sh` (apt retries, per-attempt timeouts, three
+  attempts) and every job has a `timeout-minutes`, so a stuck apt mirror fails fast instead of stalling for 25+ minutes.
+
 ## 1.0.0-rc.1 (2026-10-23)
 
 Release candidate for 1.0.0: the first image published to Docker Hub (only as `1.0.0-rc.1`, never

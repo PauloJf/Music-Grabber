@@ -46,3 +46,17 @@ def test_ci_runs_on_push_to_main_and_prs_only():
     trig = _on(WF / "ci.yml")
     assert set(trig) == {"push", "pull_request"}
     assert trig["push"]["branches"] == ["main"]
+
+
+def test_every_job_has_a_timeout_and_apt_is_never_called_bare():
+    """A hung step (the apt mirror once stalled CI for 25+ minutes) must fail fast, not wait for
+    GitHub's six-hour default, and nothing may call apt without the retrying, time-boxed helper."""
+    for f in WF.glob("*.yml"):
+        data = yaml.safe_load(f.read_text(encoding="utf-8"))
+        for name, job in data["jobs"].items():
+            assert 0 < job.get("timeout-minutes", 0) <= 60, f"{f.name}:{name} needs a timeout-minutes"
+        assert "apt-get" not in f.read_text(encoding="utf-8"), f"{f.name}: use scripts/ci-install-ffmpeg.sh"
+    script = (WF.parent.parent / "scripts" / "ci-install-ffmpeg.sh").read_text(encoding="utf-8")
+    assert "Acquire::Retries" in script and "timeout " in script and "exit 1" in script
+    assert "ci-install-ffmpeg.sh" in (WF / "ci.yml").read_text(encoding="utf-8")
+    assert "ci-install-ffmpeg.sh" in (WF / "docker-publish.yml").read_text(encoding="utf-8")
