@@ -45,7 +45,7 @@ web pages visited from the owner's browser.
 |---|---|---|---|
 | 1 | Medium | Wrong tokens could be guessed at unlimited speed | Per-address lockout: 10 wrong tokens in 60 s gives 429 with `Retry-After` (`AuthThrottle`) |
 | 2 | Medium | Cover download followed any URL from the catalogue (SSRF to LAN/localhost/cloud metadata, unbounded size) | `fetch_cover` accepts public http(s) hosts only, re-checks every redirect, caps size at 15 MB |
-| 3 | Medium | Pillow 10.4 has known CVEs; streamrip 2.1.0 pins `Pillow<11` so it cannot be upgraded | Mitigated: only JPEG/PNG/WEBP are decoded, decompression bombs capped at 40 MP, input only from the size-capped fetch above. **Residual risk**, revisit when streamrip lifts the pin |
+| 3 | Medium | Pillow 10.4 has known CVEs; streamrip 2.1.0 pins `Pillow<11` so a plain install resolves to it | Fixed: `requirements-pillow.txt` installs Pillow >=12.3 after `requirements.txt` (CI, the publish workflow and the image all do; the image build asserts the major version). Still in place as defence in depth: only JPEG/PNG/WEBP are decoded, decompression bombs capped at 40 MP, input only from the size-capped fetch above |
 | 4 | Medium | `react-router` advisory in the UI bundle | Upgraded to 7.18.4, `npm audit` reports 0 vulnerabilities |
 | 5 | Low | `update_grab(**fields)` built SQL column names from keyword names | Allowlist of real columns, else `ValueError` |
 | 6 | Low | `ntfy_url` / `ui_public_url` settings accepted any string | Must be http(s) with a host and no embedded credentials |
@@ -70,13 +70,18 @@ web pages visited from the owner's browser.
 
 ## Dependency audit (2026-10-23, before 1.0)
 
-- **`pip-audit -r requirements.txt`: Pillow 10.4.0, 63 advisories, fixed in 12.1.1 and later.** It cannot
-  be upgraded: `streamrip` 2.1.0 (the latest release) requires `Pillow<11`, and `requirements.txt`
-  repeats the bound. The mitigation in finding 3 above still applies (only JPEG/PNG/WEBP are decoded,
-  decompression bombs are capped, input comes only from the size-capped cover fetch), but it is a
-  mitigation, not a fix. Open decision before 1.0: keep it as a documented residual risk, or install
-  `streamrip` without its Pillow bound (`pip install --no-deps`) and test the Deezer path with
-  Pillow 12+; or drop Pillow's use for covers. Nothing else in `requirements.txt` has an advisory.
+- **`pip-audit -r requirements.txt`: Pillow 10.4.0, 63 advisories, fixed in 12.1.1 and later. Resolved
+  by `requirements-pillow.txt` (Pillow >=12.3).** `streamrip` 2.1.0 (the latest release) requires
+  `Pillow<11`, so the two cannot be one `pip install`: pip would refuse to resolve them together. The
+  override is a second step, `pip install -r requirements-pillow.txt`, run after `requirements.txt` in
+  the Dockerfile (which then fails the build unless `PIL.__version__` is 12 or newer), `ci.yml` and
+  `docker-publish.yml`. pip prints a "dependency conflict" note for `streamrip` at that point and exits 0;
+  that note is expected. Why it is safe: Music Grabber calls Pillow for cover resizing (JPEG/PNG/WEBP
+  checked on Pillow 13; a GIF is still not decoded). It uses only streamrip's `DeezerClient` and `Config`;
+  streamrip's own Pillow code (`media/artwork.py`, a cover-downscale helper) belongs to its media
+  pipeline, which is never called. The whole suite and the `DeezerClient` import were checked on Pillow 13. The real Deezer download path needs an ARL
+  and cannot be exercised in tests, so check one real download after upgrading. `tests/test_workflows.py`
+  guards that every environment installs the override. Nothing else in `requirements.txt` has an advisory.
 - **`npm audit` (frontend): 13 findings (2 critical, 6 high, 5 moderate), all in build and test
   tooling**: `vitest`/`tinypool` (critical), `vite`/`esbuild`, `tailwindcss` and their transitive
   packages (`braces`, `micromatch`, `chokidar`, `fast-glob`, `postcss-*`). None of it ships in the

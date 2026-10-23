@@ -150,7 +150,7 @@ class Ops:
             "queue": db.get_queue_counts(),
             "grabbed_total": db.get_grabbed_total(),
             "managed_files": db.get_grabbed_count(),
-            "last_synced_epoch": sync.last_synced_epoch or None,
+            "last_synced_epoch": max(sync.last_synced_epoch, db.get_last_sync()) or None,
             "playlists": {
                 "total": len(playlists),
                 "watched": sum(1 for p in playlists if p.get("enabled")),

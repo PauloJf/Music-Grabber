@@ -409,6 +409,7 @@ that copy. The web UI's look and its internal routes are not part of the promise
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
+pip install -r requirements-pillow.txt   # a current Pillow over streamrip's pin (pip prints a conflict note: expected)
 ruff check . && pytest -q
 cd frontend && npm ci && npm run typecheck && npm test && npm run build
 ```

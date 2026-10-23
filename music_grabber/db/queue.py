@@ -179,6 +179,22 @@ class QueueMixin:
                 "SELECT value FROM app_counters WHERE key='grabbed_total'").fetchone()
         return int(row["value"]) if row else 0
 
+    def set_last_sync(self, epoch: float) -> None:
+        """Persist when a Spotify sync last finished, so a CLI process (which has no sync
+        thread of its own) can report it. Whole seconds."""
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO app_counters (key, value) VALUES ('last_sync_epoch', ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (int(epoch),))
+            conn.commit()
+
+    def get_last_sync(self) -> float:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT value FROM app_counters WHERE key='last_sync_epoch'").fetchone()
+        return float(row["value"]) if row else 0.0
+
     def get_queue_counts(self) -> dict:
         with self._connect() as conn:
             rows = conn.execute(

@@ -2,6 +2,7 @@
 
 import json
 import threading
+import time
 
 import pytest
 from test_api import TOKEN
@@ -60,6 +61,16 @@ def test_status_text_and_json(env, capsys):
     code, out, _ = run(["--json", "status"], capsys)
     data = json.loads(out)
     assert data["queue"] == {"awaiting_user": 1} and data["playlists"]["total"] == 1
+
+
+def test_status_reports_a_sync_done_by_another_process(env, capsys):
+    db, _pid, _a = seed(env)
+    code, out, _ = run(["status"], capsys)
+    assert "Last sync   never" in out
+    db.set_last_sync(time.time() - 600)                  # the server's sync thread, in its own process
+    code, out, _ = run(["status"], capsys)
+    assert code == 0 and "Last sync   10 min ago" in out
+    assert json.loads(run(["--json", "status"], capsys)[1])["last_synced_epoch"] > 0
 
 
 def test_inbox_show_lists_candidate_ids_and_the_next_commands(env, capsys):
