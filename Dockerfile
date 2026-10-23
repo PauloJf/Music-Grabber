@@ -20,8 +20,11 @@ WORKDIR /app
 
 # streamrip and yt-dlp break often and change cadence independently of this code, so the
 # dependency layer is its own: rebuilding with a fresh yt-dlp doesn't touch the app layer.
-COPY requirements.txt ./
+COPY requirements.txt requirements-pillow.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+# A current Pillow over streamrip's <11 pin (see requirements-pillow.txt), and fail the build if it did not take.
+RUN pip install --no-cache-dir -r requirements-pillow.txt \
+    && python -c "import PIL; assert int(PIL.__version__.split('.')[0]) >= 12, PIL.__version__"
 
 COPY music_grabber/ music_grabber/
 COPY --from=frontend /fe/dist ./frontend/dist
