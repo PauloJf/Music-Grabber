@@ -135,3 +135,18 @@ days including the container check.
   covered by the ledger, as the migrated ones are).
 - Working assumptions, to be confirmed by the owner: Q4 (Suggestions dropped; Discover covers it). Not in 1.0: Q2
   (watch mode stays the only intake) and Q6 (any 2xx from Mediarium counts as success).
+
+## As built (owner decision: both before 1.0)
+
+Q3 is #15, Q5 is #16 (stacked on it). Where they differ from the text above:
+
+- **Q3 has no MP4 variant.** The grabber only produces mp3, flac and opus, and the old m4a tag path
+  was already broken, so only ID3 `TXXX:SPOTIFY_TRACK_ID` and the Vorbis comment exist.
+- **Q5 ownership is the recorded id *or* the `music-grabber:<id>` comment**, not both: the id alone
+  recovers from a failed marker write, the marker alone lets a restored database adopt the playlist.
+- **Q5 song matching** is path (exact, then unique suffix), then the file's ISRC, then its artist +
+  title within 3 s of its duration. Checked against a real Navidrome: newer versions report a display
+  path (`Artist/Album/01-01 - Title.mp3`) instead of the real one, so paths alone resolved nothing.
+- **Emptying a mirrored playlist** uses `updatePlaylist songIndexToRemove`: `createPlaylist` with a
+  `playlistId` and no songs is a no-op there.
+- Writing (mirror, ledger rebuild) is administrators only in the web UI/API.
