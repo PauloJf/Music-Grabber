@@ -39,6 +39,9 @@ are listed by name and **never printed**, so copy `DEEZER_ARL` and `NTFY_TOPIC` 
 python -m music_grabber import-env /path/to/bpm-tagger-data/settings.json
 ```
 
+`UI_PUBLIC_URL` is deliberately not copied: BPM Tagger's address is not Music Grabber's, and
+pings link to `UI_PUBLIC_URL`/inbox/<id>. Set it to where you reach Music Grabber's web UI.
+
 `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` and `SPOTIFY_REDIRECT_URI` come from BPM Tagger's
 *environment*, not its settings file. Reuse the same Spotify app, and add Music Grabber's
 redirect URI to it in the Spotify dashboard.
@@ -54,7 +57,10 @@ docker compose run --rm -v /path/to/bpm-tagger-data:/bpm:ro music-grabber \
 ```
 
 `--source-music-dir` is BPM Tagger's `MUSIC_DIR` *as BPM Tagger saw it* (inside its container,
-usually `/music`). If the dry run looks right, run it again without `--dry-run`. Add
+usually `/music`). If some managed files are not under it the import says so (they would keep
+BPM Tagger's absolute path in the ledger): fix the option and redo the import into an empty
+database. On Windows, Git Bash rewrites a bare `/music` into `C:/Program Files/Git/music`; use
+PowerShell, or prefix the command with `MSYS_NO_PATHCONV=1`. If the dry run looks right, run it again without `--dry-run`. Add
 `--include-tokens` to also carry over the Spotify login (it is a credential), otherwise run
 `spotify-login` afterwards. A second run into a database that already has data needs `--merge`;
 merging is safe to repeat and only adds what is new.

@@ -126,6 +126,22 @@ def test_managed_tracks_become_ledger_rows_rerooted(src, target, tmp_path):
     assert target.find_grabbed_by_spotify_id("s9") == []                 # deleted track not carried over
 
 
+def test_a_wrong_source_music_dir_is_called_out(src, target, tmp_path):
+    rep = imp(src, target, tmp_path, source_music_dir="/srv/elsewhere")
+    assert any("1 of 1 managed files are not under" in w and "--source-music-dir" in w for w in rep.warnings)
+    (row,) = target.find_grabbed_by_spotify_id("s1")
+    assert row["rel_path"] == "/music/Band/LP/01 - Song One.mp3"           # kept, not mangled
+    target2 = Database(str(tmp_path / "ok.db"))
+    ok = imp(src, target2, tmp_path, source_music_dir="/music")
+    assert not any("managed files" in w for w in ok.warnings)
+
+
+def test_a_top_level_folder_that_starts_with_dots_is_still_inside_the_library():
+    from music_grabber.importer import _rel
+    assert _rel("/music/..Hidden/x.mp3", "/music") == "..Hidden/x.mp3"
+    assert _rel("/elsewhere/x.mp3", "/music") == "/elsewhere/x.mp3"
+
+
 def test_counter_and_token_handling(src, target, tmp_path):
     rep = imp(src, target, tmp_path)
     assert target.get_grabbed_total() == 41

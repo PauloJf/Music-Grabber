@@ -59,6 +59,11 @@ class FakeIndex:
         return []
 
 
+class EmptyIndex(FakeIndex):
+    def is_empty(self):
+        return True
+
+
 class Notifier:
     def __init__(self):
         self.sent = []
@@ -102,6 +107,29 @@ def test_unchanged_snapshot_does_not_refetch_but_rematches(db):
     sync.sync_all()
     assert client.fetches == 1 and index.refreshed == 2
     assert db.get_playlist_track_rows(pid)[0]["match_status"] == "have"
+
+
+def test_a_brand_new_install_with_an_empty_library_still_queues(db):
+    db.add_playlist("PL1", "Mix")
+    sync = _sync(db, FakeClient([_t("s1", "One")]), EmptyIndex())
+    sync.sync_all()
+    assert len(db.get_queue()) == 1 and not sync.auto_queue_paused
+
+
+def test_an_empty_library_index_queues_nothing_automatically(db, caplog):
+    pid = db.add_playlist("PL1", "Mix")
+    db.bump_grabbed_total()                                         # it has grabbed before (or imported)
+    client = FakeClient([_t("s1", "One"), _t("s2", "Two", position=1)])
+    sync = _sync(db, client, EmptyIndex())
+    sync.sync_all()
+    assert db.get_queue() == [] and sync.auto_queue_paused
+    assert {r["match_status"] for r in db.get_playlist_track_rows(pid)} == {"missing"}
+    assert sum("Library index is empty" in r.message for r in caplog.records) == 1
+    sync.sync_all()                                                 # warns once, not on every pass
+    assert sum("Library index is empty" in r.message for r in caplog.records) == 1
+    sync.index = FakeIndex()                                        # files appear: back to normal
+    sync.sync_all()
+    assert len(db.get_queue()) == 2 and not sync.auto_queue_paused
 
 
 def test_failed_or_skipped_items_are_not_auto_requeued(db):

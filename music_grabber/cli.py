@@ -18,7 +18,7 @@ run                       start the sync thread, the download workers and (with 
 spotify-login             one-time Spotify connect
 status                    what is going on
 sync [PLAYLIST_ID]        reconcile now
-playlist list|show|add|remove|enable|disable
+playlist list|show|add|remove|enable|disable|queue-missing
 queue [list|history|show|add|retry|retry-failed|cancel|delete|clear-completed|priority]
 inbox [list|show|choose|search|research|research-all|skip]
 settings [show|set|test-deezer|test-ntfy]
@@ -69,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--status", default="", choices=["", "have", "missing", "queued", "removed"])
     x = pl.add("add")
     x.add_argument("value", help="Spotify playlist URL, URI or id")
-    for a in ("remove", "enable", "disable"):
+    for a in ("remove", "enable", "disable", "queue-missing"):
         pl.add(a).add_argument("id", type=int)
 
     q = top.nested(top.add("queue"))
@@ -167,7 +167,8 @@ def fmt_status(d: dict) -> str:
         f"Spotify     {'connected' if sp['connected'] else 'NOT connected'}"
         f"{'' if sp['configured'] else ' (client not configured)'}"
         + (f"  last error: {sp['last_error']}" if sp.get("last_error") else ""),
-        f"Library     {d['library']['tracks']} tracks via {d['library']['index']}",
+        f"Library     {d['library']['tracks']} tracks via {d['library']['index']}"
+        + ("  EMPTY: auto-queueing paused, check the library mount" if d['library'].get("auto_queue_paused") else ""),
         f"Analysis    {d['analysis']}   hooks: {', '.join(d['hooks']) or 'none'}",
         f"Providers   {', '.join(d['providers']) or 'none (set DEEZER_ARL or PROVIDER_ORDER)'}",
         f"Playlists   {pl['watched']}/{pl['total']} watched: {pl['have']} have, {pl['missing']} missing, "
@@ -265,6 +266,9 @@ def _playlist(args, a, ops, emit):
         emit(d, f"Watching #{d['playlist']['id']} {d['playlist']['name']}{note}")
     elif a == "remove":
         emit(ops.playlist_remove(args.id), f"Removed playlist #{args.id}")
+    elif a == "queue-missing":
+        d = ops.enqueue_missing(args.id)
+        emit(d, f"Queued {d['enqueued']} missing track(s) from playlist #{args.id}")
     elif a in ("enable", "disable"):
         emit(ops.playlist_enable(args.id, a == "enable"), f"Playlist #{args.id} {a}d")
 
@@ -422,6 +426,9 @@ def _import_env(args, out):
         print(f"{k}={v}", file=out)
     for var in d["copy_by_hand"]:
         print(f"# {var}= (set in BPM Tagger; copy it over yourself, it is not printed here)", file=out)
+    for var in d.get("set_to_your_own", []):
+        print(f"# {var}= (BPM Tagger's address is not copied: set Music Grabber's own, e.g. "
+              f"http://host:8099)", file=out)
     print("# SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET / SPOTIFY_REDIRECT_URI come from your BPM Tagger "
           "environment, not settings.json", file=out)
     return 0

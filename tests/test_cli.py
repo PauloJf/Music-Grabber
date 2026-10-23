@@ -119,6 +119,21 @@ def test_playlist_commands_without_a_spotify_connection(env, capsys):
     assert code == 1 and "not_found" in err
 
 
+def test_playlist_queue_missing_and_the_empty_library_note(env, capsys):
+    db, pid, _ = seed(env)
+    from test_sync_engine import _t
+    db.sync_playlist_tracks(pid, [_t("s7", "Seven", "Band")])
+    (row,) = db.get_playlist_track_rows(pid)
+    db.set_playlist_track_match(row["id"], "missing", None)
+    code, out, _ = run(["playlist", "queue-missing", str(pid)], capsys)
+    assert code == 0 and "Queued 1 missing" in out
+    assert any(i["spotify_track_id"] == "s7" for i in db.get_queue())
+    assert "EMPTY: auto-queueing paused" not in run(["status"], capsys)[1]   # new install: nothing to protect
+    db.bump_grabbed_total()                                                  # it has grabbed before
+    assert "EMPTY: auto-queueing paused" in run(["status"], capsys)[1]
+    assert json.loads(run(["--json", "status"], capsys)[1])["library"]["auto_queue_paused"] is True
+
+
 def test_sync_without_spotify_is_a_clear_error_with_exit_code_2(env, capsys):
     code, _, err = run(["sync"], capsys)
     assert code == 2 and "spotify_disconnected" in err and "spotify-login" in err
@@ -144,13 +159,16 @@ def test_import_env_never_prints_secrets(tmp_path, capsys):
     f = tmp_path / "settings.json"
     f.write_text(json.dumps({"output_format": "flac", "provider_order": "deezer,monochrome,ytdlp",
                              "grab_dry_run": True, "deezer_arl": "SECRET-ARL", "ntfy_topic": "SECRET-TOPIC",
-                             "ntfy_url": "https://ntfy.sh", "navidrome_pass": "x"}))
+                             "ntfy_url": "https://ntfy.sh", "navidrome_pass": "x",
+                             "ui_public_url": "https://bpm.example"}))
     code = cli.run_command(cli.build_parser().parse_args(["import-env", str(f)]), {})
     out = capsys.readouterr().out
     assert code == 0 and "OUTPUT_FORMAT=flac" in out and "PROVIDER_ORDER=deezer,ytdlp" in out
     assert "GRAB_DRY_RUN=true" in out and "NTFY_URL=https://ntfy.sh" in out
     assert "SECRET-ARL" not in out and "SECRET-TOPIC" not in out
     assert "# DEEZER_ARL=" in out and "# NTFY_TOPIC=" in out
+    # BPM Tagger's own address must not become Music Grabber's (ntfy links would point at the wrong app)
+    assert "bpm.example" not in out and "\nUI_PUBLIC_URL=" not in out and "# UI_PUBLIC_URL=" in out
     code = cli.run_command(cli.build_parser().parse_args(["import-env", str(tmp_path / "nope.json")]), {})
     assert code == 1
 

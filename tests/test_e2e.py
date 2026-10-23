@@ -115,6 +115,7 @@ def test_deleting_a_grabbed_file_requeues_it_on_the_next_sync(tmp_path):
     svc = service(c, db, PLAYLIST[:1])
     svc.sync.sync_all()
     drain(svc)
+    svc.sync.sync_all()                                       # the index sees the file, as the next sync would
     (row,) = db.find_grabbed_by_spotify_id("s1")
     os.remove(row["abs_path"])
     for it in db.get_queue():

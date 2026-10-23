@@ -210,6 +210,12 @@ class LibraryIndex:
                  self.source.name, len(seen), updated, removed)
         return {"seen": len(seen), "updated": updated, "removed": removed, "pruned": pruned}
 
+    def is_empty(self) -> bool:
+        """True when a source is configured but the cache holds no files at all. A scan that
+        finds nothing never empties a populated cache (see PRUNE_FLOOR), so this means "never
+        seen any files"."""
+        return self.source is not None and self.db.library_count() == 0
+
     # ── lookups used by matching.library_match ────────────────────────────────
     def find_by_spotify_id(self, spotify_track_id: str) -> list[dict]:
         """Ledger hits whose file still exists. A deleted track is re-grabbed rather

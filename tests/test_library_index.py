@@ -58,6 +58,18 @@ def test_second_refresh_skips_unchanged_and_rereads_changed(lib, monkeypatch):
     assert db.library_find_candidates("a", "y")
 
 
+def test_is_empty_only_for_a_configured_source_with_no_cached_files(lib, tmp_path):
+    root, db, index = lib
+    assert index.is_empty()                              # nothing scanned yet
+    _track(root, "A/one.flac", title="One", artist="A")
+    index.refresh()
+    assert not index.is_empty()
+    assert not LibraryIndex(db, source=None).is_empty()  # ledger-only: nothing to be wrong about
+    (root / "A" / "one.flac").unlink()
+    index.refresh()                                      # a scan that finds nothing keeps a populated cache
+    assert not index.is_empty()
+
+
 def test_deleted_files_are_pruned(lib):
     root, db, idx = lib
     for i in range(30):
