@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { Empty, ErrorState, Pill, Skeleton } from "../components/ui";
+import { LibraryTabs } from "./Owned";
 import { del, errorText, get, patch, post } from "../lib/api";
 import { ago, useRefreshJobs } from "../lib/hooks";
 import { useToast } from "../lib/toast";
@@ -38,6 +39,7 @@ export default function Playlists() {
         <div className="eyebrow">Library</div><h1>Playlists you watch</h1>
         <p>Missing tracks from these Spotify playlists are queued automatically.</p>
       </section>
+      <LibraryTabs />
       <form className="row" onSubmit={submit} style={{ margin: "14px 0 6px" }}>
         <div className="grow" style={{ minWidth: 220 }}><input aria-label="Spotify playlist URL" placeholder="Paste a Spotify playlist link" value={value} onChange={(e) => setValue(e.target.value)} /></div>
         <button className="btn primary" disabled={add.isPending || !value.trim()}>{add.isPending ? "Adding…" : "Watch playlist"}</button>

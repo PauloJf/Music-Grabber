@@ -419,6 +419,17 @@ class Ops:
         except Exception as exc:
             raise OpsError("library_error", str(exc), 502) from None
 
+    def library_list(self, query: str = "", limit: int = 100, offset: int = 0) -> dict:
+        """The tracks the library index knows (what search marks as owned), a page at a time."""
+        try:
+            limit, offset = int(limit), int(offset)
+        except (TypeError, ValueError):
+            raise OpsError("invalid_paging", "limit and offset must be numbers", 400) from None
+        limit, offset = max(1, min(limit, 500)), max(0, offset)
+        tracks, total = self.db.library_list(str(query or "").strip(), limit, offset)
+        return {"tracks": tracks, "total": total, "limit": limit, "offset": offset, "q": str(query or "").strip(),
+                "index": self.svc.index.source.name if self.svc.index.source else None}
+
     def ledger_rebuild(self) -> dict:
         """Add a ledger row for every library file that carries our Spotify id tag and has none.
         Only adds: existing rows and the files themselves are never touched. Needs the

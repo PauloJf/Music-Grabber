@@ -368,3 +368,36 @@ def test_library_refresh_reports_a_failing_source(ops, tmp_path):
     assert e.value.code == "library_error" and e.value.http == 502
     os.makedirs(tmp_path / "music")
     assert ops.library_refresh()["seen"] == 0
+
+
+# ── library listing ───────────────────────────────────────────────────────────
+def _seed_library(ops):
+    rows = [("A/One/01 - Alpha.mp3", "Alpha", "Zed", "One", 1), ("A/One/02 - Beta.mp3", "Beta", "Zed", "One", 2),
+            ("B/Two/01 - 100% Pure_Gold.mp3", "100% Pure_Gold", "Amy", "Two", 1), ("C/03 - Gamma.mp3", "Gamma", "amy", "Three", 3)]
+    ops.db.library_upsert([{"path": p, "source": "filesystem", "title": t, "artist": a, "album": al, "track_no": n,
+                            "norm_title": t.lower(), "norm_artist": a.lower()} for p, t, a, al, n in rows])
+
+
+def test_library_list_pages_orders_and_totals(ops):
+    _seed_library(ops)
+    d = ops.library_list()
+    assert d["total"] == 4 and d["index"] == "filesystem" and [t["artist"].lower() for t in d["tracks"]] == ["amy", "amy", "zed", "zed"]
+    assert [t["title"] for t in d["tracks"][2:]] == ["Alpha", "Beta"]            # album, then track number
+    page = ops.library_list(limit=2, offset=1)
+    assert page["total"] == 4 and len(page["tracks"]) == 2 and page["offset"] == 1
+    assert ops.library_list(limit=10_000)["limit"] == 500 and ops.library_list(limit=0)["limit"] == 1
+    json.dumps(d)
+
+
+def test_library_list_search_is_case_insensitive_all_words_and_literal(ops):
+    _seed_library(ops)
+    assert [t["title"] for t in ops.library_list("ZED beta")["tracks"]] == ["Beta"]
+    assert ops.library_list("amy")["total"] == 2                                  # artist, any case
+    assert ops.library_list("100%")["total"] == 1 and ops.library_list("%")["total"] == 1   # % and _ are not wildcards
+    assert ops.library_list("_")["total"] == 1 and ops.library_list("nothing here")["total"] == 0
+
+
+def test_library_list_rejects_bad_paging(ops):
+    with pytest.raises(OpsError) as e:
+        ops.library_list(limit="x")
+    assert e.value.code == "invalid_paging" and e.value.http == 400

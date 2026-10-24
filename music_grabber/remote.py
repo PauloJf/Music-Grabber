@@ -40,6 +40,8 @@ class RemoteOps:
 
     # status / library / settings
     def status(self): return self._get("/api/status")
+    def library_list(self, query="", limit=100, offset=0):
+        return self._get("/api/library", q=query, limit=limit, offset=offset)
     def library_refresh(self): return self._post("/api/library/refresh")
     def mirror_status(self): return self._get("/api/mirror")
     def mirror_run(self, pid=None):

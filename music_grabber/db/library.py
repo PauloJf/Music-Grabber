@@ -43,6 +43,28 @@ class LibraryMixin:
         with self._connect() as conn:
             return conn.execute("SELECT COUNT(*) FROM library_tracks").fetchone()[0]
 
+    def library_list(self, query: str = "", limit: int = 100, offset: int = 0) -> tuple[list[dict], int]:
+        """A page of the cached library ordered artist, album, disc, track, title, and the total
+        that matched. `query` is a case-insensitive substring of title, artist, album or path."""
+        where, args = "", []
+        words = [w for w in (query or "").split() if w]
+        if words:
+            like = "(title LIKE ? ESCAPE '\\' OR artist LIKE ? ESCAPE '\\' OR album LIKE ? ESCAPE '\\' "\
+                   "OR album_artist LIKE ? ESCAPE '\\' OR path LIKE ? ESCAPE '\\')"
+            where = " WHERE " + " AND ".join([like] * len(words))
+            for w in words:
+                pat = "%" + w.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+                args += [pat] * 5
+        with self._connect() as conn:
+            total = conn.execute(f"SELECT COUNT(*) FROM library_tracks{where}", args).fetchone()[0]
+            rows = conn.execute(
+                "SELECT path, title, artist, album, album_artist, duration_ms, year, track_no, disc_no "
+                f"FROM library_tracks{where} ORDER BY COALESCE(album_artist, artist, '') COLLATE NOCASE, "
+                "COALESCE(album, '') COLLATE NOCASE, COALESCE(disc_no, 0), COALESCE(track_no, 0), "
+                "COALESCE(title, '') COLLATE NOCASE, path LIMIT ? OFFSET ?",
+                [*args, int(limit), int(offset)]).fetchall()
+        return [dict(r) for r in rows], total
+
     def library_has_path(self, path: str) -> bool:
         with self._connect() as conn:
             return conn.execute("SELECT 1 FROM library_tracks WHERE path = ? LIMIT 1",
