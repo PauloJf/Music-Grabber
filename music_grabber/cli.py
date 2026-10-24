@@ -23,6 +23,7 @@ queue [list|history|show|add|retry|retry-failed|cancel|delete|clear-completed|pr
 inbox [list|show|choose|search|research|research-all|skip]
 settings [show|set|test-deezer|test-ntfy]
 users [list|add|passwd|role|delete]   accounts for the web UI (also the way back in after a lost password)
+library list [QUERY]      the tracks the library index knows (what search marks as owned)
 library refresh           reload the library index
 ledger rebuild            re-add ledger rows for files carrying our Spotify id tag
 import-bpm-tagger DB      import grab_* data from a BPM Tagger database
@@ -129,7 +130,12 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("username")
     x.add_argument("role", choices=["user", "admin"])
 
-    top.nested(top.add("library")).add("refresh")
+    lb = top.nested(top.add("library"))
+    lb.add("refresh")
+    x = lb.add("list")
+    x.add_argument("query", nargs="*", help="words that must all appear in title, artist, album or path")
+    x.add_argument("--limit", type=int, default=100)
+    x.add_argument("--offset", type=int, default=0)
     top.nested(top.add("ledger")).add("rebuild")
 
     x = top.add("import-bpm-tagger")
@@ -245,6 +251,13 @@ def _dispatch(args, ops, out) -> int:
         d = ops.ledger_rebuild()
         emit(d, f"{d['tagged_files']} tagged file(s): {d['added']} added to the ledger, "
                 f"{d['already_in_ledger']} already there")
+    elif c == "library" and a == "list":
+        d = ops.library_list(" ".join(args.query), args.limit, args.offset)
+        first = d["offset"] + 1 if d["tracks"] else 0
+        emit(d, _table(d["tracks"], [("artist", lambda t: t.get("artist") or t.get("album_artist")), ("title", "title"),
+                                     ("album", "album"), ("year", "year"), ("path", "path")])
+             + f"\n\n{first}-{d['offset'] + len(d['tracks'])} of {d['total']}"
+             + (f"  (next: --offset {d['offset'] + len(d['tracks'])})" if d["offset"] + len(d["tracks"]) < d["total"] else ""))
     elif c == "library":
         d = ops.library_refresh()
         emit(d, f"Library: {d['seen']} files, {d['updated']} updated, {d['removed']} removed")

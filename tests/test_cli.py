@@ -73,6 +73,19 @@ def test_status_reports_a_sync_done_by_another_process(env, capsys):
     assert json.loads(run(["--json", "status"], capsys)[1])["last_synced_epoch"] > 0
 
 
+def test_library_list_prints_a_page_and_how_to_get_the_next(env, capsys):
+    db = Database(str(env / "mg.db"))
+    db.library_upsert([{"path": f"Band/Album/{i:02d} - Song {i}.mp3", "source": "filesystem", "title": f"Song {i}",
+                        "artist": "Band", "album": "Album", "track_no": i} for i in range(1, 6)])
+    code, out, _ = run(["library", "list", "--limit", "2"], capsys)
+    assert code == 0 and "Song 1" in out and "Song 2" in out and "Song 3" not in out
+    assert "1-2 of 5" in out and "--offset 2" in out
+    code, out, _ = run(["library", "list", "song", "5"], capsys)
+    assert "Song 5" in out and "1-1 of 1" in out and "--offset" not in out
+    data = json.loads(run(["--json", "library", "list", "--offset", "4"], capsys)[1])
+    assert data["total"] == 5 and [t["title"] for t in data["tracks"]] == ["Song 5"]
+
+
 def test_inbox_show_lists_candidate_ids_and_the_next_commands(env, capsys):
     _db, _pid, a = seed(env)
     code, out, _ = run(["inbox"], capsys)

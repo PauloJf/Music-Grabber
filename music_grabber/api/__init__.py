@@ -277,6 +277,11 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
     def status():
         return jsonify(ops.status())
 
+    @app.get("/api/library")
+    def library_list():
+        return jsonify(ops.library_list(request.args.get("q", ""), request.args.get("limit", 100),
+                                        request.args.get("offset", 0)))
+
     @app.post("/api/library/refresh")
     def library_refresh():
         return jsonify(ops.library_refresh())

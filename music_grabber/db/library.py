@@ -1,6 +1,12 @@
 """Library-index cache: what the library already has, as loaded by a LibrarySource."""
 
+import unicodedata
 from typing import Iterable, Optional
+
+
+def fold(text: str) -> str:
+    """Lower-case and strip accents, for substring matching ("Não" -> "nao")."""
+    return "".join(c for c in unicodedata.normalize("NFKD", str(text).casefold()) if not unicodedata.combining(c))
 
 
 class LibraryMixin:
@@ -42,6 +48,28 @@ class LibraryMixin:
     def library_count(self) -> int:
         with self._connect() as conn:
             return conn.execute("SELECT COUNT(*) FROM library_tracks").fetchone()[0]
+
+    def library_list(self, query: str = "", limit: int = 100, offset: int = 0) -> tuple[list[dict], int]:
+        """A page of the cached library ordered artist, album, disc, track, title, and the total
+        that matched. `query`: every word must appear in the title, artist, album, album artist or
+        path, ignoring case and accents ("nao" finds "Não"); no wildcards."""
+        words = [fold(w) for w in (query or "").split() if w.strip()]
+        where, args = "", []
+        if words:
+            cond = "instr(fold(COALESCE(title,'') || ' ' || COALESCE(artist,'') || ' ' || COALESCE(album,'') || ' ' || " \
+                   "COALESCE(album_artist,'') || ' ' || path), ?) > 0"
+            where = " WHERE " + " AND ".join([cond] * len(words))
+            args = words
+        with self._connect() as conn:
+            conn.create_function("fold", 1, lambda v: fold(v or ""), deterministic=True)
+            total = conn.execute(f"SELECT COUNT(*) FROM library_tracks{where}", args).fetchone()[0]
+            rows = conn.execute(
+                "SELECT path, title, artist, album, album_artist, duration_ms, year, track_no, disc_no "
+                f"FROM library_tracks{where} ORDER BY COALESCE(album_artist, artist, '') COLLATE NOCASE, "
+                "COALESCE(album, '') COLLATE NOCASE, COALESCE(disc_no, 0), COALESCE(track_no, 0), "
+                "COALESCE(title, '') COLLATE NOCASE, path LIMIT ? OFFSET ?",
+                [*args, int(limit), int(offset)]).fetchall()
+        return [dict(r) for r in rows], total
 
     def library_has_path(self, path: str) -> bool:
         with self._connect() as conn:

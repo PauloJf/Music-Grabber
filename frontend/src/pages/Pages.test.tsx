@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Inbox from "./Inbox";
+import Owned from "./Owned";
 import Playlists from "./Playlists";
 import Queue from "./Queue";
 import Settings from "./Settings";
@@ -166,5 +167,36 @@ describe("settings", () => {
     await screen.findByText("Deezer rejected the ARL");
     fireEvent.click(screen.getByRole("button", { name: "Send test" }));
     await screen.findByText("Works");
+  });
+});
+
+describe("owned tracks", () => {
+  const track = (i: number) => ({ path: `Band/LP/${i}.mp3`, title: `Owned ${i}`, artist: "Band", album: "LP", album_artist: "Band", duration_ms: 185000, year: 2020 });
+
+  it("lists the library, filters with a typed query and loads the next page", async () => {
+    const calls = mockApi({
+      ...base,
+      "GET /api/library": (c: { path: string }) => {
+        const u = new URL(c.path, "http://x");
+        const offset = Number(u.searchParams.get("offset")), q = u.searchParams.get("q") ?? "";
+        if (q) return { tracks: [track(9)], total: 1, limit: 100, offset: 0, q, index: "filesystem" };
+        return { tracks: offset ? [track(101)] : [track(1), track(2)], total: 3, limit: 100, offset, q: "", index: "filesystem" };
+      },
+    });
+    renderApp(<Owned />);
+    await screen.findByText("Owned 1");
+    expect(screen.getByText("2 of 3")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /show 1 more/i }));
+    await screen.findByText("Owned 101");
+    expect(calls.some((c) => c.path.includes("offset=2"))).toBe(true);
+    fireEvent.change(screen.getByLabelText("Filter owned tracks"), { target: { value: " nine " } });
+    await screen.findByText("Owned 9", {}, { timeout: 2000 });
+    expect(calls.some((c) => c.path.includes("q=nine"))).toBe(true);
+  });
+
+  it("explains an empty index", async () => {
+    mockApi({ ...base, "GET /api/library": { tracks: [], total: 0, limit: 100, offset: 0, q: "", index: "filesystem" } });
+    renderApp(<Owned />);
+    await screen.findByText(/library index is empty/i);
   });
 });

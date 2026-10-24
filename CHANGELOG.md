@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- **Browse the tracks you already own.** The library index could only be searched (Discover marks owned
+  tracks) or counted; now it can be listed: web UI Library, "Owned tracks" (filter as you type, 100 at a
+  time), `python -m music_grabber library list [WORDS] [--limit N --offset N]`, and
+  `GET /api/library?q=&limit=&offset=`. Filtering matches every word against title, artist, album or path, ignoring case and accents
+  ("nao" finds "Não").
+
 ### Fixed
 - **Installing the web UI as an app (PWA) on a phone.** The home-screen icon was missing and the bottom
   tab bar sat below the visible area until you scrolled. The UI now ships a web app manifest

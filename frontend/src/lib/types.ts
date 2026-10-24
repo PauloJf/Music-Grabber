@@ -117,3 +117,6 @@ export interface QueueResult { ok: boolean; queued: number; item_ids: number[]; 
 
 export interface User { id: number | null; username: string; role: "admin" | "user"; prefs: { theme?: "system" | "light" | "dark"; preview_volume?: number }; created_at?: string | null; last_login?: string | null }
 export interface Me { user: User; via: "token" | "session" }
+
+export interface OwnedTrack { path: string; title: string | null; artist: string | null; album: string | null; album_artist: string | null; duration_ms: number | null; year: number | null }
+export interface OwnedPage { tracks: OwnedTrack[]; total: number; limit: number; offset: number; q: string; index: string | null }

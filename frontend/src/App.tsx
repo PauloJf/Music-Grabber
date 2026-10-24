@@ -10,6 +10,7 @@ import Help from "./pages/Help";
 import Inbox from "./pages/Inbox";
 import Login from "./pages/Login";
 import PlaylistDetail from "./pages/PlaylistDetail";
+import Owned from "./pages/Owned";
 import Playlists from "./pages/Playlists";
 import Queue from "./pages/Queue";
 import Settings from "./pages/Settings";
@@ -33,6 +34,7 @@ function Authed() {
         <Route path="/inbox" element={<Inbox />} />
         <Route path="/inbox/:id" element={<Inbox />} />
         <Route path="/playlists" element={<Playlists />} />
+        <Route path="/playlists/owned" element={<Owned />} />
         <Route path="/playlists/:id" element={<PlaylistDetail />} />
         <Route path="/help" element={<Help />} />
         <Route path="/account" element={<Account />} />

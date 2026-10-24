@@ -161,6 +161,14 @@ def test_library_refresh_route(client, app_ops, tmp_path):
     assert client.post("/api/library/refresh", headers=H).json["seen"] == 0
 
 
+def test_library_listing_needs_the_token_and_pages(client, app_ops):
+    assert client.get("/api/library").status_code == 401
+    app_ops[1].db.library_upsert([{"path": f"a/{i}.mp3", "source": "filesystem", "title": f"T{i}", "artist": "X"} for i in range(3)])
+    r = client.get("/api/library?q=t&limit=2&offset=1", headers=H)
+    assert r.status_code == 200 and r.json["total"] == 3 and len(r.json["tracks"]) == 2
+    assert client.get("/api/library?limit=abc", headers=H).status_code == 400
+
+
 # ── the web UI's static files ─────────────────────────────────────────────────
 @pytest.fixture
 def ui(tmp_path, app_ops):
