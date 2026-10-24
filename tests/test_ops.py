@@ -397,6 +397,15 @@ def test_library_list_search_is_case_insensitive_all_words_and_literal(ops):
     assert ops.library_list("_")["total"] == 1 and ops.library_list("nothing here")["total"] == 0
 
 
+def test_library_list_search_ignores_accents_both_ways(ops):
+    ops.db.library_upsert([{"path": "Cristina Branco/Não Há Só Tangos Em Paris.mp3", "source": "filesystem",
+                            "title": "Não Há Só Tangos Em Paris", "artist": "Cristina Branco", "album": "Soluço"},
+                           {"path": "x/Cafe.mp3", "source": "filesystem", "title": "Café", "artist": "Z"}])
+    assert ops.library_list("nao ha so")["total"] == 1 and ops.library_list("SOLUCO")["total"] == 1
+    assert ops.library_list("Não")["total"] == 1 and ops.library_list("cafe")["total"] == 1
+    assert ops.library_list("café")["total"] == 1
+
+
 def test_library_list_rejects_bad_paging(ops):
     with pytest.raises(OpsError) as e:
         ops.library_list(limit="x")

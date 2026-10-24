@@ -1,6 +1,12 @@
 """Library-index cache: what the library already has, as loaded by a LibrarySource."""
 
+import unicodedata
 from typing import Iterable, Optional
+
+
+def fold(text: str) -> str:
+    """Lower-case and strip accents, for substring matching ("Não" -> "nao")."""
+    return "".join(c for c in unicodedata.normalize("NFKD", str(text).casefold()) if not unicodedata.combining(c))
 
 
 class LibraryMixin:
@@ -45,17 +51,17 @@ class LibraryMixin:
 
     def library_list(self, query: str = "", limit: int = 100, offset: int = 0) -> tuple[list[dict], int]:
         """A page of the cached library ordered artist, album, disc, track, title, and the total
-        that matched. `query` is a case-insensitive substring of title, artist, album or path."""
+        that matched. `query`: every word must appear in the title, artist, album, album artist or
+        path, ignoring case and accents ("nao" finds "Não"); no wildcards."""
+        words = [fold(w) for w in (query or "").split() if w.strip()]
         where, args = "", []
-        words = [w for w in (query or "").split() if w]
         if words:
-            like = "(title LIKE ? ESCAPE '\\' OR artist LIKE ? ESCAPE '\\' OR album LIKE ? ESCAPE '\\' "\
-                   "OR album_artist LIKE ? ESCAPE '\\' OR path LIKE ? ESCAPE '\\')"
-            where = " WHERE " + " AND ".join([like] * len(words))
-            for w in words:
-                pat = "%" + w.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-                args += [pat] * 5
+            cond = "instr(fold(COALESCE(title,'') || ' ' || COALESCE(artist,'') || ' ' || COALESCE(album,'') || ' ' || " \
+                   "COALESCE(album_artist,'') || ' ' || path), ?) > 0"
+            where = " WHERE " + " AND ".join([cond] * len(words))
+            args = words
         with self._connect() as conn:
+            conn.create_function("fold", 1, lambda v: fold(v or ""), deterministic=True)
             total = conn.execute(f"SELECT COUNT(*) FROM library_tracks{where}", args).fetchone()[0]
             rows = conn.execute(
                 "SELECT path, title, artist, album, album_artist, duration_ms, year, track_no, disc_no "
