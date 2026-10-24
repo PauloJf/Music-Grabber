@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.0.0-rc.3 (2026-10-24)
+
+Third release candidate: the phone fixes (installable app, no focus zoom, readable Inbox titles) and a
+list of the tracks you already own. Please check, on a phone, that the app installs with its icon, that
+the bottom bar is fully visible and that tapping a field does not zoom; then do one Deezer download.
+
 ### Added
 - **Browse the tracks you already own.** The library index could only be searched (Discover marks owned
   tracks) or counted; now it can be listed: web UI Library, "Owned tracks" (filter as you type, 100 at a
