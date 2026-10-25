@@ -1,5 +1,7 @@
 """The Flask API over Ops: bearer auth, route mapping, error mapping, the OAuth callback."""
 
+import os
+
 import pytest
 from test_ops import FakeClient
 
@@ -118,6 +120,31 @@ def test_inbox_preview_route(client, app_ops, monkeypatch):
     assert client.get("/api/inbox/99999/preview", headers=H).status_code == 404
 
 
+def test_youtube_clip_is_served_only_with_a_valid_signature(client, app_ops):
+    from music_grabber.preview_clips import ClipCache
+    ops = app_ops[1]
+    name = "0123456789abcdef.mp3"
+    cache = ClipCache(os.path.join(os.path.dirname(ops.config["db_path"]), "previews"), lambda: object)
+    os.makedirs(cache.dir)
+    open(os.path.join(cache.dir, name), "wb").write(b"ID3" + bytes(range(200)))
+    ops._clips = cache
+    db = ops.db
+    iid = db.enqueue_grab({"spotify_track_id": "s1", "title": "T", "artist": "A"})
+    db.add_grab_candidates(iid, [{"provider": "ytdlp", "provider_track_id": "abcDEF12345", "title": "T", "rank": 0}])
+    cand = db.get_grab_candidates(iid)[0]["id"]
+    cache.clip_for = lambda c: name                                        # no yt-dlp here
+    r = client.get(f"/api/inbox/{iid}/preview?candidate={cand}", headers=H)
+    assert r.status_code == 200 and r.json["url"].startswith(f"/api/clips/{name}?exp=")
+    clip = client.get(r.json["url"])                                       # no bearer token: the signature is the key
+    assert clip.status_code == 200 and clip.mimetype == "audio/mpeg" and clip.data.startswith(b"ID3")
+    ranged = client.get(r.json["url"], headers={"Range": "bytes=0-9"})
+    assert ranged.status_code == 206 and len(ranged.data) == 10
+    assert client.get(f"/api/clips/{name}").status_code == 404                            # unsigned
+    assert client.get(r.json["url"].replace("sig=", "sig=0")).status_code == 404         # tampered
+    assert client.get("/api/clips/..%2F..%2Fx.mp3?exp=1&sig=x").status_code == 404
+    assert client.get("/api/status").status_code == 401                                  # only clips are open
+
+
 def test_inbox_routes(client, app_ops):
     db = app_ops[1].db
     iid = db.enqueue_grab({"spotify_track_id": "s1", "title": "Song", "artist": "Band"})
@@ -221,7 +248,7 @@ def test_html_carries_a_same_origin_only_csp_and_no_framing(ui):
     h = ui.get("/").headers
     csp = h["Content-Security-Policy"]
     assert "default-src 'self'" in csp and "script-src 'self'" in csp and "frame-ancestors 'none'" in csp
-    assert "img-src 'self' data: https://*.dzcdn.net" in csp and "media-src https://*.dzcdn.net" in csp
+    assert "img-src 'self' data: https://*.dzcdn.net" in csp and "media-src 'self' https://*.dzcdn.net" in csp
     assert "unsafe-eval" not in csp and "script-src 'self';" in csp and h["X-Frame-Options"] == "DENY" and h["Referrer-Policy"] == "no-referrer"
     assert "Content-Security-Policy" not in ui.get("/healthz").headers      # JSON needs none
 

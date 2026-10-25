@@ -10,7 +10,11 @@
   by Spotify id through the library index if BPM Tagger moved it.
 - **Preview a track in the Inbox before choosing it.** Each Deezer candidate has a ▶ (30 seconds, fetched
   when you press it), the original track has one too (found on Deezer by its ISRC), and a YouTube
-  candidate has a *Listen* link. CLI `inbox preview ID [CANDIDATE]`, API `GET /api/inbox/<id>/preview?candidate=`.
+  candidate has a ▶ too: the server fetches the audio with yt-dlp, cuts 30 seconds out of it with ffmpeg (a
+  quarter of the way in) and serves that small MP3 from a cache under the data folder (`previews/`, cleared
+  after an hour, at most 60 clips, two made at a time) through a short-lived signed link. If a clip cannot
+  be made the button turns into a *Listen ↗* link that opens the video in a new tab. CLI
+  `inbox preview ID [CANDIDATE]`, API `GET /api/inbox/<id>/preview?candidate=`.
 
 ## 1.0.0-rc.3 (2026-10-24)
 

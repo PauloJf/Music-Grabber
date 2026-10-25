@@ -28,11 +28,10 @@ describe("inbox", () => {
     expect(calls.find((c) => c.path === "/api/inbox/7/choose")?.body).toEqual({ candidate_id: 41 });
   });
 
-  it("previews a Deezer candidate before choosing, and links a YouTube one", async () => {
+  it("previews a Deezer candidate and the original before choosing", async () => {
     const play = vi.fn(() => Promise.resolve());
     vi.stubGlobal("Audio", class { src = ""; play = play; pause = vi.fn(); addEventListener = vi.fn(); });
-    const withYt = { ...item, isrc: "ISRC1", candidates: [item.candidates[0], { ...item.candidates[1], url: "https://music.youtube.com/watch?v=x" }] };
-    const calls = mockApi({ ...base, "GET /api/inbox": { items: [withYt] },
+    const calls = mockApi({ ...base, "GET /api/inbox": { items: [{ ...item, isrc: "ISRC1" }] },
       "GET /api/inbox/7/preview": { url: "https://cdn.dzcdn.net/p.mp3", open_url: "", reason: "" } });
     renderApp(<Inbox />);
     await screen.findByRole("heading", { name: "Band – Houdini" });
@@ -43,9 +42,43 @@ describe("inbox", () => {
     await screen.findByRole("button", { name: "Pause Band – Houdini" });
     fireEvent.click(screen.getByRole("button", { name: /preview the original houdini/i }));
     await waitFor(() => expect(calls.some((c) => c.path === "/api/inbox/7/preview")).toBe(true));
-    const link = screen.getByRole("link", { name: /listen/i }) as HTMLAnchorElement;
+  });
+
+  const yt = { ...item, candidates: [item.candidates[0], { ...item.candidates[1], url: "https://music.youtube.com/watch?v=x" }] };
+
+  it("plays the 30-second clip of a YouTube candidate", async () => {
+    const play = vi.fn(() => Promise.resolve());
+    let src = "";
+    vi.stubGlobal("Audio", class { play = play; pause = vi.fn(); addEventListener = vi.fn(); set src(v: string) { src = v; } });
+    mockApi({ ...base, "GET /api/inbox": { items: [yt] },
+      "GET /api/inbox/7/preview": { url: "/api/clips/0123456789abcdef.mp3?exp=1&sig=s", clip: "0123456789abcdef.mp3", open_url: "https://music.youtube.com/watch?v=x", reason: "" } });
+    renderApp(<Inbox />);
+    await screen.findByRole("heading", { name: "Band – Houdini" });
+    expect(screen.queryByRole("link", { name: /listen/i })).toBeNull();               // a ▶ first, not a link
+    fireEvent.click(screen.getByRole("button", { name: "Preview Band – Houdini (Live)" }));
+    await waitFor(() => expect(play).toHaveBeenCalled());
+    expect(src).toBe("/api/clips/0123456789abcdef.mp3?exp=1&sig=s");
+  });
+
+  it("falls back to opening the YouTube video in a new tab when the clip cannot be made", async () => {
+    mockApi({ ...base, "GET /api/inbox": { items: [yt] },
+      "GET /api/inbox/7/preview": { url: "", clip: "", open_url: "https://music.youtube.com/watch?v=x", reason: "couldn't make a preview (could not fetch the audio from YouTube); open it to listen" } });
+    renderApp(<Inbox />);
+    await screen.findByRole("heading", { name: "Band – Houdini" });
+    fireEvent.click(screen.getByRole("button", { name: "Preview Band – Houdini (Live)" }));
+    const link = (await screen.findByRole("link", { name: /listen/i })) as HTMLAnchorElement;
     expect(link.href).toBe("https://music.youtube.com/watch?v=x");
+    expect(link.target).toBe("_blank");
     expect(link.rel).toContain("noopener");
+    await screen.findByText(/couldn't make a preview/i);
+  });
+
+  it("also falls back to the link when the preview request itself fails", async () => {
+    mockApi({ ...base, "GET /api/inbox": { items: [yt] }, "GET /api/inbox/7/preview": { status: 500, body: { error: "boom", message: "boom" } } });
+    renderApp(<Inbox />);
+    await screen.findByRole("heading", { name: "Band – Houdini" });
+    fireEvent.click(screen.getByRole("button", { name: "Preview Band – Houdini (Live)" }));
+    await screen.findByRole("link", { name: /listen/i });
   });
 
   it("says so when there is no preview", async () => {

@@ -19,6 +19,7 @@ from html import escape
 from flask import Flask, Response, g, jsonify, request, send_from_directory
 
 from ..ops import Ops, OpsError
+from ..preview_clips import signed_query, valid_signature
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ def _page(title: str, body: str, status: int = 200) -> Response:
 # Cover art and 30-second previews come straight from Deezer's CDN (and Spotify's, for playlist
 # art); everything else is same-origin.
 CSP = ("default-src 'self'; img-src 'self' data: https://*.dzcdn.net https://i.scdn.co; "
-       "media-src https://*.dzcdn.net; style-src 'self' 'unsafe-inline'; script-src 'self'; "
+       "media-src 'self' https://*.dzcdn.net; style-src 'self' 'unsafe-inline'; script-src 'self'; "
        "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 
 
@@ -99,6 +100,7 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
         raise ValueError(f"API token must be at least {MIN_TOKEN_LENGTH} characters")
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
+    clip_secret = hmac.new(token.encode(), b"music-grabber-preview-clips", "sha256").digest()
     open_paths = {"/healthz", "/callback", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
     throttle = throttle or AuthThrottle()
 
@@ -112,8 +114,8 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
     @app.before_request
     def _auth():
         g.principal, g.bearer = None, ""
-        if request.path in open_paths or not request.path.startswith("/api/"):
-            return None                  # open routes and the UI's static files
+        if request.path in open_paths or not request.path.startswith("/api/") or request.path.startswith("/api/clips/"):
+            return None                  # open routes, the UI's static files, and signed preview clips
         who = request.remote_addr or "?"
         locked = too_many(who)
         if locked:
@@ -452,7 +454,22 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
 
     @app.get("/api/inbox/<int:item_id>/preview")
     def inbox_preview(item_id):
-        return jsonify(ops.inbox_preview(item_id, request.args.get("candidate")))
+        d = ops.inbox_preview(item_id, request.args.get("candidate"))
+        if d.get("clip"):                # a YouTube clip made on the server: a short-lived signed URL
+            d["url"] = f"/api/clips/{d['clip']}?{signed_query(clip_secret, d['clip'])}"
+        return jsonify(d)
+
+    @app.get("/api/clips/<name>")
+    def preview_clip(name):
+        # Signed (the <audio> element cannot send a bearer token), so it is open to the auth hook.
+        if not valid_signature(clip_secret, name, request.args.get("exp", ""), request.args.get("sig", "")):
+            return jsonify(error="not_found", message="no such clip"), 404
+        path = ops.preview_clips().path(name)
+        if not path:
+            return jsonify(error="not_found", message="no such clip"), 404
+        resp = send_from_directory(os.path.dirname(path), name, mimetype="audio/mpeg", conditional=True)
+        resp.headers["Cache-Control"] = "private, max-age=600"
+        return resp
 
     @app.post("/api/inbox/research-all")
     def inbox_research_all():

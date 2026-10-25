@@ -55,6 +55,7 @@ live in `docs/plans/extraction.md`, the origin in `docs/provenance.md`.
 | `music_grabber/wiring.py` | config to source/analysis, `ConfigError` |
 | `music_grabber/matching.py`, `text.py` | scoring and normalizers (`text.py` is a pinned duplicate of BPM Tagger's) |
 | `music_grabber/providers/` | Deezer (streamrip) and yt-dlp, lazily imported |
+| `music_grabber/preview_clips.py` | 30 s YouTube preview clips for Inbox candidates: yt-dlp + ffmpeg, a small cache under the data folder, HMAC-signed short-lived URLs (`GET /api/clips/<name>` is the one open route besides auth) |
 | `music_grabber/spotify.py` | Spotify Web API client (Authorization Code flow) |
 | `frontend/` | the web UI: Vite + React 18 + TS + react-query + Tailwind (utilities only, preflight off) + `src/styles/design-system.css` tokens (same names as BPM Tagger's). Talks only to `/api`; `npm run typecheck|test|build` |
 | `tests/` | pytest; `audio_fixtures.py` builds tiny valid audio with no audio libraries; `fake_servers.py` is a loopback fake peer + a manual clock for timer tests |

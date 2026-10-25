@@ -17,22 +17,32 @@ function useAction<V>(fn: (v: V) => Promise<unknown>, ok: string) {
   return useMutation({ mutationFn: fn, onSuccess: () => { toast.push({ kind: "ok", text: ok }); refresh(); }, onError: (e) => toast.push({ kind: "err", text: errorText(e) }) });
 }
 
-// ▶ for a candidate (or, with no candidate, the original track): fetches the 30-second preview URL on
-// demand (one Deezer lookup per press, not one per row), then plays it in the shared player.
-function PreviewButton({ itemId, candidateId, label, ytLink }: { itemId: number; candidateId?: number; label: string; ytLink?: string }) {
+// ▶ for a candidate (or, with no candidate, the original track): fetches the preview on demand (one
+// lookup per press, not one per row), then plays it in the shared player. A YouTube candidate's clip is
+// cut on the server and takes a few seconds; if that fails the button becomes a link that opens the
+// video in a new tab, so there is always a way to listen.
+function PreviewButton({ itemId, candidateId, label, link }: { itemId: number; candidateId?: number; label: string; link?: string }) {
   const { playing, toggle, stop } = usePlayer();
   const toast = useToast();
+  const [openUrl, setOpenUrl] = useState("");
   const key = `inbox-${itemId}-${candidateId ?? "source"}`;
   const on = playing === key;
   const load = useMutation({
     mutationFn: () => get<InboxPreview>(`/api/inbox/${itemId}/preview${candidateId ? `?candidate=${candidateId}` : ""}`),
-    onSuccess: (r) => (r.url ? toggle(key, r.url) : toast.push({ kind: "info", text: r.reason || "No preview available" })),
-    onError: (e) => toast.push({ kind: "err", text: errorText(e) }),
+    onSuccess: (r) => {
+      if (r.url) { toggle(key, r.url); return; }
+      toast.push({ kind: "info", text: r.reason || "No preview available" });
+      const next = r.open_url || link || "";
+      if (next.startsWith("https://")) setOpenUrl(next);
+    },
+    onError: (e) => { toast.push({ kind: "err", text: errorText(e) }); if (link?.startsWith("https://")) setOpenUrl(link); },
   });
-  if (ytLink) return <a className="btn sm" href={ytLink} target="_blank" rel="noopener noreferrer" aria-label={`Open ${label} to listen`}>Listen ↗</a>;
+  if (openUrl) return <a className="btn sm" href={openUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${label} to listen`}>Listen ↗</a>;
   return (
-    <button className="btn icon sm" aria-label={`${on ? "Pause" : "Preview"} ${label}`} aria-pressed={on} disabled={load.isPending}
-      onClick={() => (on ? stop() : load.mutate())}>{on ? <Pause width={16} height={16} /> : <Play width={16} height={16} />}</button>
+    <button className="btn icon sm" aria-label={`${on ? "Pause" : "Preview"} ${label}`} aria-pressed={on} aria-busy={load.isPending} disabled={load.isPending}
+      title={load.isPending ? "Getting a 30-second clip…" : undefined} onClick={() => (on ? stop() : load.mutate())}>
+      {load.isPending ? <span aria-hidden>…</span> : on ? <Pause width={16} height={16} /> : <Play width={16} height={16} />}
+    </button>
   );
 }
 
@@ -62,8 +72,8 @@ function ItemCard({ item }: { item: InboxItem }) {
                 <div className="s wrap mono">{[c.provider, c.quality, c.album, fmtDuration(c.duration_ms)].filter(Boolean).join(" · ")}</div>
               </div>
               <div className="row tight" style={{ flexWrap: "nowrap" }}>
-                {c.provider === "deezer" ? <PreviewButton itemId={item.id} candidateId={c.id} label={`${c.artist} – ${c.title}`} />
-                  : c.url?.startsWith("https://") ? <PreviewButton itemId={item.id} candidateId={c.id} label={`${c.artist} – ${c.title}`} ytLink={c.url} /> : null}
+                {c.provider === "deezer" || c.provider === "ytdlp"
+                  ? <PreviewButton itemId={item.id} candidateId={c.id} label={`${c.artist} – ${c.title}`} link={c.provider === "ytdlp" ? c.url ?? undefined : undefined} /> : null}
                 <button className="btn signal sm" disabled={busy} onClick={() => choose.mutate(c.id)}>Download this</button>
               </div>
             </li>

@@ -70,7 +70,7 @@ export default function Help() {
         <Section id="inbox" title="Queue and Inbox">
           <ul>
             <li>The <b>Queue</b> lists everything in progress, waiting, finished or failed. You can retry or remove items.</li>
-            <li>The <b>Inbox</b> holds songs where several candidates scored close. Press <b>▶</b> on a candidate to hear 30 seconds of it (and the ▶ next to the title for the original), then pick <i>Download this</i> on the right one, search with different words, or skip it. A YouTube candidate has a <i>Listen</i> link instead, since it has no preview.</li>
+            <li>The <b>Inbox</b> holds songs where several candidates scored close. Press <b>▶</b> on a candidate to hear 30 seconds of it (and the ▶ next to the title for the original), then pick <i>Download this</i> on the right one, search with different words, or skip it. A YouTube candidate takes a few seconds, because the server cuts a 30-second clip for it; if that fails the button becomes a <i>Listen</i> link that opens the video in a new tab.</li>
             <li>Removing something from the queue never deletes a file that was already filed in your library.</li>
           </ul>
         </Section>
