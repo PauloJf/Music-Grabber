@@ -19,6 +19,8 @@ from .db import GRAB_TERMINAL
 from .notify import Notifier
 from .enqueue import enqueue_track
 from .matching import library_match
+from .preview_clips import ClipCache, ClipError
+from .providers.ytdlp import YtDlpProvider
 from .path_template import render
 from .text import normalize_artist, normalize_title
 from .spotify import SpotifyAuthError, SpotifyError, parse_playlist_id
@@ -128,6 +130,7 @@ class Ops:
         self.settings_path = settings_path or settings_file_path(config["db_path"])
         self._started = time.time()
         self._oauth_states: dict[str, float] = {}
+        self._clips: Optional[ClipCache] = None
         self._lock = threading.Lock()
 
     # ── status ────────────────────────────────────────────────────────────────
@@ -392,8 +395,25 @@ class Ops:
             return {"url": url, "open_url": "", "reason": "" if url else "Deezer has no preview for this track"}
         link = cand.get("url") or (f"https://music.youtube.com/watch?v={cand['provider_track_id']}"
                                    if cand["provider"] == "ytdlp" and cand.get("provider_track_id") else "")
-        return {"url": "", "open_url": link if link.startswith("https://") else "",
-                "reason": "this source has no preview; open it to listen"}
+        link = link if link.startswith("https://") else ""
+        if cand["provider"] == "ytdlp":
+            # A 30-second clip cut on the server; when that fails the caller still gets the link to open.
+            try:
+                name = self.preview_clips().clip_for(cand)
+            except ClipError as exc:
+                return {"url": "", "clip": "", "open_url": link,
+                        "reason": f"couldn't make a preview ({exc}); open it to listen"}
+            return {"url": "", "clip": name, "open_url": link, "reason": ""}
+        return {"url": "", "open_url": link, "reason": "this source has no preview; open it to listen"}
+
+    def preview_clips(self) -> ClipCache:
+        """The cache of YouTube preview clips (under the data folder), made on first use."""
+        if self._clips is None:
+            def ydl_cls():
+                prov = next((p for p in self.svc.pool.pipeline.providers if getattr(p, "name", "") == "ytdlp"), None)
+                return (prov or YtDlpProvider(self.config))._YoutubeDL()
+            self._clips = ClipCache(os.path.join(os.path.dirname(os.path.abspath(self.config["db_path"])), "previews"), ydl_cls)
+        return self._clips
 
     def inbox_choose(self, item_id: int, candidate_id: int) -> dict:
         item = self._awaiting(item_id)

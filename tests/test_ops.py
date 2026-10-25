@@ -230,6 +230,28 @@ def test_inbox_preview_deezer_candidate_source_and_youtube(ops, monkeypatch):
         ops.inbox_preview(99999)
 
 
+def test_inbox_preview_youtube_candidate_makes_a_clip_or_falls_back_to_the_link(ops):
+    from music_grabber.preview_clips import ClipError
+    i = _item(ops, "awaiting_user")
+    ops.db.add_grab_candidates(i, [{"provider": "ytdlp", "provider_track_id": "abcDEF12345", "rank": 0, "title": "Live",
+                                    "url": "https://music.youtube.com/watch?v=abcDEF12345"}])
+    cand = ops.db.get_grab_candidates(i)[0]["id"]
+    made = []
+
+    class FakeClips:
+        def clip_for(self, c): made.append(c["provider_track_id"]); return "0123456789abcdef.mp3"
+    ops._clips = FakeClips()
+    ok = ops.inbox_preview(i, cand)
+    assert ok["clip"] == "0123456789abcdef.mp3" and ok["url"] == "" and made == ["abcDEF12345"]
+    assert ok["open_url"] == "https://music.youtube.com/watch?v=abcDEF12345"          # the link is there either way
+
+    class Broken:
+        def clip_for(self, c): raise ClipError("could not fetch the audio from YouTube")
+    ops._clips = Broken()
+    bad = ops.inbox_preview(i, cand)
+    assert bad["clip"] == "" and bad["open_url"].startswith("https://music.youtube.com/") and "open it to listen" in bad["reason"]
+
+
 def test_inbox_choose_search_research_skip(ops):
     i = _item(ops, "awaiting_user")
     ops.db.add_grab_candidates(i, [{"provider": "deezer", "title": "Song", "rank": 0}])

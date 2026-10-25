@@ -371,7 +371,9 @@ def _inbox(args, a, ops, emit):
                f"| inbox skip {it['id']}")
     elif a == "preview":
         d = ops.inbox_preview(args.id, args.candidate_id)
-        emit(d, d["url"] or (f"open to listen: {d['open_url']}" if d["open_url"] else f"no preview: {d['reason']}"))
+        clip = ops.preview_clips().path(d["clip"]) if d.get("clip") and hasattr(ops, "preview_clips") else None
+        emit(d, d["url"] or (f"30 s clip: {clip}" if clip else "") or (f"open to listen: {d['open_url']}" if d["open_url"] else "")
+             or f"no preview: {d['reason']}")
     elif a == "choose":
         emit(ops.inbox_choose(args.id, args.candidate_id), f"#{args.id}: queued candidate {args.candidate_id}")
     elif a == "search":

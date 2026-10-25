@@ -165,7 +165,7 @@ first (tab bar, thumb-sized targets, safe areas) and works as well on a desktop.
 - **Instant feedback**: pressing *Queue* flips the row at once, a toast confirms (with **Undo**), a
   floating activity button shows what's running, and you get a toast when a download finishes or fails.
 - **Queue**: Now / Up next / Failed / Finished, retry, cancel, move to front, per-item event log.
-- **Inbox**: ambiguous matches with scored candidates: download one, search again, or skip.
+- **Inbox**: ambiguous matches with scored candidates: hear 30 seconds of each (and of the original), then download one, search again, or skip.
 - **Library**: watched Spotify playlists with coverage, sync, queue missing, tracks by status.
 - **Settings**: Spotify, Deezer ARL (with a test button), ntfy, formats, thresholds, path template
   with a live example; changes apply without a restart.
