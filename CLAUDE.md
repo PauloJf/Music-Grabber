@@ -9,7 +9,7 @@
 | Repo | `PauloJf/Music-Grabber` (**private**; never make it public) |
 | Image | `gatoserio/music-grabber`, published to Docker Hub by `docker-publish.yml` **when a GitHub release is published** (or a confirmed manual run) |
 | Licence | AGPL-3.0-or-later (same as BPM Tagger) |
-| Git identity | `Paulo <PauloJf@users.noreply.github.com>` (GitHub rejects pushes exposing `paulo@gatoserio.dev`, error GH007) |
+| Git identity | `Paulo <PauloJf@users.noreply.github.com>` (GitHub rejects pushes that expose the account's private email address, error GH007) |
 
 ## What it is
 
