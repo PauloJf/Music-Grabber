@@ -110,3 +110,65 @@ def test_only_recent_finished_items_that_were_filed_for_analysis_are_checked(db,
     assert w.run_once() == 0                                              # all older than the 24 h window
     assert _watcher(db, tmp_path).run_once() == 1 and _results(db, old) and not _results(db, plain)
     assert not _results(db, pending)
+
+
+class FakeIndex:
+    """Stands in for LibraryIndex: a refresh makes the moved file known, like a real scan would."""
+    def __init__(self, db, rows=(), fail=False):
+        self.db, self.rows, self.fail, self.refreshes = db, list(rows), fail, 0
+
+    def refresh(self):
+        self.refreshes += 1
+        if self.fail:
+            raise RuntimeError("share unmounted")
+        self.db.library_upsert(self.rows)
+
+
+def test_a_missing_file_makes_the_watcher_refresh_the_index_and_then_finds_it(db, tmp_path):
+    _filed(db, str(tmp_path / "Music-raw" / "gone.mp3"), sid="sp9")
+    _mp3(tmp_path / "Sepultura" / "01.mp3", bpm=117, gain="-9.9")
+    idx = FakeIndex(db, [{"path": "Sepultura/01.mp3", "source": "filesystem", "title": "T", "spotify_track_id": "sp9"}])
+    w = _watcher(db, tmp_path, index=idx)
+    assert w.run_once() == 1 and idx.refreshes == 1          # found in the same pass, no 30-minute wait
+
+
+def test_nothing_is_refreshed_when_every_file_is_where_it_was_filed(db, tmp_path):
+    f = _mp3(tmp_path / "a.mp3")                              # present, just not tagged yet
+    _filed(db, f)
+    idx = FakeIndex(db)
+    _watcher(db, tmp_path, index=idx).run_once()
+    assert idx.refreshes == 0
+
+
+def test_the_refresh_is_throttled_and_slower_for_old_items(db, tmp_path):
+    i = _filed(db, str(tmp_path / "gone.mp3"), sid="x")
+    idx = FakeIndex(db)
+    t = {"now": 1000.0}
+    w = _watcher(db, tmp_path, index=idx, clock=lambda: t["now"], refresh_fast=120, refresh_slow=900)
+    w.run_once()
+    assert idx.refreshes == 1
+    t["now"] += 60
+    w.run_once()
+    assert idx.refreshes == 1                                 # too soon
+    t["now"] += 61
+    w.run_once()
+    assert idx.refreshes == 2                                 # 2 minutes passed
+    # the same item, filed more than an hour ago: only every 15 minutes
+    with db._connect() as conn:
+        conn.execute("UPDATE grab_queue SET updated_at=? WHERE id=?",
+                     ((datetime.now(timezone.utc) - timedelta(hours=3)).isoformat(), i))
+        conn.commit()
+    t["now"] += 130
+    w.run_once()
+    assert idx.refreshes == 2
+    t["now"] += 800
+    w.run_once()
+    assert idx.refreshes == 3
+
+
+def test_a_failing_refresh_does_not_break_the_check(db, tmp_path):
+    f = _mp3(tmp_path / "a.mp3", bpm=120, gain="-5")
+    _filed(db, f, sid="here")
+    _filed(db, str(tmp_path / "gone.mp3"), sid="gone")
+    idx = FakeIndex(db, fail=True)
+    assert _watcher(db, tmp_path, index=idx).run_once() == 1 and idx.refreshes == 1
