@@ -106,6 +106,8 @@ input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--signal); }
 .item .t { font-weight: 600; } .item .s { color: var(--ink-3); font-size: 13px; }
 .item a { text-decoration: none; } .item a:hover { text-decoration: underline; text-decoration-color: var(--signal); text-underline-offset: 3px; }
 .item.dim { opacity: .62; }
+/* a queue row's title is a button: let a long one wrap inside its column instead of running under the badge */
+.btn.qtitle { display: block; max-width: 100%; padding: 0; min-height: 0; text-align: left; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
 .ord { width: 28px; text-align: right; color: var(--ink-3); font: 500 13px var(--mono); }
 .cover { width: 52px; height: 52px; border: 1.5px solid var(--ink); background: var(--paper-2); object-fit: cover; display: block; flex: none; }
 .cover.lg { width: 120px; height: 120px; } .cover.xl { width: 100%; height: auto; aspect-ratio: 1; }

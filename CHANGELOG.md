@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- **Queue rows:** a long title ran under the status badge on a phone; it now wraps inside its column.
+
 ## 1.0.0-rc.4 (2026-10-25)
 
 Fourth release candidate: previews in the Inbox (30 seconds of each Deezer and YouTube candidate, and of
