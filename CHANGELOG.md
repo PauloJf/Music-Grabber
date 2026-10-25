@@ -9,6 +9,9 @@ list of the tracks you already own. Please check, on a phone, that the app insta
 the bottom bar is fully visible and that tapping a field does not zoom; then do one Deezer download.
 
 ### Added
+- **Preview a track in the Inbox before choosing it.** Each Deezer candidate has a ▶ (30 seconds, fetched
+  when you press it), the original track has one too (found on Deezer by its ISRC), and a YouTube
+  candidate has a *Listen* link. CLI `inbox preview ID [CANDIDATE]`, API `GET /api/inbox/<id>/preview?candidate=`.
 - **Browse the tracks you already own.** The library index could only be searched (Discover marks owned
   tracks) or counted; now it can be listed: web UI Library, "Owned tracks" (filter as you type, 100 at a
   time), `python -m music_grabber library list [WORDS] [--limit N --offset N]`, and

@@ -20,7 +20,7 @@ status                    what is going on
 sync [PLAYLIST_ID]        reconcile now
 playlist list|show|add|remove|enable|disable|queue-missing|mirror
 queue [list|history|show|add|retry|retry-failed|cancel|delete|clear-completed|priority]
-inbox [list|show|choose|search|research|research-all|skip]
+inbox [list|show|preview|choose|search|research|research-all|skip]
 settings [show|set|test-deezer|test-ntfy]
 users [list|add|passwd|role|delete]   accounts for the web UI (also the way back in after a lost password)
 library list [QUERY]      the tracks the library index knows (what search marks as owned)
@@ -102,6 +102,9 @@ def build_parser() -> argparse.ArgumentParser:
     ib = top.nested(top.add("inbox"))
     ib.add("list")
     ib.add("show").add_argument("id", type=int)
+    x = ib.add("preview")
+    x.add_argument("id", type=int)
+    x.add_argument("candidate_id", type=int, nargs="?", help="omit to preview the track being looked for")
     x = ib.add("choose")
     x.add_argument("id", type=int)
     x.add_argument("candidate_id", type=int)
@@ -366,6 +369,9 @@ def _inbox(args, a, ops, emit):
              + (fmt_candidates(d["candidates"]) if d["candidates"] else "(no candidates)")
              + f"\n\nResolve: inbox choose {it['id']} <candidate id> | inbox search {it['id']} <query> "
                f"| inbox skip {it['id']}")
+    elif a == "preview":
+        d = ops.inbox_preview(args.id, args.candidate_id)
+        emit(d, d["url"] or (f"open to listen: {d['open_url']}" if d["open_url"] else f"no preview: {d['reason']}"))
     elif a == "choose":
         emit(ops.inbox_choose(args.id, args.candidate_id), f"#{args.id}: queued candidate {args.candidate_id}")
     elif a == "search":

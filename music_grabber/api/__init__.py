@@ -450,6 +450,10 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
     def inbox_list():
         return jsonify(ops.inbox_list())
 
+    @app.get("/api/inbox/<int:item_id>/preview")
+    def inbox_preview(item_id):
+        return jsonify(ops.inbox_preview(item_id, request.args.get("candidate")))
+
     @app.post("/api/inbox/research-all")
     def inbox_research_all():
         return jsonify(ops.inbox_research_all())

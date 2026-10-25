@@ -105,6 +105,19 @@ def test_queue_routes(client, app_ops):
     assert client.get("/api/queue/99999", headers=H).status_code == 404
 
 
+def test_inbox_preview_route(client, app_ops, monkeypatch):
+    from music_grabber import deezer_catalog
+    monkeypatch.setattr(deezer_catalog, "track_preview_url", lambda tid: f"https://cdn.dzcdn.net/{tid}.mp3")
+    db = app_ops[1].db
+    iid = db.enqueue_grab({"spotify_track_id": "s1", "title": "T", "artist": "A"})
+    db.add_grab_candidates(iid, [{"provider": "deezer", "provider_track_id": "42", "title": "T", "rank": 0}])
+    cand = db.get_grab_candidates(iid)[0]["id"]
+    assert client.get(f"/api/inbox/{iid}/preview?candidate={cand}").status_code == 401
+    r = client.get(f"/api/inbox/{iid}/preview?candidate={cand}", headers=H)
+    assert r.status_code == 200 and r.json["url"] == "https://cdn.dzcdn.net/42.mp3"
+    assert client.get("/api/inbox/99999/preview", headers=H).status_code == 404
+
+
 def test_inbox_routes(client, app_ops):
     db = app_ops[1].db
     iid = db.enqueue_grab({"spotify_track_id": "s1", "title": "Song", "artist": "Band"})
