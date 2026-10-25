@@ -504,6 +504,11 @@ the point.
   from "already running") and whether the API key can be scoped to that route only.
   Phase 2 treats any 2xx as success and does not depend on the body.
 
+**Decisions (2026-10-25, before 1.0.0):** Q3 and Q5 were built (the Spotify-id tag; the Navidrome
+playlist mirror, opt-in). Q2, Q4 and Q6 are **not in 1.0**: intake is supported through BPM Tagger's
+watch mode only (Q2); the Suggestions page is dropped (Q4); the Mediarium hook keeps treating any 2xx
+as success (Q6). They are listed in the README under "Not in 1.0".
+
 ## 9. Outcome (after Phase 5)
 
 What was built, and where it differs from sections 1-8 above.
@@ -520,13 +525,13 @@ What was built, and where it differs from sections 1-8 above.
 | Export/import tool | `import-bpm-tagger` (read-only source, dry run, merge, tokens opt-in) and `import-env` (never prints secrets) |
 | Tests mock everything | socket-level guard in `tests/conftest.py`; fakes for Spotify, Deezer, yt-dlp, Mediarium, BPM Tagger, OpenSubsonic, ntfy; a golden file pins the duplicated `text.py` to BPM Tagger |
 
-**Not built, still waiting on an owner decision:** the Spotify-id file tag (Q3), the Navidrome
-playlist mirror that would keep Spotify playlists usable in BPM Tagger's player (Q5), re-homing
-the suggestions page (Q4), a lighter per-folder scan trigger in BPM Tagger for `ApiAnalysis` (Q2).
+**Built after this plan, with the owner's agreement:** the Spotify-id file tag (Q3) and the Navidrome
+playlist mirror that keeps Spotify playlists usable in BPM Tagger's player (Q5), both shipped in
+1.0.0-rc.1. **Decided not in 1.0:** re-homing the suggestions page (Q4), a lighter per-folder scan
+trigger in BPM Tagger for `ApiAnalysis` (Q2), and a verified Mediarium contract (Q6).
 
-**Not yet done, by design:** the BPM Tagger cleanup (section 5.2) and any release. Both wait for
-Music Grabber to be stable, and the cleanup must not ship as a `VERSION` bump to BPM Tagger's
-`main` before then.
+**Not yet done, by design:** the BPM Tagger cleanup (section 5.2). It waits for Music Grabber 1.0.0 to
+be out and proven, and must not ship as a `VERSION` bump to BPM Tagger's `main` before then.
 
 **Bug found by testing that the plan could not have predicted:** the first cut crashed on its
 second start (counter seeding used an aggregate `INSERT ... SELECT`). Fixed with regression tests in
