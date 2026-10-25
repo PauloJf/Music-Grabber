@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.0.0 (2026-10-25)
+
+First stable release. It is 1.0.0-rc.4 plus the fixes below; the stability promise in the README
+(CLI, JSON API, environment variable names and `settings.json` keys stay compatible within 1.x) applies
+from here. What is deliberately not in 1.0 is listed in the README under "Not in 1.0": a per-file scan
+trigger in BPM Tagger, the Suggestions page, and a verified Mediarium contract.
+
 ### Fixed
 - **BPM and loudness results for files BPM Tagger moved:** the result line used to wait for the next
   library refresh (up to 30 minutes) when BPM Tagger moved a file out of the intake folder. The check now
