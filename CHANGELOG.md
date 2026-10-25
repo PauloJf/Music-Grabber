@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- **The BPM and loudness BPM Tagger wrote show up in Music Grabber.** The queue item's history used to
+  stop at "BPM Tagger will analyse it". With `ANALYSIS=intake` or `api` a read-only check (about once a
+  minute, for 24 hours after filing) now adds `analysis_result: 117 BPM, ReplayGain -9.9 dB (peak 0.98)`
+  once the file carries BPM Tagger's tags (ID3, MP4 and Vorbis). It never modifies the file, and finds it
+  by Spotify id through the library index if BPM Tagger moved it.
+
 ## 1.0.0-rc.3 (2026-10-24)
 
 Third release candidate: the phone fixes (installable app, no focus zoom, readable Inbox titles) and a
