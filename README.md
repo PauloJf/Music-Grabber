@@ -266,8 +266,9 @@ Writing playlists needs an administrator in the web UI/API.
 
 ## Working with BPM Tagger, Navidrome and Mediarium
 
-**BPM Tagger, intake mode (recommended).** Mount the same music folder into both containers at the
-same path and file new tracks into a subfolder BPM Tagger watches
+**BPM Tagger, intake mode (recommended).** Mount the same music folder into both containers (each
+may use its own path, e.g. `/music` in one and `/library` in the other: set Music Grabber's
+`MUSIC_DIR`/`INTAKE_DIR` to its own view of it) and file new tracks into a subfolder BPM Tagger watches
 ([`with-bpm-tagger.yml`](docs/compose/with-bpm-tagger.yml)):
 
 ```yaml
@@ -282,7 +283,9 @@ BPM Tagger's watcher sees each placed file, detects the BPM, writes the tag and,
 Navidrome to rescan *after* tagging. Leave Music Grabber's own `navidrome` hook off in this mode: a
 rescan before the BPM tag exists is one Navidrome's quick scan never revisits. Music Grabber never
 touches a file after placing it, so BPM Tagger analyses it exactly once. `ANALYSIS_WAIT_SECONDS`
-can make it wait (blocking one worker) and record whether the BPM tag appeared.
+can make it wait (blocking one worker) and record whether the BPM tag appeared. Either way, Music
+Grabber keeps looking (read-only, about once a minute, for 24 hours) and adds the BPM and ReplayGain
+loudness BPM Tagger wrote to the queue item's history, also after BPM Tagger has moved the file.
 
 **Library index over HTTP.** If Music Grabber cannot see the library files, let it ask BPM Tagger
 (or Navidrome): `LIBRARY_INDEX=opensubsonic`, `LIBRARY_URL=http://bpm-tagger:5000`,
