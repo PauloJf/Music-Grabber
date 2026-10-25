@@ -384,6 +384,17 @@ release first. The **database** migrates forward only: opening it with a newer v
 in place, after copying the old file to `<db>.bak-<version>` (the version that is starting), so going back means restoring
 that copy. The web UI's look and its internal routes are not part of the promise.
 
+### Not in 1.0
+
+Decided, not forgotten (the questions are in [`docs/plans/extraction.md`](docs/plans/extraction.md), section 8):
+
+- **A "scan just these files" trigger in BPM Tagger.** `ANALYSIS=api` can only start a full-library
+  scan (and not with admin two-factor). The supported setup is BPM Tagger in watch mode with
+  `ANALYSIS=intake`; Music Grabber then reads back the BPM and loudness BPM Tagger wrote.
+- **The Suggestions page** BPM Tagger's grabber had. Discover, Library and Owned tracks cover most of it.
+- **A verified Mediarium contract.** The scan hook treats any 2xx answer from `POST /api/music/import/scan`
+  as success and does not read the body, and it uses the API key you give it as is.
+
 ## Troubleshooting
 
 - **Every track shows as missing.** `status` → *Library*. If it says 0 tracks the index cannot see
