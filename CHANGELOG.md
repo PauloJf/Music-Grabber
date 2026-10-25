@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Fixed
+- **BPM and loudness results for files BPM Tagger moved:** the result line used to wait for the next
+  library refresh (up to 30 minutes) when BPM Tagger moved a file out of the intake folder. The check now
+  refreshes the library index itself when it cannot find a file: about every 2 minutes for items filed in
+  the last hour, every 15 minutes after that.
 - **Queue rows:** a long title ran under the status badge on a phone; it now wraps inside its column.
 
 ## 1.0.0-rc.4 (2026-10-25)

@@ -51,7 +51,7 @@ def build_service(config: dict) -> GrabberService:
     service.analysis = analysis
     if analysis.name in ("intake", "api"):
         from .analysis_watch import AnalysisWatcher
-        service.analysis_watcher = AnalysisWatcher(db, config.get("library_dir") or config["music_dir"])
+        service.analysis_watcher = AnalysisWatcher(db, config.get("library_dir") or config["music_dir"], index=index)
     return service
 
 
