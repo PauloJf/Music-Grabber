@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.0.0-rc.4 (2026-10-25)
+
+Fourth release candidate: previews in the Inbox (30 seconds of each Deezer and YouTube candidate, and of
+the original track) and the BPM and loudness BPM Tagger wrote, shown on the queue item. Please try ▶ on a
+YouTube candidate in the Inbox (the first press takes a few seconds; if it cannot make a clip you get a
+Listen link), and grab one track to see its `analysis_result` line appear in the queue item's history.
+
 ### Added
 - **The BPM and loudness BPM Tagger wrote show up in Music Grabber.** The queue item's history used to
   stop at "BPM Tagger will analyse it". With `ANALYSIS=intake` or `api` a read-only check (about once a
