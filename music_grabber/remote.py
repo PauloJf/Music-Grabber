@@ -93,6 +93,8 @@ class RemoteOps:
 
     # inbox
     def inbox_list(self): return self._get("/api/inbox")
+    def inbox_preview(self, item_id, candidate_id=None):
+        return self._get(f"/api/inbox/{int(item_id)}/preview", candidate=candidate_id)
     def inbox_choose(self, item_id, candidate_id):
         return self._post(f"/api/inbox/{int(item_id)}/choose", {"candidate_id": candidate_id})
     def inbox_search(self, item_id, query):

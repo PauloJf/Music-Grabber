@@ -202,6 +202,34 @@ def test_inbox_lists_awaiting_items_with_candidates(ops):
     assert [x["id"] for x in items] == [i] and len(items[0]["candidates"]) == 1
 
 
+def test_inbox_preview_deezer_candidate_source_and_youtube(ops, monkeypatch):
+    from music_grabber import deezer_catalog
+    calls = []
+    monkeypatch.setattr(deezer_catalog, "track_preview_url", lambda tid: calls.append(tid) or ("https://cdn.dzcdn.net/p.mp3" if tid == "11" else ""))
+    monkeypatch.setattr(deezer_catalog, "track_by_isrc", lambda isrc: {"dz_track_id": "9", "preview_url": "https://cdn.dzcdn.net/src.mp3"} if isrc == "ISRC1" else {})
+    i = _item(ops, "awaiting_user", isrc="ISRC1")
+    other = _item(ops, "awaiting_user", "other")
+    ops.db.add_grab_candidates(i, [{"provider": "deezer", "provider_track_id": "11", "title": "A", "rank": 0},
+                                   {"provider": "deezer", "provider_track_id": "12", "title": "B", "rank": 1},
+                                   {"provider": "ytdlp", "provider_track_id": "yt1", "url": "https://music.youtube.com/watch?v=yt1", "title": "C", "rank": 2},
+                                   {"provider": "ytdlp", "provider_track_id": "yt2", "url": "javascript:alert(1)", "title": "D", "rank": 3}])
+    ops.db.add_grab_candidates(other, [{"provider": "deezer", "provider_track_id": "99", "title": "X", "rank": 0}])
+    a, b, c, d = [x["id"] for x in ops.db.get_grab_candidates(i)]
+    assert ops.inbox_preview(i, a)["url"] == "https://cdn.dzcdn.net/p.mp3" and calls == ["11"]
+    nope = ops.inbox_preview(i, b)
+    assert nope["url"] == "" and "no preview" in nope["reason"].lower()
+    yt = ops.inbox_preview(i, c)
+    assert yt["url"] == "" and yt["open_url"] == "https://music.youtube.com/watch?v=yt1"
+    assert ops.inbox_preview(i, d)["open_url"] == ""                     # only https links are offered
+    assert ops.inbox_preview(i)["url"] == "https://cdn.dzcdn.net/src.mp3"             # the original, by ISRC
+    assert ops.inbox_preview(other)["url"] == "" and ops.inbox_preview(other)["reason"]   # no ISRC
+    with pytest.raises(OpsError) as e:
+        ops.inbox_preview(i, ops.db.get_grab_candidates(other)[0]["id"])    # another item's candidate
+    assert e.value.code == "invalid_candidate"
+    with pytest.raises(OpsError):
+        ops.inbox_preview(99999)
+
+
 def test_inbox_choose_search_research_skip(ops):
     i = _item(ops, "awaiting_user")
     ops.db.add_grab_candidates(i, [{"provider": "deezer", "title": "Song", "rank": 0}])

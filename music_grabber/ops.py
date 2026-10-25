@@ -375,6 +375,26 @@ class Ops:
             raise OpsError("not_awaiting", f"item is {item['status']}", status=item["status"])
         return item
 
+    def inbox_preview(self, item_id: int, candidate_id=None) -> dict:
+        """Something to listen to before choosing: a candidate's 30-second Deezer preview, or (no
+        candidate) the track being looked for, found on Deezer by its ISRC. ``url`` is empty when
+        there is none; a YouTube candidate has no preview but ``open_url`` to listen to it there."""
+        item = self._item(item_id)
+        if candidate_id in (None, ""):
+            res = deezer_catalog.track_by_isrc(item.get("isrc") or "") if item.get("isrc") else {}
+            return {"url": res.get("preview_url", ""), "open_url": "",
+                    "reason": "" if res.get("preview_url") else "no preview found for the original track"}
+        cand = self.db.get_grab_candidate(int(candidate_id))
+        if not cand or cand["queue_item_id"] != item["id"]:
+            raise OpsError("invalid_candidate", "that candidate does not belong to this item")
+        if cand["provider"] == "deezer":
+            url = deezer_catalog.track_preview_url(cand["provider_track_id"] or "")
+            return {"url": url, "open_url": "", "reason": "" if url else "Deezer has no preview for this track"}
+        link = cand.get("url") or (f"https://music.youtube.com/watch?v={cand['provider_track_id']}"
+                                   if cand["provider"] == "ytdlp" and cand.get("provider_track_id") else "")
+        return {"url": "", "open_url": link if link.startswith("https://") else "",
+                "reason": "this source has no preview; open it to listen"}
+
     def inbox_choose(self, item_id: int, candidate_id: int) -> dict:
         item = self._awaiting(item_id)
         cand = self.db.get_grab_candidate(int(candidate_id)) if candidate_id else None

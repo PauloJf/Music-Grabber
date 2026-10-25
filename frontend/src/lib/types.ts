@@ -80,7 +80,10 @@ export interface Candidate {
   quality: string | null;
   score: number | null;
   rank: number;
+  url?: string | null;
 }
+
+export interface InboxPreview { url: string; open_url: string; reason: string }
 
 export interface InboxItem extends QueueItem {
   candidates: Candidate[];

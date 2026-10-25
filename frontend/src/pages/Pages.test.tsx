@@ -28,6 +28,34 @@ describe("inbox", () => {
     expect(calls.find((c) => c.path === "/api/inbox/7/choose")?.body).toEqual({ candidate_id: 41 });
   });
 
+  it("previews a Deezer candidate before choosing, and links a YouTube one", async () => {
+    const play = vi.fn(() => Promise.resolve());
+    vi.stubGlobal("Audio", class { src = ""; play = play; pause = vi.fn(); addEventListener = vi.fn(); });
+    const withYt = { ...item, isrc: "ISRC1", candidates: [item.candidates[0], { ...item.candidates[1], url: "https://music.youtube.com/watch?v=x" }] };
+    const calls = mockApi({ ...base, "GET /api/inbox": { items: [withYt] },
+      "GET /api/inbox/7/preview": { url: "https://cdn.dzcdn.net/p.mp3", open_url: "", reason: "" } });
+    renderApp(<Inbox />);
+    await screen.findByRole("heading", { name: "Band – Houdini" });
+    expect(calls.some((c) => c.path.includes("/preview"))).toBe(false);                    // nothing fetched until you press play
+    fireEvent.click(screen.getByRole("button", { name: "Preview Band – Houdini" }));
+    await waitFor(() => expect(play).toHaveBeenCalled());
+    expect(calls.find((c) => c.path.includes("/preview"))?.path).toBe("/api/inbox/7/preview?candidate=40");
+    await screen.findByRole("button", { name: "Pause Band – Houdini" });
+    fireEvent.click(screen.getByRole("button", { name: /preview the original houdini/i }));
+    await waitFor(() => expect(calls.some((c) => c.path === "/api/inbox/7/preview")).toBe(true));
+    const link = screen.getByRole("link", { name: /listen/i }) as HTMLAnchorElement;
+    expect(link.href).toBe("https://music.youtube.com/watch?v=x");
+    expect(link.rel).toContain("noopener");
+  });
+
+  it("says so when there is no preview", async () => {
+    mockApi({ ...base, "GET /api/inbox": { items: [item] }, "GET /api/inbox/7/preview": { url: "", open_url: "", reason: "Deezer has no preview for this track" } });
+    renderApp(<Inbox />);
+    await screen.findByRole("heading", { name: "Band – Houdini" });
+    fireEvent.click(screen.getByRole("button", { name: "Preview Band – Houdini" }));
+    await screen.findByText("Deezer has no preview for this track");
+  });
+
   it("searches with a trimmed query, skips, and shows the empty state", async () => {
     const calls = mockApi({ ...base, "GET /api/inbox": { items: [item] }, "POST /api/inbox/7/search": { ok: true }, "POST /api/inbox/7/skip": { ok: true } });
     renderApp(<Inbox />);

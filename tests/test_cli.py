@@ -73,6 +73,18 @@ def test_status_reports_a_sync_done_by_another_process(env, capsys):
     assert json.loads(run(["--json", "status"], capsys)[1])["last_synced_epoch"] > 0
 
 
+def test_inbox_preview_prints_the_url_or_why_not(env, capsys, monkeypatch):
+    from music_grabber import deezer_catalog
+    monkeypatch.setattr(deezer_catalog, "track_preview_url", lambda tid: "https://cdn.dzcdn.net/p.mp3" if tid == "7" else "")
+    _db, _pid, a = seed(env)
+    db = Database(str(env / "mg.db"))
+    db.add_grab_candidates(a, [{"provider": "deezer", "provider_track_id": "7", "title": "T", "rank": 5},
+                               {"provider": "deezer", "provider_track_id": "8", "title": "U", "rank": 6}])
+    c7, c8 = [c["id"] for c in db.get_grab_candidates(a) if c["provider_track_id"] in ("7", "8")]
+    assert run(["inbox", "preview", str(a), str(c7)], capsys)[1].strip() == "https://cdn.dzcdn.net/p.mp3"
+    assert "no preview" in run(["inbox", "preview", str(a), str(c8)], capsys)[1]
+
+
 def test_library_list_prints_a_page_and_how_to_get_the_next(env, capsys):
     db = Database(str(env / "mg.db"))
     db.library_upsert([{"path": f"Band/Album/{i:02d} - Song {i}.mp3", "source": "filesystem", "title": f"Song {i}",

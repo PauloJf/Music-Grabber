@@ -2,10 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Empty, ErrorState } from "../components/ui";
+import { Pause, Play } from "../components/icons";
 import { errorText, get, post } from "../lib/api";
 import { fmtDuration, useRefreshJobs } from "../lib/hooks";
+import { usePlayer } from "../lib/player";
 import { useToast } from "../lib/toast";
-import type { InboxItem } from "../lib/types";
+import type { InboxItem, InboxPreview } from "../lib/types";
 
 const grade = (s: number | null) => (s == null ? "" : s >= 0.85 ? "hi" : s >= 0.55 ? "mid" : "lo");
 
@@ -13,6 +15,25 @@ function useAction<V>(fn: (v: V) => Promise<unknown>, ok: string) {
   const toast = useToast();
   const refresh = useRefreshJobs();
   return useMutation({ mutationFn: fn, onSuccess: () => { toast.push({ kind: "ok", text: ok }); refresh(); }, onError: (e) => toast.push({ kind: "err", text: errorText(e) }) });
+}
+
+// ▶ for a candidate (or, with no candidate, the original track): fetches the 30-second preview URL on
+// demand (one Deezer lookup per press, not one per row), then plays it in the shared player.
+function PreviewButton({ itemId, candidateId, label, ytLink }: { itemId: number; candidateId?: number; label: string; ytLink?: string }) {
+  const { playing, toggle, stop } = usePlayer();
+  const toast = useToast();
+  const key = `inbox-${itemId}-${candidateId ?? "source"}`;
+  const on = playing === key;
+  const load = useMutation({
+    mutationFn: () => get<InboxPreview>(`/api/inbox/${itemId}/preview${candidateId ? `?candidate=${candidateId}` : ""}`),
+    onSuccess: (r) => (r.url ? toggle(key, r.url) : toast.push({ kind: "info", text: r.reason || "No preview available" })),
+    onError: (e) => toast.push({ kind: "err", text: errorText(e) }),
+  });
+  if (ytLink) return <a className="btn sm" href={ytLink} target="_blank" rel="noopener noreferrer" aria-label={`Open ${label} to listen`}>Listen ↗</a>;
+  return (
+    <button className="btn icon sm" aria-label={`${on ? "Pause" : "Preview"} ${label}`} aria-pressed={on} disabled={load.isPending}
+      onClick={() => (on ? stop() : load.mutate())}>{on ? <Pause width={16} height={16} /> : <Play width={16} height={16} />}</button>
+  );
 }
 
 function ItemCard({ item }: { item: InboxItem }) {
@@ -25,7 +46,10 @@ function ItemCard({ item }: { item: InboxItem }) {
   return (
     <article style={{ marginBottom: 30 }} aria-label={`${item.artist} – ${item.title}`}>
       <div className="eyebrow">We weren't sure which one</div>
-      <h2 style={{ marginTop: 4 }}>{item.artist} – {item.title}</h2>
+      <div className="row" style={{ flexWrap: "nowrap", gap: 10 }}>
+        <h2 style={{ marginTop: 4 }}>{item.artist} – {item.title}</h2>
+        {item.isrc && <PreviewButton itemId={item.id} label={`the original ${item.title}`} />}
+      </div>
       <div className="muted mono">{[item.album, fmtDuration(item.duration_ms), item.isrc].filter(Boolean).join(" · ")}</div>
       {item.note && <p className="ink2" style={{ margin: "6px 0 0" }}>{item.note}</p>}
       {item.candidates.length === 0 ? <p className="muted">No candidates were found. Try a different search below.</p> : (
@@ -37,7 +61,11 @@ function ItemCard({ item }: { item: InboxItem }) {
                 <div className="t wrap">{c.artist} – {c.title}</div>
                 <div className="s wrap mono">{[c.provider, c.quality, c.album, fmtDuration(c.duration_ms)].filter(Boolean).join(" · ")}</div>
               </div>
-              <button className="btn signal sm" disabled={busy} onClick={() => choose.mutate(c.id)}>Download this</button>
+              <div className="row tight" style={{ flexWrap: "nowrap" }}>
+                {c.provider === "deezer" ? <PreviewButton itemId={item.id} candidateId={c.id} label={`${c.artist} – ${c.title}`} />
+                  : c.url?.startsWith("https://") ? <PreviewButton itemId={item.id} candidateId={c.id} label={`${c.artist} – ${c.title}`} ytLink={c.url} /> : null}
+                <button className="btn signal sm" disabled={busy} onClick={() => choose.mutate(c.id)}>Download this</button>
+              </div>
             </li>
           ))}
         </ul>

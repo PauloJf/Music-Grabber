@@ -8,6 +8,9 @@
   minute, for 24 hours after filing) now adds `analysis_result: 117 BPM, ReplayGain -9.9 dB (peak 0.98)`
   once the file carries BPM Tagger's tags (ID3, MP4 and Vorbis). It never modifies the file, and finds it
   by Spotify id through the library index if BPM Tagger moved it.
+- **Preview a track in the Inbox before choosing it.** Each Deezer candidate has a ▶ (30 seconds, fetched
+  when you press it), the original track has one too (found on Deezer by its ISRC), and a YouTube
+  candidate has a *Listen* link. CLI `inbox preview ID [CANDIDATE]`, API `GET /api/inbox/<id>/preview?candidate=`.
 
 ## 1.0.0-rc.3 (2026-10-24)
 
