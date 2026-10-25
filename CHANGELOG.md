@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- The compose examples use `gatoserio/bpm-tagger:latest` again: BPM Tagger 2.19.0, the grabber-free build, is stable.
+
 ## 1.0.0 (2026-10-25)
 
 First stable release. It is 1.0.0-rc.4 plus the fixes below; the stability promise in the README
