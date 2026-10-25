@@ -283,6 +283,17 @@ class QueueMixin:
                     "SELECT * FROM grab_queue ORDER BY priority DESC, id DESC").fetchall()
         return [dict(r) for r in rows]
 
+    def get_items_awaiting_analysis(self, since_iso: str) -> list[dict]:
+        """Finished items filed for a BPM Tagger to analyse (they have an ``analysis`` event) that
+        have no ``analysis_result`` event yet, updated since `since_iso`. Oldest first."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT q.* FROM grab_queue q WHERE q.status='done' AND q.updated_at >= ? "
+                "AND EXISTS (SELECT 1 FROM grab_events e WHERE e.queue_item_id=q.id AND e.event='analysis') "
+                "AND NOT EXISTS (SELECT 1 FROM grab_events e WHERE e.queue_item_id=q.id AND e.event='analysis_result') "
+                "ORDER BY q.id", (since_iso,)).fetchall()
+        return [dict(r) for r in rows]
+
     def get_last_change(self) -> str:
         """Cheap token that changes whenever grabber state does — lets the client
         gate cache invalidation instead of blindly refetching lists."""

@@ -87,6 +87,62 @@ def read_bpm_tag(path: str) -> Optional[float]:
         return None
 
 
+def _gain_db(raw) -> Optional[float]:
+    """-9.9 from "-9.90 dB" (ReplayGain writes a number and a unit)."""
+    import re
+    m = re.search(r"[-+]?\d+(?:\.\d+)?", str(raw or ""))
+    return float(m.group(0)) if m else None
+
+
+def read_analysis(path: str) -> dict:
+    """What BPM Tagger wrote into a file: ``{"bpm", "gain_db", "peak"}``, each absent when not
+    tagged. Read-only (never changes the file or its mtime). Loudness is the ReplayGain track
+    gain/peak, as BPM Tagger stores it."""
+    out: dict = {}
+    bpm = read_bpm_tag(path)
+    if bpm:
+        out["bpm"] = bpm
+    gain = peak = None
+    try:
+        import mutagen
+        from mutagen.id3 import ID3
+        from mutagen.mp4 import MP4
+        ext = os.path.splitext(path)[1].lower()
+        if ext == ".mp3":
+            for fr in ID3(path).getall("TXXX"):
+                desc, val = str(fr.desc).lower(), (fr.text[0] if fr.text else "")
+                if desc == "replaygain_track_gain": gain = _gain_db(val)
+                elif desc == "replaygain_track_peak": peak = _gain_db(val)
+        elif ext in (".m4a", ".aac", ".mp4"):
+            tags = MP4(path)
+            def first(name):
+                v = tags.get(f"----:com.apple.iTunes:{name}")
+                return bytes(v[0]).decode("utf-8", "replace") if v else None
+            gain, peak = _gain_db(first("replaygain_track_gain")), _gain_db(first("replaygain_track_peak"))
+        else:
+            audio = mutagen.File(path)
+            if audio is not None and audio.tags is not None:
+                g, p = audio.get("REPLAYGAIN_TRACK_GAIN"), audio.get("REPLAYGAIN_TRACK_PEAK")
+                gain, peak = _gain_db(g[0] if g else None), _gain_db(p[0] if p else None)
+    except Exception:
+        pass
+    if gain is not None:
+        out["gain_db"] = gain
+    if peak is not None:
+        out["peak"] = peak
+    return out
+
+
+def describe_analysis(found: dict) -> str:
+    """One line for the queue item's history, e.g. "117 BPM, ReplayGain -9.9 dB (peak 0.98)"."""
+    parts = []
+    if "bpm" in found:
+        parts.append(f"{found['bpm']:g} BPM")
+    if "gain_db" in found:
+        parts.append(f"ReplayGain {found['gain_db']:+.1f} dB" + (f" (peak {found['peak']:g})" if "peak" in found else ""))
+    return ", ".join(parts)
+
+
 class IntakeFolderAnalysis:
     """File into BPM Tagger's watched folder and let its watcher do the rest."""
     name = "intake"

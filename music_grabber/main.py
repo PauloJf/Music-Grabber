@@ -49,6 +49,9 @@ def build_service(config: dict) -> GrabberService:
         service.mirror = mirror
         service.sync.on_synced = mirror.request
     service.analysis = analysis
+    if analysis.name in ("intake", "api"):
+        from .analysis_watch import AnalysisWatcher
+        service.analysis_watcher = AnalysisWatcher(db, config.get("library_dir") or config["music_dir"])
     return service
 
 
