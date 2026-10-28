@@ -142,4 +142,9 @@ export interface SuggestHidden {
 export interface Me { user: User; via: "token" | "session" }
 
 export interface OwnedTrack { path: string; title: string | null; artist: string | null; album: string | null; album_artist: string | null; duration_ms: number | null; year: number | null }
+export interface OwnedRelated {
+  found: boolean; matched_by: "isrc" | "artist_map" | "name" | null;
+  artist: { dz_id: string; name: string } | null; album: { dz_id: string; title: string } | null; track: { dz_id: string; title: string } | null;
+  related: { dz_id: string; name: string; image_url: string; fans: number | null }[];
+}
 export interface OwnedPage { tracks: OwnedTrack[]; total: number; limit: number; offset: number; q: string; index: string | null }

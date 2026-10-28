@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.2.0 (2026-10-28)
+
+### Added
+- **Related, on the Owned tracks list.** Open a row to see where the track sits on Deezer: links to its artist page,
+  album page and the track on Deezer, plus the artist's "fans also like" as chips. The file's ISRC names all of it
+  exactly; without one only the artist is matched (the artist map from New releases, then an equal-name search) and
+  the album and track are left out; if nothing is certain the row says so. Looked up only when a row is opened.
+  `GET /api/library/related?path=`.
+
 ## 1.1.4 (2026-10-28)
 
 ### Added

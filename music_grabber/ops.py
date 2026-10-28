@@ -480,6 +480,42 @@ class Ops:
         return {"tracks": tracks, "total": total, "limit": limit, "offset": offset, "q": str(query or "").strip(),
                 "index": self.svc.index.source.name if self.svc.index.source else None}
 
+    def library_related(self, path: str) -> dict:
+        """Where an owned track lives on Deezer, and who is related to its artist. The ISRC names the track,
+        artist and album exactly; without one only the artist can be found (the artist map the new releases
+        keep, then an equal-name search), never a guess. ``found`` is False when nothing is certain."""
+        row = self.db.library_track(str(path or ""))
+        if not row:
+            raise _not_found("track")
+        artist = album = track = None
+        how = ""
+        if row.get("isrc"):
+            d = deezer_catalog.track_detail_by_isrc(row["isrc"])
+            if d is None:
+                raise OpsError("deezer_unreachable", "Deezer is unreachable", 502)
+            if d.get("id") and (d.get("artist") or {}).get("id"):
+                artist = {"dz_id": str(d["artist"]["id"]), "name": d["artist"].get("name") or ""}
+                if (d.get("album") or {}).get("id"):
+                    album = {"dz_id": str(d["album"]["id"]), "title": d["album"].get("title") or ""}
+                track = {"dz_id": str(d["id"]), "title": d.get("title") or row.get("title") or ""}
+                how = "isrc"
+        if artist is None and row.get("norm_artist"):
+            mapped = self.db.get_artist_map(row["norm_artist"])
+            if mapped and mapped.get("dz_artist_id"):
+                artist, how = {"dz_id": mapped["dz_artist_id"], "name": mapped.get("name") or row.get("artist") or ""}, "artist_map"
+        if artist is None and row.get("artist"):
+            hits = [h for h in self._catalog(deezer_catalog.search, "artist", row["artist"], 5)
+                    if normalize_artist(h["name"]) == normalize_artist(row["artist"])]
+            if hits:
+                best = max(hits, key=lambda h: h.get("fans") or 0)
+                artist, how = {"dz_id": best["dz_id"], "name": best["name"]}, "name"
+        related = []
+        if artist:
+            related = [{k: a[k] for k in ("dz_id", "name", "image_url", "fans")}
+                       for a in self._catalog(deezer_catalog.artist_related, artist["dz_id"])]
+        return {"found": artist is not None, "matched_by": how or None, "artist": artist, "album": album,
+                "track": track, "related": related}
+
     def ledger_rebuild(self) -> dict:
         """Add a ledger row for every library file that carries our Spotify id tag and has none.
         Only adds: existing rows and the files themselves are never touched. Needs the
