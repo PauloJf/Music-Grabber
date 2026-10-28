@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.1.1 (2026-10-28)
+
+A small follow-up to 1.1.0: the new pages move to the front of the app. No database or configuration changes.
+
 ### Changed
 - **"For you" is the home page** while New releases and suggestions are on: a preview of the new releases, then
   artists you may like and albums you're missing. It is the first tab; Discover moved to `/discover` (second
