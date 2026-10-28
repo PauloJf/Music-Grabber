@@ -20,6 +20,18 @@ describe("album page", () => {
     await waitFor(() => expect((calls.find((c) => c.path === "/api/browse/queue")?.body as { tracks: unknown[] }).tracks).toHaveLength(1));
   });
 
+  it("previews a track from its row, and keeps the slot when a track has none", async () => {
+    const play = vi.fn().mockResolvedValue(undefined);
+    const srcs: string[] = [];
+    vi.stubGlobal("Audio", class { set src(v: string) { srcs.push(v); } play = play; pause = vi.fn(); addEventListener = vi.fn(); volume = 1; });
+    mockApi({ ...base, ...page([{ ...track(1, "A"), preview_url: "https://cdn/a.mp3" }, { ...track(2, "B"), preview_url: "" }]) });
+    renderAlbum();
+    fireEvent.click(await screen.findByRole("button", { name: "Preview A" }));
+    await waitFor(() => expect(srcs).toEqual(["https://cdn/a.mp3"]));
+    expect(screen.queryByRole("button", { name: "Preview B" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Pause A" })).toBeTruthy();
+  });
+
   it("says everything is queued or owned, with the button disabled", async () => {
     mockApi({ ...base, ...page([track(1, "A", { kind: "library" })]) });
     renderAlbum();

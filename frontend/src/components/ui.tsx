@@ -96,6 +96,19 @@ export function PreviewButton({ track }: { track: CatTrack }) {
   );
 }
 
+/** The small play button on an album's numbered rows (the cover is the album's own, so no cover here). The slot is
+ * kept when there is no preview so titles stay in line down the list. */
+function RowPreview({ track }: { track: CatTrack }) {
+  const { playing, toggle } = usePlayer();
+  const on = playing === track.dz_id;
+  if (!track.preview_url) return <span style={{ width: 32, height: 32 }} aria-hidden />;
+  return (
+    <button className="btn quiet icon sm" style={{ width: 32, minHeight: 32 }} aria-label={`${on ? "Pause" : "Preview"} ${track.title}`} aria-pressed={on} onClick={() => toggle(track.dz_id, track.preview_url)}>
+      {on ? <Pause width={16} height={16} /> : <Play width={16} height={16} />}
+    </button>
+  );
+}
+
 export function TrackRow({ track, ord, selected, onSelect, hideAlbum = false, hideArtist = false }: {
   track: CatTrack; ord?: number; selected?: boolean; onSelect?: (on: boolean) => void; hideAlbum?: boolean; hideArtist?: boolean;
 }) {
@@ -104,7 +117,7 @@ export function TrackRow({ track, ord, selected, onSelect, hideAlbum = false, hi
   return (
     <li className={`item ${own ? "dim" : ""}`} style={onSelect ? { gridTemplateColumns: "auto auto 1fr auto" } : undefined}>
       {onSelect && <input type="checkbox" aria-label={`Select ${track.title}`} checked={!!selected} disabled={own} onChange={(e) => onSelect(e.target.checked)} />}
-      {ord != null ? <div className="row tight"><span className="ord">{ord}</span></div> : null}
+      {ord != null ? <div className="row tight"><span className="ord">{ord}</span><RowPreview track={track} /></div> : null}
       <div className="row" style={{ flexWrap: "nowrap", minWidth: 0, gap: 12 }}>
         {ord == null && <PreviewButton track={track} />}
         <div style={{ minWidth: 0 }}>

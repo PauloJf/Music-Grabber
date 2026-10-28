@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.1.3 (2026-10-28)
+
+### Fixed
+- **Album pages had no preview.** Each numbered track row now has a small play button (30 seconds, the shared
+  player); a track Deezer has no preview for keeps an empty slot so the titles stay in line.
+
 ## 1.1.2 (2026-10-28)
 
 A small follow-up: previews on the suggestion tiles, and a tidier header. No database or configuration changes.
