@@ -23,6 +23,7 @@ queue [list|history|show|add|retry|retry-failed|cancel|delete|clear-completed|pr
 inbox [list|show|preview|choose|search|research|research-all|skip]
 settings [show|set|test-deezer|test-ntfy]
 users [list|add|passwd|role|delete]   accounts for the web UI (also the way back in after a lost password)
+keys [list|create|revoke]             API keys for other apps (scoped; the key is shown once)
 library list [QUERY]      the tracks the library index knows (what search marks as owned)
 library refresh           reload the library index
 ledger rebuild            re-add ledger rows for files carrying our Spotify id tag
@@ -121,6 +122,13 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("pairs", nargs="+", metavar="KEY VALUE")
     st.add("test-deezer")
     st.add("test-ntfy")
+
+    ks = top.nested(top.add("keys"))
+    ks.add("list")
+    x = ks.add("create")
+    x.add_argument("name")
+    x.add_argument("--scopes", default="request", help="comma list of: browse, request, library")
+    ks.add("revoke").add_argument("key_id", type=int)
 
     us = top.nested(top.add("users"))
     us.add("list")
@@ -274,6 +282,8 @@ def _dispatch(args, ops, out) -> int:
         _settings(args, a or "show", ops, emit)
     elif c == "users":
         _users(args, a or "list", ops, emit)
+    elif c == "keys":
+        _keys(args, a or "list", ops, emit)
     else:
         print(f"unknown command: {c}", file=sys.stderr)
         return 2
@@ -421,6 +431,20 @@ def _users(args, a, ops, emit):
     elif a == "delete":
         ops.users_delete(uid)
         emit({"ok": True}, f"Deleted '{match[0]['username']}'")
+
+
+def _keys(args, a, ops, emit):
+    if a == "list":
+        keys = ops.keys_list()["keys"]
+        rows = [{**k, "scopes": ",".join(k["scopes"]), "state": "revoked" if k["revoked_at"] else "active"} for k in keys]
+        emit({"keys": keys}, _table(rows, [("ID", "id"), ("NAME", "name"), ("SCOPES", "scopes"), ("STATE", "state"),
+                                           ("LAST USED", "last_used_at")]) if keys else "No API keys yet.")
+    elif a == "create":
+        d = ops.keys_create(args.name, args.scopes, "cli")
+        emit(d, f"Created key '{d['key']['name']}' ({','.join(d['key']['scopes'])}). Copy it now, it is not shown again:\n{d['token']}")
+    elif a == "revoke":
+        ops.keys_revoke(args.key_id)
+        emit({"ok": True}, f"Revoked key {args.key_id}")
 
 
 def _settings(args, a, ops, emit):

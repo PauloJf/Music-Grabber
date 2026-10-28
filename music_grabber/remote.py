@@ -59,6 +59,10 @@ class RemoteOps:
     def users_update(self, uid, changes): return self._req("PATCH", f"/api/users/{int(uid)}", changes)
     def users_delete(self, uid): return self._req("DELETE", f"/api/users/{int(uid)}")
     def test_ntfy(self): return self._post("/api/settings/test-ntfy")
+    def keys_list(self): return self._get("/api/keys")
+    def keys_create(self, name, scopes, created_by=""):
+        return self._post("/api/keys", {"name": name, "scopes": scopes})
+    def keys_revoke(self, key_id): return self._req("DELETE", f"/api/keys/{int(key_id)}")
 
     # spotify
     def spotify_status(self): return self._get("/api/spotify/status")

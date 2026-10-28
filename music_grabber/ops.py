@@ -34,6 +34,9 @@ DEEZER_QUALITIES = ("MP3_128", "MP3_320", "FLAC")
 MASK = "********"
 OAUTH_STATE_TTL = 600
 SESSION_DAYS = 14
+# Integration API keys: what a key may do (docs/plans/integration-and-suggestions.md).
+API_SCOPES = ("browse", "request", "library")
+KEY_PREFIX = "mgk_"
 # Per-user preferences: key -> (kind, allowed values or range).
 PREFS = {"theme": ("enum", ("system", "light", "dark")), "preview_volume": ("float", (0.0, 1.0))}
 
@@ -826,6 +829,94 @@ class Ops:
                 self.db.delete_grab(it["id"])
                 n += 1
         return {"ok": True, "removed": n}
+
+    # ── integration API: keys for other apps, and requests from them ──────────
+    def keys_list(self) -> dict:
+        return {"keys": self.db.list_api_keys()}
+
+    def keys_create(self, name: str, scopes, created_by: str = "") -> dict:
+        name = (name or "").strip()
+        if not 1 <= len(name) <= 40 or not name.isprintable():
+            raise OpsError("invalid_key", "a key needs a name of 1 to 40 characters")
+        if isinstance(scopes, str):
+            scopes = [s.strip() for s in scopes.split(",") if s.strip()]
+        if not isinstance(scopes, (list, tuple)) or not scopes or any(s not in API_SCOPES for s in scopes):
+            raise OpsError("invalid_key", f"scopes must be some of: {', '.join(API_SCOPES)}")
+        key = KEY_PREFIX + secrets.token_urlsafe(32)
+        try:
+            row = self.db.create_api_key(name, key, sorted(set(scopes), key=API_SCOPES.index), created_by)
+        except ValueError:
+            raise OpsError("key_name_taken", "a key with that name already exists", 409) from None
+        return {"key": row, "token": key}          # the only time the plain key is ever shown
+
+    def keys_revoke(self, key_id: int) -> dict:
+        if not self.db.revoke_api_key(int(key_id)):
+            raise _not_found("key")
+        return {"ok": True}
+
+    def api_key_principal(self, token: str) -> Optional[dict]:
+        """The principal for a presented API key (None for an unknown or revoked one)."""
+        if not token.startswith(KEY_PREFIX):
+            return None
+        row = self.db.api_key_for(token)
+        if not row:
+            return None
+        return {"id": None, "username": row["name"], "role": "key", "scopes": row["scopes"], "prefs": {}}
+
+    def request_track(self, data: dict, requested_by: str) -> dict:
+        """Queue one track for another app. Identify it by ``dz_id`` or ``isrc`` (exact), or by
+        ``title`` + ``artist``. Already owned -> ``in_library``; already in flight -> ``already_queued``;
+        the same ``source_ref`` filed twice -> ``already_requested`` (idempotent)."""
+        ref = str(data.get("source_ref") or "").strip()[:200]
+        if ref:
+            prev = self.db.find_request(requested_by, ref)
+            if prev and prev["status"] not in ("failed", "skipped"):
+                return {"ok": True, "result": "already_requested", "id": prev["id"], "status": prev["status"]}
+        dz_id, isrc = str(data.get("dz_id") or "").strip(), str(data.get("isrc") or "").strip().upper()
+        title, artist = str(data.get("title") or "").strip(), str(data.get("artist") or "").strip()
+        if dz_id or (isrc and not (title and artist)):
+            found = self._catalog(deezer_catalog.track_page, dz_id or f"isrc:{isrc}")
+            if not found:
+                raise OpsError("not_found", "the catalogue has no such track", 404)
+            dz_id = found["dz_id"]
+            meta = {k: found.get(k) for k in ("title", "artist", "album", "duration_ms", "cover_url", "track_no",
+                                              "disc_no", "year", "isrc")}
+        elif title and artist:
+            meta = {"title": title, "artist": artist, "album": str(data.get("album") or "").strip(),
+                    "duration_ms": data.get("duration_ms") if isinstance(data.get("duration_ms"), int) else None,
+                    "isrc": isrc}
+        else:
+            raise OpsError("invalid_track", "send dz_id, isrc, or title and artist")
+        meta["album_artist"] = meta["artist"]
+        if not data.get("force") and library_match(
+                {"title": meta["title"], "artist": meta["artist"], "album": meta.get("album"),
+                 "duration_ms": meta.get("duration_ms"), "isrc": meta.get("isrc") or ""}, self.svc.index, 0.88):
+            return {"ok": True, "result": "in_library"}
+        item_id = enqueue_track(self.db, self.svc, {**meta, "requested_by": requested_by, "source_ref": ref or None},
+                                dz_track_id=dz_id)
+        if item_id is None:
+            return {"ok": True, "result": "already_queued"}
+        self.svc.request_sync()
+        return {"ok": True, "result": "queued", "id": item_id, "status": "pending"}
+
+    REQUEST_FIELDS = ("id", "status", "progress", "title", "artist", "album", "error", "source_ref",
+                      "requested_by", "created_at", "updated_at")
+
+    def request_status(self, item_id: int, requested_by: Optional[str] = None) -> dict:
+        """One queue item as an integration sees it. ``requested_by`` limits it to that caller's own."""
+        item = self.db.get_grab_item(int(item_id))
+        if not item or (requested_by is not None and item.get("requested_by") != requested_by):
+            raise _not_found("request")
+        return {k: item.get(k) for k in self.REQUEST_FIELDS}
+
+    def library_has(self, data: dict) -> dict:
+        title, artist, isrc = (str(data.get(k) or "").strip() for k in ("title", "artist", "isrc"))
+        if not (isrc or (title and artist)):
+            raise OpsError("invalid_track", "send isrc, or title and artist")
+        have = library_match({"title": title, "artist": artist, "album": str(data.get("album") or ""),
+                              "duration_ms": data.get("duration_ms") if isinstance(data.get("duration_ms"), int) else None,
+                              "isrc": isrc}, self.svc.index, 0.88)
+        return {"have": bool(have)}
 
     # ── activity (the always-visible tray) ────────────────────────────────────
     def activity(self) -> dict:

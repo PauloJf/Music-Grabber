@@ -24,7 +24,7 @@ from ..preview_clips import signed_query, valid_signature
 log = logging.getLogger(__name__)
 
 MIN_TOKEN_LENGTH = 16
-ADMIN_PREFIXES = ("/api/settings", "/api/users", "/api/spotify")      # administrators only
+ADMIN_PREFIXES = ("/api/settings", "/api/users", "/api/spotify", "/api/keys")      # administrators only
 # Writes that reach outside this app (Navidrome) or rebuild its ledger: administrators only too.
 ADMIN_WRITE_PREFIXES = ("/api/mirror", "/api/ledger")
 # After this many wrong tokens inside the window, that address is refused (429) until the
@@ -126,12 +126,14 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
         if supplied and hmac.compare_digest(supplied.encode(), token.encode()):
             principal = {"id": None, "username": "api-token", "role": "admin", "prefs": {}}   # the machine/bootstrap key
         elif supplied:
-            principal = ops.session_user(supplied)
+            principal = ops.session_user(supplied) or ops.api_key_principal(supplied)
         if not principal:
             throttle.fail(who)
             return (jsonify(error="unauthorized", message="sign in, or send 'Authorization: Bearer <token>'"),
                     401, {"WWW-Authenticate": "Bearer"})
         g.principal, g.bearer = principal, supplied
+        if principal["role"] == "key" and not request.path.startswith("/api/v1/"):
+            return jsonify(error="forbidden", message="an API key can only use /api/v1"), 403
         admin_only = request.path.startswith(ADMIN_PREFIXES) or (
             request.method != "GET" and (request.path.startswith(ADMIN_WRITE_PREFIXES)
                                          or request.path.endswith("/mirror")))
@@ -175,6 +177,11 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
             return jsonify(error=e.name.lower().replace(" ", "_")), e.code
         log.exception("unhandled error on %s %s", request.method, request.path)
         return jsonify(error="internal_error", message="see the server log"), 500
+
+    def need(scope: str) -> None:
+        """An API key must hold ``scope``; accounts and the API token can do everything under /api/v1."""
+        if g.principal["role"] == "key" and scope not in g.principal["scopes"]:
+            raise OpsError("forbidden", f"this key does not have the '{scope}' scope", 403)
 
     def body() -> dict:
         data = request.get_json(force=True, silent=True)
@@ -273,6 +280,53 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
         if user_id == g.principal["id"]:
             raise OpsError("invalid_account", "you cannot delete your own account while signed in as it")
         return jsonify(ops.users_delete(user_id))
+
+    # ── API keys (administrators) ─────────────────────────────────────────────
+    @app.get("/api/keys")
+    def keys_list():
+        return jsonify(ops.keys_list())
+
+    @app.post("/api/keys")
+    def keys_create():
+        b = body()
+        return jsonify(ops.keys_create(b.get("name", ""), b.get("scopes"), g.principal["username"])), 201
+
+    @app.delete("/api/keys/<int:key_id>")
+    def keys_revoke(key_id: int):
+        return jsonify(ops.keys_revoke(key_id))
+
+    # ── the integration API (/api/v1): for other apps, with an API key ────────
+    @app.get("/api/v1/search")
+    def v1_search():
+        need("browse")
+        return jsonify(ops.browse_search(request.args.get("q", ""), request.args.get("type", "track")))
+
+    @app.get("/api/v1/artist/<dz_id>")
+    def v1_artist(dz_id):
+        need("browse")
+        return jsonify(ops.browse_artist(dz_id))
+
+    @app.get("/api/v1/album/<dz_id>")
+    def v1_album(dz_id):
+        need("browse")
+        return jsonify(ops.browse_album(dz_id))
+
+    @app.post("/api/v1/requests")
+    def v1_request():
+        need("request")
+        out = ops.request_track(body(), g.principal["username"])
+        return jsonify(out), 201 if out["result"] == "queued" else 200
+
+    @app.get("/api/v1/requests/<int:item_id>")
+    def v1_request_status(item_id: int):
+        need("request")
+        own = g.principal["username"] if g.principal["role"] == "key" else None
+        return jsonify(ops.request_status(item_id, own))
+
+    @app.get("/api/v1/library/has")
+    def v1_library_has():
+        need("library")
+        return jsonify(ops.library_has(request.args))
 
     # ── status / library / settings ───────────────────────────────────────────
     @app.get("/api/status")

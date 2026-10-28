@@ -279,3 +279,22 @@ class _DBBase:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lt_isrc ON library_tracks(isrc)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lt_norm_artist ON library_tracks(norm_artist)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lt_norm_title ON library_tracks(norm_title)")
+        # Integration API (docs/plans/integration-and-suggestions.md, part 1): scoped keys for
+        # other apps (stored hashed), and where a queue item came from.
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS api_keys (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                name         TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                key_hash     TEXT NOT NULL UNIQUE,
+                scopes       TEXT NOT NULL,
+                created_by   TEXT,
+                created_at   TEXT,
+                last_used_at TEXT,
+                revoked_at   TEXT
+            )
+        """)
+        queue_cols = {r[1] for r in conn.execute("PRAGMA table_info(grab_queue)")}
+        for col in ("requested_by", "source_ref"):
+            if col not in queue_cols:
+                conn.execute(f"ALTER TABLE grab_queue ADD COLUMN {col} TEXT")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_gq_source ON grab_queue(requested_by, source_ref)")

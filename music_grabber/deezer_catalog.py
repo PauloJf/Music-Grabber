@@ -156,6 +156,20 @@ def album_view(a: dict, artist: Optional[dict] = None) -> dict:
             "kind": a.get("record_type") or "album", "explicit": bool(a.get("explicit_lyrics"))}
 
 
+def track_page(ref: str) -> dict:
+    """One track in our shape, with its ISRC, by Deezer id or ``isrc:<ISRC>``. ``{}`` when Deezer has
+    no such track; raises CatalogError when it could not be asked."""
+    try:
+        d = _get(f"track/{ref}")
+    except Exception as exc:
+        raise CatalogError(f"Deezer is unreachable ({type(exc).__name__})") from None
+    if not isinstance(d, dict) or d.get("error") or not d.get("id"):
+        return {}
+    t = track_view(d)
+    t["isrc"] = (d.get("isrc") or "").upper()
+    return t
+
+
 def search(kind: str, query: str, limit: int = 25) -> list:
     """kind: track | artist | album."""
     if kind not in ("track", "artist", "album"):

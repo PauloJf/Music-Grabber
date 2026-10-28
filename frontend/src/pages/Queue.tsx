@@ -54,7 +54,7 @@ export default function Queue() {
       <li className="item" style={{ gridTemplateColumns: "1fr auto" }}>
         <div style={{ minWidth: 0 }}>
           <button className="btn quiet qtitle" aria-expanded={open === it.id} onClick={() => setOpen(open === it.id ? null : it.id)}>{it.title}</button>
-          <div className="s clamp">{it.artist}{it.album ? ` · ${it.album}` : ""}</div>
+          <div className="s clamp">{it.artist}{it.album ? ` · ${it.album}` : ""}{it.requested_by ? ` · requested by ${it.requested_by}` : ""}</div>
           {meta}
           {it.note && <div className="s">{it.note}</div>}
         </div>
