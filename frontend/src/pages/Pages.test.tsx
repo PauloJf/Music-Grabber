@@ -255,6 +255,36 @@ describe("owned tracks", () => {
     expect(calls.some((c) => c.path.includes("q=nine"))).toBe(true);
   });
 
+  it("opens a row to see its artist, album and related artists, looked up only then", async () => {
+    const calls = mockApi({
+      ...base,
+      "GET /api/library": { tracks: [track(1), track(2)], total: 2, limit: 100, offset: 0, q: "", index: "filesystem" },
+      "GET /api/library/related": { found: true, matched_by: "isrc", artist: { dz_id: "7", name: "Band" }, album: { dz_id: "55", title: "LP" },
+        track: { dz_id: "101", title: "Owned 1" }, related: [{ dz_id: "20", name: "Dojja", image_url: "", fans: 5 }] },
+    });
+    renderApp(<Owned />);
+    await screen.findByText("Owned 1");
+    expect(calls.some((c) => c.path.startsWith("/api/library/related"))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Related to Owned 1" }));
+    await screen.findByText("Dojja");
+    expect(screen.getByRole("link", { name: "Artist: Band" }).getAttribute("href")).toBe("/artist/7");
+    expect(screen.getByRole("link", { name: "Album: LP" }).getAttribute("href")).toBe("/album/55");
+    expect(screen.getByRole("link", { name: "Track on Deezer" }).getAttribute("href")).toBe("https://www.deezer.com/track/101");
+    expect(calls.filter((c) => c.path.startsWith("/api/library/related"))).toHaveLength(1);
+    expect(decodeURIComponent(calls.find((c) => c.path.startsWith("/api/library/related"))!.path)).toContain("path=Band/LP/1.mp3");
+  });
+
+  it("says so when the artist can't be found with certainty", async () => {
+    mockApi({
+      ...base,
+      "GET /api/library": { tracks: [track(1)], total: 1, limit: 100, offset: 0, q: "", index: "filesystem" },
+      "GET /api/library/related": { found: false, matched_by: null, artist: null, album: null, track: null, related: [] },
+    });
+    renderApp(<Owned />);
+    fireEvent.click(await screen.findByRole("button", { name: "Related to Owned 1" }));
+    await screen.findByText(/can't find this artist on Deezer with certainty/i);
+  });
+
   it("explains an empty index", async () => {
     mockApi({ ...base, "GET /api/library": { tracks: [], total: 0, limit: 100, offset: 0, q: "", index: "filesystem" } });
     renderApp(<Owned />);

@@ -45,6 +45,12 @@ class LibraryMixin:
             conn.commit()
         return n
 
+    def library_track(self, path: str):
+        """One cached library row by its path, or None."""
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM library_tracks WHERE path = ?", (path,)).fetchone()
+        return dict(row) if row else None
+
     def library_count(self) -> int:
         with self._connect() as conn:
             return conn.execute("SELECT COUNT(*) FROM library_tracks").fetchone()[0]
