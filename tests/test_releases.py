@@ -23,7 +23,7 @@ def days_ago(n):
 # 11 is followed but not owned.
 ALBUMS = {
     "7": [{"id": 701, "title": "New Album", "release_date": days_ago(10), "record_type": "album", "cover_medium": "c1"},
-          {"id": 702, "title": "Old Album", "release_date": days_ago(400), "record_type": "album", "cover_medium": "c2"},
+          {"id": 702, "title": "Old Album", "release_date": days_ago(400), "record_type": "album", "cover_medium": "c2", "nb_tracks": 10},
           {"id": 703, "title": "Summer Single", "release_date": days_ago(45), "record_type": "single", "cover_medium": "c3"}],
     "9": [{"id": 901, "title": "Purple Thing", "release_date": days_ago(5), "record_type": "ep", "cover_medium": "c4"}],
     "11": [{"id": 1101, "title": "Followed Release", "release_date": days_ago(3), "record_type": "album", "cover_medium": "c5"}],
@@ -47,6 +47,12 @@ def fake_get(path, params=None):
                              {"id": 10, "name": "Prince Royce", "nb_fan": 99999}]}
         if q == "Obscure Band":
             return {"data": [{"id": 12, "name": "Obscure Band Tribute", "nb_fan": 3}]}
+        return {"data": []}
+    if path == "artist/7/related":
+        return {"data": [{"id": 20, "name": "Dojja", "nb_fan": 1}, {"id": 9, "name": "Prince"}, {"id": 21, "name": "Third"}]}
+    if path == "artist/9/related":
+        return {"data": [{"id": 20, "name": "Dojja"}, {"id": 22, "name": "Other"}]}
+    if path.startswith("artist/") and path.endswith("/related"):
         return {"data": []}
     if path.startswith("artist/") and path.endswith("/albums"):
         aid = path.split("/")[1]
@@ -120,7 +126,7 @@ def test_nothing_is_asked_twice_inside_the_refresh_window(env):
     svc.releases.refresh()
     assert len(CALLS) == first                                          # mapped, "no match" cached, albums fresh
     svc.releases.refresh(force=True)
-    assert len(CALLS) == first + 2                                      # force re-reads the two mapped artists only
+    assert len(CALLS) == first + 4                                      # force re-reads the two mapped artists and their related
 
 
 def test_hide_is_per_user_and_reversible(env):
@@ -178,7 +184,7 @@ def test_deezer_down_leaves_the_cache_and_does_not_raise(env):
 
 def test_off_means_no_requests_and_clear_answers(env):
     svc, ops, _ = env
-    svc.releases = None
+    svc.config["releases_enabled"] = False
     d = ops.releases_feed(0)
     assert d["enabled"] is False and d["releases"] == [] and CALLS == []
     with pytest.raises(OpsError) as e:

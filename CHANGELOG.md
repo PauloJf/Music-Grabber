@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- **Suggestions ("For you")**, on the same switch as New releases and each part with its own switch in
+  Settings (applied without a restart): *albums you're missing* from artists you own, and *artists you may
+  like* (Deezer's related artists of your top artists, weighted by tracks owned and songs you starred in
+  BPM Tagger/Navidrome). Per account: not interested, hide artist, a hidden list to undo.
+  `RELEASES_ENABLED`, `SUGGEST_GAPS`, `SUGGEST_ARTISTS` and `SUGGEST_STARS` are all runtime settings now.
 - **New releases** (off by default, `RELEASES_ENABLED=true`): a page, linked from Discover, of albums,
   singles and EPs from the last 90 days by artists you own (3+ tracks), artists on watched playlists and
   artists you follow. Artists are matched to Deezer by ISRC, else by an equal name, else left out. Per

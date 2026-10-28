@@ -128,6 +128,16 @@ export interface ReleaseFeed {
 }
 export interface ArtistPref { dz_artist_id: string; name: string; follow: number; hide_releases: number; hide_suggestions: number }
 export interface ReleasesHidden { artists: ArtistPref[]; releases: Release[] }
+export interface SuggestedArtist { dz_id: string; name: string; image_url: string; fans: number | null; score: number; because: string[] }
+export interface AlbumGap { dz_artist_id: string; dz_album_id: string; title: string; release_date: string; cover_url: string; artist_name: string; track_count: number | null; owned: number; state: "missing" | "partial" }
+export interface Suggestions {
+  enabled: boolean; gaps_enabled: boolean; artists_enabled: boolean; gaps: AlbumGap[]; artists: SuggestedArtist[];
+  status: { more_to_do: boolean } | null;
+}
+export interface SuggestHidden {
+  artists: { dz_artist_id: string; name: string; hide_suggestions?: number }[];
+  albums: { dz_album_id: string; dz_artist_id: string; title: string; artist_name: string }[];
+}
 export interface Me { user: User; via: "token" | "session" }
 
 export interface OwnedTrack { path: string; title: string | null; artist: string | null; album: string | null; album_artist: string | null; duration_ms: number | null; year: number | null }

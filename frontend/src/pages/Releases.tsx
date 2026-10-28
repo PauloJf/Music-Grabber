@@ -29,7 +29,7 @@ export default function Releases() {
       <section className="hero">
         <div className="eyebrow">New releases</div>
         <h1>What your artists<br />put out lately.</h1>
-        <p>Albums, singles and EPs from artists you own a few tracks of, artists on your watched playlists, and ones you follow.</p>
+        <p>Albums, singles and EPs from artists you own a few tracks of, artists on your watched playlists, and ones you follow. <Link to="/for-you">Suggestions for you</Link></p>
       </section>
       {feed.isLoading && <Skeleton />}
       {feed.isError && <ErrorState error={feed.error} retry={() => feed.refetch()} />}

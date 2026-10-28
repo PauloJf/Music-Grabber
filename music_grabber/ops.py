@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlsplit
 
-from . import accounts, deezer_catalog
+from . import accounts, deezer_catalog, suggest
 from .config import SECRET_KEYS, __version__, masked, save_settings, settings_file_path
 from .db import GRAB_TERMINAL
 from .notify import Notifier
@@ -75,6 +75,10 @@ SETTINGS = {
     "ntfy_topic":            ("secret", None),
     "ntfy_notify_done":      ("bool", None),
     "ui_public_url":         ("str", None),
+    "releases_enabled":      ("bool", None),
+    "suggest_gaps":          ("bool", None),
+    "suggest_artists":       ("bool", None),
+    "suggest_stars":         ("bool", None),
 }
 # Needs a restart to take effect (threads and wiring are created at boot).
 RESTART_KEYS = {"grab_workers", "spotify_sync_minutes"}
@@ -648,6 +652,8 @@ class Ops:
             raise OpsError("invalid_setting", "ask_threshold cannot be above auto_accept_threshold")
         self.config.update({k: ("" if v is None else v) for k, v in updates.items()})
         save_settings(self.settings_path, updates)
+        if {"releases_enabled", "suggest_artists", "suggest_stars"} & set(updates) and self.svc.releases:
+            self.svc.releases.request()                  # switched on: look now, not in five minutes
         pipe = self.svc.pool.pipeline
         pipe.reload_settings()
         if {"ntfy_url", "ntfy_topic"} & set(updates):
@@ -924,16 +930,16 @@ class Ops:
         from .releases import NEW_DAYS
         days = int(days) if str(days).isdigit() and 0 < int(days) <= 365 else NEW_DAYS
         since = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
-        rel = self.svc.releases
+        rel = self.svc.releases if self.config.get("releases_enabled") else None
         items = [{k: r[k] for k in ("dz_artist_id", "dz_album_id", "title", "kind", "release_date", "cover_url",
-                                    "artist_name")} for r in self.db.release_feed(user_id, since)]
+                                    "artist_name")} for r in self.db.release_feed(user_id, since)] if rel else []
         return {"enabled": rel is not None, "days": days, "releases": items,
                 "status": rel.status() if rel else None,
                 "following": [p["dz_artist_id"] for p in self.db.get_artist_prefs(user_id) if p["follow"]]}
 
     def releases_refresh(self) -> dict:
-        if self.svc.releases is None:
-            raise OpsError("releases_disabled", "new releases are off: set RELEASES_ENABLED=true", 409)
+        if self.svc.releases is None or not self.config.get("releases_enabled"):
+            raise OpsError("releases_disabled", "new releases are off: turn them on in Settings (RELEASES_ENABLED)", 409)
         threading.Thread(target=self.svc.releases.refresh, kwargs={"force": True}, daemon=True,
                          name="releases-refresh").start()
         return {"ok": True, "started": True}
@@ -973,6 +979,27 @@ class Ops:
     def releases_hidden(self, user_id: int) -> dict:
         prefs = [p for p in self.db.get_artist_prefs(user_id) if p["hide_releases"]]
         return {"artists": prefs, "releases": self.db.dismissed_releases(user_id)}
+
+    def suggestions(self, user_id: int) -> dict:
+        """Gaps in artists you own and artists you may like, each behind its own switch. Reads the cache
+        only: nothing here asks Deezer."""
+        on = bool(self.config.get("releases_enabled"))
+        gaps_on, artists_on = on and bool(self.config.get("suggest_gaps", True)), on and bool(self.config.get("suggest_artists", True))
+        return {"enabled": on, "gaps_enabled": gaps_on, "artists_enabled": artists_on,
+                "gaps": suggest.gaps(self.db, user_id) if gaps_on else [],
+                "artists": suggest.artists(self.db, user_id) if artists_on else [],
+                "status": self.svc.releases.status() if on and self.svc.releases else None}
+
+    def suggest_dismiss(self, user_id: int, kind: str, ref: str, on: bool = True) -> dict:
+        if kind not in ("album", "artist") or not str(ref).isdigit():
+            raise OpsError("invalid_suggestion", "kind must be album or artist, with a Deezer id")
+        self.db.dismiss_item(user_id, kind, str(ref), on)
+        return {"ok": True}
+
+    def suggest_hidden(self, user_id: int) -> dict:
+        d = self.db.dismissed_suggestions(user_id)
+        d["artists"] = [p for p in self.db.get_artist_prefs(user_id) if p["hide_suggestions"]] + d["artists"]
+        return d
 
     # ── activity (the always-visible tray) ────────────────────────────────────
     def activity(self) -> dict:

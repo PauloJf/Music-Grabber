@@ -14,13 +14,14 @@ function ArtistPrefs({ id, name }: { id: string; name: string }) {
   const qc = useQueryClient();
   const prefs = useQuery({ queryKey: ["artist-prefs"], queryFn: () => get<{ prefs: ArtistPref[] }>("/api/artist-prefs") });
   const set = useMutation({ mutationFn: (changes: object) => put(`/api/artist-prefs/${id}`, { name, ...changes }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["artist-prefs"] }); qc.invalidateQueries({ queryKey: ["releases"] }); } });
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["artist-prefs"] }); qc.invalidateQueries({ queryKey: ["releases"] }); qc.invalidateQueries({ queryKey: ["suggest"] }); } });
   if (!prefs.data) return null;
   const mine = prefs.data.prefs.find((p) => p.dz_artist_id === id);
   return (
     <div className="row tight" style={{ margin: "6px 0 14px" }}>
       <button className="btn sm" aria-pressed={!!mine?.follow} onClick={() => set.mutate({ follow: !mine?.follow })}>{mine?.follow ? "Following" : "Follow new releases"}</button>
       <button className="btn quiet sm" aria-pressed={!!mine?.hide_releases} onClick={() => set.mutate({ hide_releases: !mine?.hide_releases })}>{mine?.hide_releases ? "Hidden from new releases" : "Hide from new releases"}</button>
+      <button className="btn quiet sm" aria-pressed={!!mine?.hide_suggestions} onClick={() => set.mutate({ hide_suggestions: !mine?.hide_suggestions })}>{mine?.hide_suggestions ? "Hidden from suggestions" : "Hide from suggestions"}</button>
     </div>
   );
 }

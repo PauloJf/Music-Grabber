@@ -183,7 +183,7 @@ Set `API_TOKEN` and the API listens on `API_PORT`. Every `/api/*` call needs
 `GET /api/status`; `/api/playlists` (`POST {"value": url}`, `PATCH {"enabled": false}`, `DELETE`,
 `POST /api/playlists/<id>/sync`, `/enqueue-missing`); `POST /api/sync`; `/api/queue` and
 `/api/queue/<id>/{retry,cancel,priority}`; `/api/inbox` and `/api/inbox/<id>/{choose,search,research,skip}`;
-`/api/browse/{search,artist/<id>,album/<id>,queue,undo}` (catalogue + queueing) and `/api/activity`; accounts: `/api/auth/{state,login,setup,logout}`, `/api/me`, `/api/users` (admin); `/api/settings` (secrets come back masked); `/api/spotify/*`; `GET /api/library?q=&limit=&offset=` (the tracks the index knows), `POST /api/library/refresh`; `/api/keys` (admin; see below); `/api/releases`, `/api/artist-prefs/<deezer artist id>` (new releases, below); open:
+`/api/browse/{search,artist/<id>,album/<id>,queue,undo}` (catalogue + queueing) and `/api/activity`; accounts: `/api/auth/{state,login,setup,logout}`, `/api/me`, `/api/users` (admin); `/api/settings` (secrets come back masked); `/api/spotify/*`; `GET /api/library?q=&limit=&offset=` (the tracks the index knows), `POST /api/library/refresh`; `/api/keys` (admin; see below); `/api/releases`, `/api/suggest`, `/api/artist-prefs/<deezer artist id>` (new releases and suggestions, below); open:
 `GET /healthz` (just `{"ok": true}`) and the Spotify `/callback` (which only accepts a single-use `state` this instance
 issued). Errors are `{"error": "<code>", "message": "..."}` with a matching HTTP status. Publish
 the port on loopback only, and put TLS in front before exposing it further. Ten wrong tokens in a minute
@@ -235,12 +235,12 @@ python -m music_grabber users passwd alice              # also the way back afte
 runtime: `output_format`, `path_template`, `provider_order`, `deezer_quality`, `deezer_arl`,
 `auto_accept_threshold`, `ask_threshold`, `grab_dry_run`, `lyrics_enabled`, `write_spotify_id_tag`,
 `spotify_sync_minutes`, `grab_workers`, `ntfy_url`, `ntfy_topic`, `ntfy_notify_done`,
-`ui_public_url`. Values are validated, saved to `settings.json` (mode 0600, next to the database)
+`ui_public_url`, `releases_enabled`, `suggest_gaps`, `suggest_artists`, `suggest_stars`. Values are validated, saved to `settings.json` (mode 0600, next to the database)
 and applied to the running instance without a restart (`grab_workers` and `spotify_sync_minutes`
 need one). Settings saved this way override the environment from then on. Credentials that come
 from the environment (Spotify secret, API token, library/hook keys) are never written to the file.
 
-## New releases
+## New releases and suggestions
 
 Off by default. With `RELEASES_ENABLED=true` a background job (first pass about a minute after start,
 then every `RELEASES_REFRESH_HOURS`) looks at **your artists**: library artists with at least 3 tracks,
@@ -259,6 +259,22 @@ out in the last 90 days, newest first. Queue a whole album from its page as usua
   period; if Deezer is unreachable the page keeps showing what it last learned.
 - `python -m music_grabber releases [list|refresh]` and `GET /api/releases` do the same from a script;
   `POST /api/releases/refresh` (administrators) checks now.
+
+**For you** (the same background pass, its own page) adds two lists, each with its own switch:
+
+- **Albums you're missing**: albums by artists you own (3+ tracks) that nothing in your library matches, or
+  that you own at most half of when Deezer gives the album's length ("you have 2 of 10"). A deluxe edition
+  counts as the album; singles and EPs are not suggested. Up to 5 per artist, newest first.
+- **Artists you may like**: Deezer's "fans also like" lists for your top 30 artists, weighted by how many
+  tracks you own and, with `LIBRARY_INDEX=opensubsonic`, how many you **starred** (read from BPM Tagger or
+  Navidrome with the library key: that is that library user's taste, not each Grabber account's). Artists
+  you own, follow, hid or dismissed never appear; each tile says who it is "because" of.
+- **Switches**, all in Settings (*New releases and suggestions*) and applied at once, no restart: the
+  master switch (`RELEASES_ENABLED`), `SUGGEST_GAPS`, `SUGGEST_ARTISTS`, `SUGGEST_STARS`. Switching a part off
+  hides it and stops fetching what it needs (no "related" calls without the artists list, no star reads
+  without the stars switch); what was already learned is kept for when you turn it back on.
+- Per account, like the releases: *Not interested* on a tile, *Hide artist*, and *Hide from suggestions* on an
+  artist's page; a *Hidden suggestions* list undoes them. Nothing here ever downloads on its own.
 
 ## Library and the ledger
 
@@ -406,7 +422,10 @@ an environment variable; a few can also be changed at runtime ([Settings](#setti
 | `NAVIDROME_URL`, `NAVIDROME_USER`, `NAVIDROME_PASS` | | for the `navidrome` hook and the playlist mirror |
 | `PLAYLIST_MIRROR` | | `navidrome` writes watched playlists to Navidrome (off when empty); see [the mirror](#spotify-playlists-in-navidrome-the-mirror) |
 | `MIRROR_PREFIX` | `Spotify: ` | prefix of the mirrored playlists' names |
-| `RELEASES_ENABLED` | `false` | turns on [New releases](#new-releases) (reads Deezer's public catalogue in the background) |
+| `RELEASES_ENABLED` | `false` | turns on [New releases and suggestions](#new-releases-and-suggestions) (reads Deezer's public catalogue in the background); also a switch in Settings |
+| `SUGGEST_GAPS` | `true` | suggestions: albums you are missing from artists you own (needs `RELEASES_ENABLED`; also in Settings) |
+| `SUGGEST_ARTISTS` | `true` | suggestions: artists you may like (needs `RELEASES_ENABLED`; also in Settings) |
+| `SUGGEST_STARS` | `true` | use the songs you starred in BPM Tagger or Navidrome to weight your taste (`LIBRARY_INDEX=opensubsonic` only; also in Settings) |
 | `RELEASES_REFRESH_HOURS` | `24` | how often each artist's releases are re-read |
 | `HOOK_DEBOUNCE_SECONDS` / `HOOK_MAX_WAIT_SECONDS` / `HOOK_MIN_INTERVAL_SECONDS` | `45` / `600` / `60` | hook coalescing |
 | `NTFY_URL`, `NTFY_TOPIC` | | an empty topic disables ntfy |

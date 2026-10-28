@@ -100,6 +100,13 @@ export default function SettingsPage() {
         <Banner kind="warn">These are set by environment variables and need a restart to change: music folder, library index, BPM analysis, hooks.</Banner>
       </Section>
 
+      <Section title="New releases and suggestions" hint="Reads Deezer's public catalogue in the background and your own library. Each part can be switched off; what is already learned is kept.">
+        <label className="row"><input type="checkbox" checked={!!draft.releases_enabled} onChange={(e) => set("releases_enabled", e.target.checked)} /><span>New releases and suggestions <span className="muted">(the master switch)</span></span></label>
+        <label className="row"><input type="checkbox" disabled={!draft.releases_enabled} checked={!!draft.suggest_gaps} onChange={(e) => set("suggest_gaps", e.target.checked)} /><span>Albums you're missing from artists you own</span></label>
+        <label className="row"><input type="checkbox" disabled={!draft.releases_enabled} checked={!!draft.suggest_artists} onChange={(e) => set("suggest_artists", e.target.checked)} /><span>Artists you may like</span></label>
+        <label className="row"><input type="checkbox" disabled={!draft.releases_enabled} checked={!!draft.suggest_stars} onChange={(e) => set("suggest_stars", e.target.checked)} /><span>Use the songs you starred in BPM Tagger or Navidrome <span className="muted">(only with the OpenSubsonic library index)</span></span></label>
+      </Section>
+
       <div style={{ height: 70 }} />
       {dirty.length > 0 && (
         <div className="selbar" role="region" aria-label="Save settings">

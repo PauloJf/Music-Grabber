@@ -152,3 +152,101 @@ class ReleasesMixin:
                 "SELECT r.* FROM item_dismissals d JOIN release_cache r ON r.dz_album_id = d.ref "
                 "WHERE d.user_id=? AND d.kind='release' ORDER BY r.release_date DESC", (user_id,)).fetchall()
         return [dict(r) for r in rows]
+
+    # ── suggestions: discography, related artists, taste ─────────────────────
+    def save_albums(self, dz_artist_id: str, name: str, albums: list[dict]) -> None:
+        from ..text import normalize_title
+        with self._connect() as conn:
+            for a in albums:
+                conn.execute(
+                    "INSERT INTO album_cache (dz_artist_id, dz_album_id, title, norm_title, kind, release_date, cover_url, "
+                    "track_count, artist_name) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(dz_artist_id, dz_album_id) DO UPDATE SET "
+                    "title=excluded.title, norm_title=excluded.norm_title, kind=excluded.kind, "
+                    "release_date=excluded.release_date, cover_url=excluded.cover_url, track_count=excluded.track_count, "
+                    "artist_name=excluded.artist_name",
+                    (dz_artist_id, a["dz_id"], a["title"], normalize_title(a["title"]), a["kind"], a["release_date"],
+                     a["cover_url"], a.get("track_count"), name))
+            conn.commit()
+
+    def albums_of(self, dz_artist_id: str) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM album_cache WHERE dz_artist_id=?", (dz_artist_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def active_mapped(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT norm_name AS norm, name, dz_artist_id AS dz_id FROM artist_map "
+                                "WHERE active=1 AND dz_artist_id IS NOT NULL").fetchall()
+        return [dict(r) for r in rows]
+
+    def library_artist_counts(self) -> dict:
+        with self._connect() as conn:
+            return {r[0]: r[1] for r in conn.execute(
+                "SELECT norm_artist, COUNT(*) FROM library_tracks WHERE norm_artist <> '' GROUP BY norm_artist")}
+
+    def library_album_counts(self, norms: list[str]) -> dict:
+        """{norm_artist: {album title: tracks owned}} for the given artists."""
+        out: dict = {}
+        with self._connect() as conn:
+            for i in range(0, len(norms), 500):
+                chunk = norms[i:i + 500]
+                for r in conn.execute(
+                        f"SELECT norm_artist, album, COUNT(*) AS n FROM library_tracks WHERE norm_artist IN "
+                        f"({','.join('?' * len(chunk))}) AND album IS NOT NULL AND album <> '' GROUP BY norm_artist, album", chunk):
+                    out.setdefault(r["norm_artist"], {})[r["album"]] = r["n"]
+        return out
+
+    def replace_artist_taste(self, starred: dict) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM artist_taste")
+            conn.executemany("INSERT INTO artist_taste (norm_name, starred) VALUES (?,?)", list(starred.items()))
+            conn.commit()
+
+    def artist_taste(self) -> dict:
+        with self._connect() as conn:
+            return {r[0]: r[1] for r in conn.execute("SELECT norm_name, starred FROM artist_taste")}
+
+    def related_due(self, ids: list[str], stale_before: str) -> list[str]:
+        """Those of ``ids`` whose related artists were never read, or not since ``stale_before``."""
+        if not ids:
+            return []
+        with self._connect() as conn:
+            fresh = {r[0] for r in conn.execute(
+                f"SELECT dz_artist_id FROM related_checks WHERE checked_at >= ? AND dz_artist_id IN "
+                f"({','.join('?' * len(ids))})", (stale_before, *ids))}
+        return [i for i in ids if i not in fresh]
+
+    def save_related(self, dz_artist_id: str, related: list[dict]) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM related_cache WHERE dz_artist_id=?", (dz_artist_id,))
+            conn.executemany(
+                "INSERT INTO related_cache (dz_artist_id, rel_id, rel_name, image_url, fans, rank) VALUES (?,?,?,?,?,?)",
+                [(dz_artist_id, r["dz_id"], r["name"], r["image_url"], r.get("fans"), i) for i, r in enumerate(related)])
+            conn.execute("INSERT INTO related_checks (dz_artist_id, checked_at) VALUES (?,?) "
+                         "ON CONFLICT(dz_artist_id) DO UPDATE SET checked_at=excluded.checked_at", (dz_artist_id, _now()))
+            conn.commit()
+
+    def related_of(self, ids: list[str]) -> list[dict]:
+        out: list[dict] = []
+        with self._connect() as conn:
+            for i in range(0, len(ids), 500):
+                chunk = ids[i:i + 500]
+                out += [dict(r) for r in conn.execute(
+                    f"SELECT * FROM related_cache WHERE dz_artist_id IN ({','.join('?' * len(chunk))})", chunk)]
+        return out
+
+    def dismissed_refs(self, user_id: int, kind: str) -> set:
+        with self._connect() as conn:
+            return {r[0] for r in conn.execute("SELECT ref FROM item_dismissals WHERE user_id=? AND kind=?", (user_id, kind))}
+
+    def dismissed_suggestions(self, user_id: int) -> dict:
+        """What this user dismissed from the suggestions, with names: {artists: [...], albums: [...]}."""
+        with self._connect() as conn:
+            artists = [dict(r) for r in conn.execute(
+                "SELECT DISTINCT d.ref AS dz_artist_id, COALESCE(r.rel_name, d.ref) AS name FROM item_dismissals d "
+                "LEFT JOIN related_cache r ON r.rel_id = d.ref WHERE d.user_id=? AND d.kind='artist' "
+                "GROUP BY d.ref", (user_id,))]
+            albums = [dict(r) for r in conn.execute(
+                "SELECT a.dz_album_id, a.dz_artist_id, a.title, a.artist_name FROM item_dismissals d "
+                "JOIN album_cache a ON a.dz_album_id = d.ref WHERE d.user_id=? AND d.kind='album'", (user_id,))]
+        return {"artists": artists, "albums": albums}

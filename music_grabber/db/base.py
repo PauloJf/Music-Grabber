@@ -345,6 +345,45 @@ class _DBBase:
                 PRIMARY KEY (user_id, dz_artist_id)
             )
         """)
+        # Suggestions: every album of a mapped artist (gaps), related artists (artists you may like),
+        # and the stars read from the library server (taste).
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS album_cache (
+                dz_artist_id TEXT NOT NULL,
+                dz_album_id  TEXT NOT NULL,
+                title        TEXT,
+                norm_title   TEXT,
+                kind         TEXT,
+                release_date TEXT,
+                cover_url    TEXT,
+                track_count  INTEGER,
+                artist_name  TEXT,
+                PRIMARY KEY (dz_artist_id, dz_album_id)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS related_cache (
+                dz_artist_id TEXT NOT NULL,
+                rel_id       TEXT NOT NULL,
+                rel_name     TEXT,
+                image_url    TEXT,
+                fans         INTEGER,
+                rank         INTEGER,
+                PRIMARY KEY (dz_artist_id, rel_id)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS related_checks (
+                dz_artist_id TEXT PRIMARY KEY,
+                checked_at   TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS artist_taste (
+                norm_name TEXT PRIMARY KEY,
+                starred   INTEGER NOT NULL
+            )
+        """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS item_dismissals (
                 user_id INTEGER NOT NULL,
