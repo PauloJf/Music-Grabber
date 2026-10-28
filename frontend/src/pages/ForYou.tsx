@@ -1,17 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Empty, ErrorState, Skeleton, Tile } from "../components/ui";
+import { Link, Navigate } from "react-router-dom";
+import { Empty, ErrorState, Skeleton, Tile, TileCard } from "../components/ui";
 import { del, errorText, get, post, put } from "../lib/api";
 import { fmtCount } from "../lib/hooks";
 import { useToast } from "../lib/toast";
-import type { SuggestHidden, Suggestions } from "../lib/types";
+import type { ReleaseFeed, SuggestHidden, Suggestions } from "../lib/types";
 
 export default function ForYou() {
   const qc = useQueryClient();
   const toast = useToast();
   const [showHidden, setShowHidden] = useState(false);
   const q = useQuery({ queryKey: ["suggest"], queryFn: () => get<Suggestions>("/api/suggest") });
+  const feed = useQuery({ queryKey: ["releases"], queryFn: () => get<ReleaseFeed>("/api/releases"), enabled: !!q.data?.enabled });
   const hidden = useQuery({ queryKey: ["suggest", "hidden"], queryFn: () => get<SuggestHidden>("/api/suggest/hidden"), enabled: showHidden });
   const refresh = () => { qc.invalidateQueries({ queryKey: ["suggest"] }); qc.invalidateQueries({ queryKey: ["artist-prefs"] }); };
   const fail = (e: unknown) => toast.push({ kind: "err", text: errorText(e) });
@@ -21,18 +22,28 @@ export default function ForYou() {
     onSuccess: (_d, v) => { toast.push({ kind: "ok", text: v.on ? `No more suggestions for ${v.name}` : `${v.name} is back` }); refresh(); }, onError: fail });
 
   const d = q.data;
+  if (d && !d.enabled) return <Navigate to="/discover" replace />;          // the home page only exists while this is on
   const nothing = d?.enabled && !d.gaps_enabled && !d.artists_enabled;
   return (
     <>
       <section className="hero">
         <div className="eyebrow">For you</div>
         <h1>Based on what<br />you already play.</h1>
-        <p>Albums you're missing from artists you own, and artists your artists point to. <Link to="/releases">New releases</Link></p>
+        <p>What your artists put out lately, albums you're missing, and artists your artists point to. <Link to="/discover">Search Deezer</Link></p>
       </section>
       {q.isLoading && <Skeleton />}
       {q.isError && <ErrorState error={q.error} retry={() => q.refetch()} />}
-      {d && !d.enabled && <Empty title="Suggestions are off">Turn on New releases and suggestions in Settings. They read Deezer's public catalogue in the background and your own library.</Empty>}
       {nothing && <Empty title="Every suggestion is switched off">Choose which ones you want under Settings, New releases and suggestions.</Empty>}
+
+      {feed.data?.enabled && (
+        <section>
+          <div className="sectionhead"><h2>New releases</h2><Link className="btn quiet sm" to="/releases">See all and manage</Link></div>
+          {feed.data.releases.length === 0
+            ? <Empty title={`Nothing new in ${feed.data.days} days`}>Releases show up after the first pass has looked at your artists{feed.data.status?.more_to_do ? " (still working through them)" : ""}.</Empty>
+            : <div className="grid">{feed.data.releases.slice(0, 8).map((r) => (
+              <Tile key={r.dz_album_id} to={`/album/${r.dz_album_id}`} cover={r.cover_url} title={r.title} sub={`${r.artist_name} · ${r.release_date}`} />))}</div>}
+        </section>
+      )}
 
       {d?.artists_enabled && (
         <section>
@@ -40,12 +51,9 @@ export default function ForYou() {
           {d.artists.length === 0
             ? <Empty title="Nothing yet">It needs a pass over your top artists first{d.status?.more_to_do ? " (still working through them)" : ""}.</Empty>
             : <div className="grid">{d.artists.map((a) => (
-              <div key={a.dz_id}>
-                <Tile to={`/artist/${a.dz_id}`} cover={a.image_url} title={a.name} sub={`Because you have ${a.because.join(" and ")}${a.fans ? ` · ${fmtCount(a.fans)} fans` : ""}`} round />
-                <div className="row tight" style={{ marginTop: 6 }}>
-                  <button className="btn quiet sm" onClick={() => dismiss.mutate({ kind: "artist", id: a.dz_id, on: true })}>Not interested</button>
-                </div>
-              </div>))}</div>}
+              <TileCard key={a.dz_id} to={`/artist/${a.dz_id}`} cover={a.image_url} title={a.name} sub={`Because you have ${a.because.join(" and ")}${a.fans ? ` · ${fmtCount(a.fans)} fans` : ""}`} round>
+                  <button className="btn quiet sm" style={{ paddingLeft: 0 }} onClick={() => dismiss.mutate({ kind: "artist", id: a.dz_id, on: true })}>Not interested</button>
+                </TileCard>))}</div>}
         </section>
       )}
 
@@ -55,14 +63,11 @@ export default function ForYou() {
           {d.gaps.length === 0
             ? <Empty title="No gaps found">Albums by artists you own show up here once they have been read from Deezer.</Empty>
             : <div className="grid">{d.gaps.map((g) => (
-              <div key={g.dz_album_id}>
-                <Tile to={`/album/${g.dz_album_id}`} cover={g.cover_url} title={g.title}
-                  sub={`${g.artist_name}${g.release_date ? ` · ${g.release_date.slice(0, 4)}` : ""} · ${g.state === "partial" ? `you have ${g.owned} of ${g.track_count}` : "none of it"}`} />
-                <div className="row tight" style={{ marginTop: 6 }}>
-                  <button className="btn quiet sm" onClick={() => dismiss.mutate({ kind: "album", id: g.dz_album_id, on: true })}>Not interested</button>
-                  <button className="btn quiet sm" onClick={() => hideArtist.mutate({ id: g.dz_artist_id, name: g.artist_name, on: true })}>Hide artist</button>
-                </div>
-              </div>))}</div>}
+              <TileCard key={g.dz_album_id} to={`/album/${g.dz_album_id}`} cover={g.cover_url} title={g.title}
+                  sub={`${g.artist_name}${g.release_date ? ` · ${g.release_date.slice(0, 4)}` : ""} · ${g.state === "partial" ? `you have ${g.owned} of ${g.track_count}` : "none of it"}`}>
+                  <button className="btn quiet sm" style={{ paddingLeft: 0 }} onClick={() => dismiss.mutate({ kind: "album", id: g.dz_album_id, on: true })}>Not interested</button>
+                  <button className="btn quiet sm" style={{ paddingLeft: 0 }} onClick={() => hideArtist.mutate({ id: g.dz_artist_id, name: g.artist_name, on: true })}>Hide artist</button>
+                </TileCard>))}</div>}
         </section>
       )}
 

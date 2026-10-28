@@ -131,6 +131,17 @@ export function Tile({ to, cover, title, sub, round }: { to: string; cover?: str
   );
 }
 
+/** A tile with a row of actions under it. The tile stretches, so the actions sit on one line across a grid row
+ * whatever the text above them; they start at the tile's left edge (a quiet button's own padding is removed). */
+export function TileCard({ children, ...tile }: Parameters<typeof Tile>[0] & { children: ReactNode }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div style={{ flex: 1 }}><Tile {...tile} /></div>
+      <div className="row tight" style={{ marginTop: 6, gap: 4 }}>{children}</div>
+    </div>
+  );
+}
+
 export function CloseButton({ onClick, label = "Close" }: { onClick: () => void; label?: string }) {
   return <button className="btn quiet icon sm" aria-label={label} onClick={onClick}><X width={18} height={18} /></button>;
 }

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+- **"For you" is the home page** while New releases and suggestions are on: a preview of the new releases, then
+  artists you may like and albums you're missing. It is the first tab; Discover moved to `/discover` (second
+  tab). With the feature off nothing changes except that the home page opens Discover. `/for-you` still works.
+- **Settings moved out of the tab bar** to a gear icon in the header (administrators) and a button on the
+  Account page, to make room.
+- The action buttons under the suggestion and release tiles line up across a row and start at the tile's edge.
+
 ## 1.1.0 (2026-10-28)
 
 Adds an integration API for other apps (BPM Tagger can request a track), New releases from your artists, and

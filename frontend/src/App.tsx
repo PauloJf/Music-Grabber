@@ -29,12 +29,13 @@ function Authed() {
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={<Discover />} />
+        <Route path="/" element={<ForYou />} />
+        <Route path="/discover" element={<Discover />} />
+        <Route path="/for-you" element={<Navigate to="/" replace />} />
         <Route path="/artist/:id" element={<Artist />} />
         <Route path="/album/:id" element={<Album />} />
         <Route path="/queue" element={<Queue />} />
         <Route path="/releases" element={<Releases />} />
-        <Route path="/for-you" element={<ForYou />} />
         <Route path="/inbox" element={<Inbox />} />
         <Route path="/inbox/:id" element={<Inbox />} />
         <Route path="/playlists" element={<Playlists />} />

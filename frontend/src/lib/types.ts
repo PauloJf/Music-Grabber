@@ -12,6 +12,7 @@ export interface Status {
   last_synced_epoch: number | null;
   playlists: { total: number; watched: number; have: number; missing: number; queued: number };
   dry_run: boolean;
+  releases_enabled?: boolean;
 }
 
 /** The Navidrome mirror of a playlist; null/absent when the mirror is not configured. */
