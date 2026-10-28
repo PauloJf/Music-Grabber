@@ -1,14 +1,29 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Back, Plus } from "../components/icons";
 import { Cover, ErrorState, Skeleton, Tile, TrackRow } from "../components/ui";
-import { get } from "../lib/api";
+import { get, put } from "../lib/api";
 import { fmtCount, hasLive } from "../lib/hooks";
 import { useQueueing } from "../lib/queueing";
-import type { CatAlbum, CatArtist, CatTrack } from "../lib/types";
+import type { ArtistPref, CatAlbum, CatArtist, CatTrack } from "../lib/types";
 
 interface Page { artist: CatArtist; top: CatTrack[]; albums: CatAlbum[]; related: CatArtist[] }
+
+function ArtistPrefs({ id, name }: { id: string; name: string }) {
+  const qc = useQueryClient();
+  const prefs = useQuery({ queryKey: ["artist-prefs"], queryFn: () => get<{ prefs: ArtistPref[] }>("/api/artist-prefs") });
+  const set = useMutation({ mutationFn: (changes: object) => put(`/api/artist-prefs/${id}`, { name, ...changes }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["artist-prefs"] }); qc.invalidateQueries({ queryKey: ["releases"] }); } });
+  if (!prefs.data) return null;
+  const mine = prefs.data.prefs.find((p) => p.dz_artist_id === id);
+  return (
+    <div className="row tight" style={{ margin: "6px 0 14px" }}>
+      <button className="btn sm" aria-pressed={!!mine?.follow} onClick={() => set.mutate({ follow: !mine?.follow })}>{mine?.follow ? "Following" : "Follow new releases"}</button>
+      <button className="btn quiet sm" aria-pressed={!!mine?.hide_releases} onClick={() => set.mutate({ hide_releases: !mine?.hide_releases })}>{mine?.hide_releases ? "Hidden from new releases" : "Hide from new releases"}</button>
+    </div>
+  );
+}
 
 export default function Artist() {
   const { id } = useParams();
@@ -36,6 +51,8 @@ export default function Artist() {
           <div className="muted mono">{[artist.fans ? `${fmtCount(artist.fans)} fans` : "", artist.album_count ? `${artist.album_count} releases` : ""].filter(Boolean).join(" · ")}</div>
         </div>
       </header>
+
+      <ArtistPrefs id={artist.dz_id} name={artist.name} />
 
       <section>
         <div className="sectionhead">

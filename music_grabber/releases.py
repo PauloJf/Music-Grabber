@@ -1,0 +1,158 @@
+"""New releases from the artists you own or follow (docs/plans/integration-and-suggestions.md, part 2).
+
+A background pass, never on page view: pick your artists (library artists with a few tracks, artists
+on watched playlists), map each to a Deezer artist, then read each mapped artist's albums and keep the
+recent ones. Mapping is conservative: a track's ISRC names its Deezer artist exactly, a name search is
+accepted only when the normalised name is equal, and "no confident match" is remembered (and shown
+nowhere) rather than guessed. Every Deezer failure leaves the cache as it was.
+"""
+
+import logging
+import threading
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+from . import deezer_catalog as dz
+from .text import normalize_artist
+
+log = logging.getLogger(__name__)
+
+MIN_OWNED_TRACKS = 3          # library tracks that make an artist "yours"
+MIN_PLAYLIST_TRACKS = 2       # ... or tracks on watched playlists
+NEW_DAYS = 90                 # how far back the feed looks by default
+KEEP_DAYS = 180               # releases older than this are not cached
+MAP_BATCH = 40                # artists mapped per pass (a big library takes a few passes)
+POLL_BATCH = 60               # artists whose albums are read per pass
+RETRY_UNMAPPED_DAYS = 30
+FAILURES_BEFORE_GIVING_UP = 3
+
+
+def _stamp(days: int) -> str:
+    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+
+class ReleaseTracker:
+    def __init__(self, config: dict, db):
+        self.db = db
+        self.refresh_hours = max(0.25, float(config.get("releases_refresh_hours") or 24))
+        self._stop = threading.Event()
+        self._wake = threading.Event()
+        self._lock = threading.Lock()
+        self._thread: Optional[threading.Thread] = None
+        self.last_run: Optional[str] = None
+        self.last_error = ""
+        self.more_to_do = False
+
+    # ── one pass ──────────────────────────────────────────────────────────────
+    def map_artist(self, cand: dict) -> tuple[Optional[str], float, str]:
+        """(Deezer artist id | None, confidence, how). May raise CatalogError (Deezer unreachable)."""
+        norm = cand["norm"]
+        for isrc in cand["isrcs"]:
+            d = dz.track_detail_by_isrc(isrc)
+            artist = (d or {}).get("artist") or {}
+            if artist.get("id") and normalize_artist(artist.get("name")) == norm:
+                return str(artist["id"]), 1.0, "isrc"
+        hits = [h for h in dz.search("artist", cand["name"], limit=5) if normalize_artist(h["name"]) == norm]
+        if hits:
+            best = max(hits, key=lambda h: h.get("fans") or 0)
+            return best["dz_id"], 0.8, "name"
+        return None, 0.0, "none"
+
+    def refresh(self, force: bool = False) -> dict:
+        """One pass. Returns what it did; never raises."""
+        if not self._lock.acquire(blocking=False):
+            return {"ok": False, "skipped": "a refresh is already running"}
+        try:
+            return self._pass(force)
+        except Exception as exc:                                    # a bad pass must not kill the thread
+            log.exception("release refresh failed")
+            self.last_error = type(exc).__name__
+            return {"ok": False, "error": self.last_error}
+        finally:
+            self._lock.release()
+
+    def _pass(self, force: bool) -> dict:
+        cands = self.db.candidate_artists(MIN_OWNED_TRACKS, MIN_PLAYLIST_TRACKS)
+        stats = {"ok": True, "artists": len(cands), "mapped_now": 0, "polled": 0, "failed": 0}
+        retry_before = _stamp(RETRY_UNMAPPED_DAYS)
+        for c in cands:                                            # keep what we know; add rows for new artists
+            row = self.db.get_artist_map(c["norm"])
+            if row is None:
+                self.db.save_artist_map(c["norm"], c["name"], None, 0.0, "pending", active=True)
+        self.db.set_active_artists(c["norm"] for c in cands)
+
+        failures = 0
+        need = [c for c in cands if self._needs_mapping(c, retry_before)]
+        self.more_to_do = len(need) > MAP_BATCH
+        for c in need[:MAP_BATCH]:
+            try:
+                dz_id, conf, how = self.map_artist(c)
+            except dz.CatalogError as exc:
+                failures += 1
+                self.last_error = str(exc)
+                stats["failed"] += 1
+                if failures >= FAILURES_BEFORE_GIVING_UP:
+                    break
+                continue
+            self.db.save_artist_map(c["norm"], c["name"], dz_id, conf, how, active=True)
+            stats["mapped_now"] += 1
+
+        failures = 0
+        stale = _stamp(0) if force else (datetime.now(timezone.utc) - timedelta(hours=self.refresh_hours * 0.9)).isoformat()
+        due = self.db.artists_to_poll(stale, POLL_BATCH + 1)
+        self.more_to_do = self.more_to_do or len(due) > POLL_BATCH
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=KEEP_DAYS)).date().isoformat()
+        for a in due[:POLL_BATCH]:
+            try:
+                albums = dz.artist_albums(a["id"])
+            except dz.CatalogError as exc:
+                failures += 1
+                self.last_error = str(exc)
+                stats["failed"] += 1
+                if failures >= FAILURES_BEFORE_GIVING_UP:
+                    break
+                continue
+            self.db.save_releases(a["id"], a["name"], [x for x in albums if (x.get("release_date") or "") >= cutoff])
+            stats["polled"] += 1
+        stats["ok"] = stats["failed"] == 0                         # a partial pass is reported, and retried next time
+        if stats["ok"]:
+            self.last_error = ""
+        self.last_run = datetime.now(timezone.utc).isoformat()
+        log.info("New releases: %s", stats)
+        return stats
+
+    def _needs_mapping(self, cand: dict, retry_before: str) -> bool:
+        row = self.db.get_artist_map(cand["norm"])
+        if row is None or row["source"] == "pending":
+            return True
+        return row["dz_artist_id"] is None and (row["mapped_at"] or "") < retry_before
+
+    def status(self) -> dict:
+        return {**self.db.artist_map_counts(), "last_run": self.last_run, "last_checked": self.db.last_release_check(),
+                "last_error": self.last_error, "more_to_do": self.more_to_do}
+
+    # ── the thread ────────────────────────────────────────────────────────────
+    def request(self) -> None:
+        self._wake.set()
+
+    def start(self) -> None:
+        if self._thread and self._thread.is_alive():
+            return
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True, name="releases")
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._wake.set()
+        if self._thread:
+            self._thread.join(5)
+
+    def _run(self) -> None:
+        if self._stop.wait(90):                                    # let the library index load first
+            return
+        while not self._stop.is_set():
+            self.refresh()
+            wait = 600 if self.more_to_do else self.refresh_hours * 3600
+            self._wake.wait(wait)
+            self._wake.clear()

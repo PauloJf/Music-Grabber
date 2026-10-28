@@ -190,6 +190,7 @@ class GrabberService:
         self._thread_started = False
         self.mirror = None                       # set by main.build_service (PLAYLIST_MIRROR)
         self.analysis_watcher = None             # set by main.build_service (intake/api analysis)
+        self.releases = None                     # set by main.build_service (RELEASES_ENABLED)
 
     def seed_playlists(self) -> int:
         """Register WATCH_PLAYLISTS (URLs/URIs/ids). No network: names are filled in by
@@ -210,6 +211,8 @@ class GrabberService:
             self.pool.start()
             if self.analysis_watcher:
                 self.analysis_watcher.start()
+            if self.releases:
+                self.releases.start()
             self._thread_started = True
 
     def stop_background(self):
@@ -218,6 +221,8 @@ class GrabberService:
             self.pool.stop()
             if self.analysis_watcher:
                 self.analysis_watcher.stop()
+            if self.releases:
+                self.releases.stop()
 
     def enqueue_missing(self, playlist_id: int) -> int:
         """Manually enqueue every missing (non-tombstone) track of a playlist

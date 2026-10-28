@@ -152,7 +152,8 @@ def album_view(a: dict, artist: Optional[dict] = None) -> dict:
     return {"dz_id": str(a.get("id")), "title": a.get("title") or "", "artist": ar.get("name") or "",
             "artist_id": str(ar["id"]) if ar.get("id") else "",
             "cover_url": _img(a, "cover_medium", "cover_big", "cover"),
-            "year": _year(a.get("release_date") or ""), "track_count": a.get("nb_tracks"),
+            "year": _year(a.get("release_date") or ""), "release_date": a.get("release_date") or "",
+            "track_count": a.get("nb_tracks"),
             "kind": a.get("record_type") or "album", "explicit": bool(a.get("explicit_lyrics"))}
 
 
@@ -203,3 +204,19 @@ def album_page(dz_id: str) -> dict:
         t["track_no"] = t["track_no"] or i
         t["artist"] = t["artist"] or album["artist"]
     return {"album": album, "tracks": tracks}
+
+
+def artist_albums(dz_id: str, limit: int = 100) -> list:
+    """An artist's albums, singles and EPs with their release dates. Deezer does not promise an
+    order, so an artist with more than ``limit`` releases is read from both ends."""
+    first = _call(f"artist/{dz_id}/albums", {"limit": limit})
+    data = list(first.get("data", []))
+    total = first.get("total") or 0
+    if total > len(data):
+        data += _call(f"artist/{dz_id}/albums", {"limit": limit, "index": max(0, total - limit)}).get("data", [])
+    seen, out = set(), []
+    for x in data:
+        if x and x.get("id") and x["id"] not in seen:
+            seen.add(x["id"])
+            out.append(album_view(x))
+    return out

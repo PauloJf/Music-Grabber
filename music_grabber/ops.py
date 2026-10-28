@@ -10,6 +10,7 @@ import os
 import secrets
 import threading
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlsplit
 
@@ -917,6 +918,61 @@ class Ops:
                               "duration_ms": data.get("duration_ms") if isinstance(data.get("duration_ms"), int) else None,
                               "isrc": isrc}, self.svc.index, 0.88)
         return {"have": bool(have)}
+
+    # ── new releases from your artists (docs/plans/integration-and-suggestions.md, part 2) ──
+    def releases_feed(self, user_id: int, days=0) -> dict:
+        from .releases import NEW_DAYS
+        days = int(days) if str(days).isdigit() and 0 < int(days) <= 365 else NEW_DAYS
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
+        rel = self.svc.releases
+        items = [{k: r[k] for k in ("dz_artist_id", "dz_album_id", "title", "kind", "release_date", "cover_url",
+                                    "artist_name")} for r in self.db.release_feed(user_id, since)]
+        return {"enabled": rel is not None, "days": days, "releases": items,
+                "status": rel.status() if rel else None,
+                "following": [p["dz_artist_id"] for p in self.db.get_artist_prefs(user_id) if p["follow"]]}
+
+    def releases_refresh(self) -> dict:
+        if self.svc.releases is None:
+            raise OpsError("releases_disabled", "new releases are off: set RELEASES_ENABLED=true", 409)
+        threading.Thread(target=self.svc.releases.refresh, kwargs={"force": True}, daemon=True,
+                         name="releases-refresh").start()
+        return {"ok": True, "started": True}
+
+    def artist_pref_set(self, user_id: int, dz_id: str, data: dict) -> dict:
+        dz_id = str(dz_id or "").strip()
+        if not dz_id.isdigit():
+            raise OpsError("invalid_artist", "artist id must be a Deezer artist id")
+        changes = {k: data[k] for k in ("follow", "hide_releases", "hide_suggestions") if k in data}
+        if not changes or any(not isinstance(v, bool) for v in changes.values()):
+            raise OpsError("invalid_pref", "send follow, hide_releases and/or hide_suggestions as true or false")
+        name = str(data.get("name") or "").strip()[:200]
+        if not name:
+            known = next((p["name"] for p in self.db.get_artist_prefs(user_id) if p["dz_artist_id"] == dz_id), "")
+            name = known or self._artist_name(dz_id)
+        pref = self.db.set_artist_pref(user_id, dz_id, name, changes)
+        if changes.get("follow") and self.svc.releases:
+            self.svc.releases.request()
+        return {"ok": True, "pref": pref}
+
+    def _artist_name(self, dz_id: str) -> str:
+        with self.db._connect() as conn:
+            cached = conn.execute("SELECT artist_name FROM release_cache WHERE dz_artist_id=? LIMIT 1", (dz_id,)).fetchone()
+        if cached:
+            return cached[0]
+        return self._catalog(deezer_catalog.artist_page, dz_id)["artist"]["name"]
+
+    def artist_prefs(self, user_id: int) -> dict:
+        return {"prefs": self.db.get_artist_prefs(user_id)}
+
+    def release_dismiss(self, user_id: int, album_id: str, on: bool = True) -> dict:
+        if not str(album_id).isdigit():
+            raise OpsError("invalid_release", "release id must be a Deezer album id")
+        self.db.dismiss_item(user_id, "release", str(album_id), on)
+        return {"ok": True}
+
+    def releases_hidden(self, user_id: int) -> dict:
+        prefs = [p for p in self.db.get_artist_prefs(user_id) if p["hide_releases"]]
+        return {"artists": prefs, "releases": self.db.dismissed_releases(user_id)}
 
     # ── activity (the always-visible tray) ────────────────────────────────────
     def activity(self) -> dict:

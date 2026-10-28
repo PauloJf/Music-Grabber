@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- **New releases** (off by default, `RELEASES_ENABLED=true`): a page, linked from Discover, of albums,
+  singles and EPs from the last 90 days by artists you own (3+ tracks), artists on watched playlists and
+  artists you follow. Artists are matched to Deezer by ISRC, else by an equal name, else left out. Per
+  account: follow an artist from its page, hide an artist, or dismiss one release, with a list to undo.
+  Reads Deezer's public catalogue in the background (once per artist per `RELEASES_REFRESH_HOURS`).
+  CLI `releases list|refresh`. Design: `docs/plans/integration-and-suggestions.md`.
 - **Integration API for other apps.** Administrators create named API keys (Account page, or `keys
   create NAME --scopes request,browse,library`); the key is shown once and stored hashed, can be revoked,
   and works only on the new `/api/v1`: `GET /search`, `/artist/<id>`, `/album/<id>`, `POST /requests`

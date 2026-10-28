@@ -316,3 +316,9 @@ def test_keys_commands_create_list_and_revoke(env, capsys):
     assert run(["keys", "revoke", "1"], capsys)[0] == 0
     assert "revoked" in run(["keys", "list"], capsys)[1]
     assert run(["keys", "revoke", "1"], capsys)[0] != 0
+
+
+def test_releases_command_says_when_it_is_off(env, capsys):
+    code, out, _ = run(["releases", "list"], capsys)
+    assert code == 0 and "RELEASES_ENABLED" in out
+    assert run(["releases", "refresh"], capsys)[0] != 0               # off: a clear refusal, not a crash

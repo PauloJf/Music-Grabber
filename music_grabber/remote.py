@@ -64,6 +64,10 @@ class RemoteOps:
         return self._post("/api/keys", {"name": name, "scopes": scopes})
     def keys_revoke(self, key_id): return self._req("DELETE", f"/api/keys/{int(key_id)}")
 
+    # new releases
+    def releases_feed(self, user_id=0, days=0): return self._get("/api/releases", days=days or None)
+    def releases_refresh(self): return self._post("/api/releases/refresh")
+
     # spotify
     def spotify_status(self): return self._get("/api/spotify/status")
     def spotify_authorize_url(self): return self._get("/api/spotify/authorize-url")
