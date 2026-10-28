@@ -36,7 +36,7 @@ MASK = "********"
 OAUTH_STATE_TTL = 600
 SESSION_DAYS = 14
 # Integration API keys: what a key may do (docs/plans/integration-and-suggestions.md).
-API_SCOPES = ("browse", "request", "library")
+API_SCOPES = ("browse", "request", "library", "suggestions")
 KEY_PREFIX = "mgk_"
 # Per-user preferences: key -> (kind, allowed values or range).
 PREFS = {"theme": ("enum", ("system", "light", "dark")), "preview_volume": ("float", (0.0, 1.0))}
@@ -76,6 +76,7 @@ SETTINGS = {
     "ntfy_notify_done":      ("bool", None),
     "ui_public_url":         ("str", None),
     "releases_enabled":      ("bool", None),
+    "releases_notify":       ("bool", None),
     "suggest_gaps":          ("bool", None),
     "suggest_artists":       ("bool", None),
     "suggest_stars":         ("bool", None),

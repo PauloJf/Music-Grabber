@@ -29,6 +29,8 @@ ADMIN_PREFIXES = ("/api/settings", "/api/users", "/api/spotify", "/api/keys")   
 ADMIN_WRITE_PREFIXES = ("/api/mirror", "/api/ledger", "/api/releases/refresh")
 # After this many wrong tokens inside the window, that address is refused (429) until the
 # window passes, whatever it sends. Per address, in memory.
+# Keys have no account, so what they read is the unfiltered view: nobody's hides or dismissals apply.
+INTEGRATION_USER = -1
 AUTH_MAX_FAILURES = 10
 AUTH_WINDOW_SECONDS = 60
 
@@ -322,6 +324,17 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
         need("request")
         own = g.principal["username"] if g.principal["role"] == "key" else None
         return jsonify(ops.request_status(item_id, own))
+
+    @app.get("/api/v1/suggestions")
+    def v1_suggestions():
+        need("suggestions")
+        return jsonify(ops.suggestions(INTEGRATION_USER if g.principal["role"] == "key" else uid()))
+
+    @app.get("/api/v1/releases")
+    def v1_releases():
+        need("suggestions")
+        return jsonify(ops.releases_feed(INTEGRATION_USER if g.principal["role"] == "key" else uid(),
+                                         request.args.get("days", "")))
 
     @app.get("/api/v1/library/has")
     def v1_library_has():

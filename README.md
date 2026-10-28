@@ -195,7 +195,8 @@ an account (below). See [`docs/security.md`](docs/security.md) for the review an
 To let another app (BPM Tagger, a script) request music without handing it the admin token, create an
 **API key**: Account page, or `python -m music_grabber keys create "BPM Tagger" --scopes request`. The key
 (`mgk_...`) is shown once, stored hashed, named, revocable (`keys revoke ID`), and limited to scopes:
-`request` (create and read requests), `browse` (search the catalogue) and `library` (is it owned?). A key can
+`request` (create and read requests), `browse` (search the catalogue), `library` (is it owned?) and
+`suggestions` (read the suggestions and new releases). A key can
 only call `/api/v1`; every other route answers 403. Use it as `Authorization: Bearer mgk_...`, from a server
 (not from a browser page).
 
@@ -211,6 +212,8 @@ curl -H "Authorization: Bearer $KEY" -H "Content-Type: application/json"   -d '{
   `failed`...), `progress`, `error`. A key sees only the requests it made.
 - `GET /api/v1/library/has?isrc=...` (or `title` + `artist`): `{"have": true|false}`.
 - `GET /api/v1/search?q=&type=track|artist|album`, `/artist/<id>`, `/album/<id>`: the Discover data.
+- `GET /api/v1/suggestions` (`gaps` and `artists`, each empty when its switch is off) and
+  `GET /api/v1/releases?days=`: read-only, the unfiltered view (no account's hides or dismissals apply).
 
 The queue shows who asked ("requested by BPM Tagger").
 
@@ -235,7 +238,7 @@ python -m music_grabber users passwd alice              # also the way back afte
 runtime: `output_format`, `path_template`, `provider_order`, `deezer_quality`, `deezer_arl`,
 `auto_accept_threshold`, `ask_threshold`, `grab_dry_run`, `lyrics_enabled`, `write_spotify_id_tag`,
 `spotify_sync_minutes`, `grab_workers`, `ntfy_url`, `ntfy_topic`, `ntfy_notify_done`,
-`ui_public_url`, `releases_enabled`, `suggest_gaps`, `suggest_artists`, `suggest_stars`. Values are validated, saved to `settings.json` (mode 0600, next to the database)
+`ui_public_url`, `releases_enabled`, `releases_notify`, `suggest_gaps`, `suggest_artists`, `suggest_stars`. Values are validated, saved to `settings.json` (mode 0600, next to the database)
 and applied to the running instance without a restart (`grab_workers` and `spotify_sync_minutes`
 need one). Settings saved this way override the environment from then on. Credentials that come
 from the environment (Spotify secret, API token, library/hook keys) are never written to the file.
@@ -273,6 +276,11 @@ out in the last 90 days, newest first. Queue a whole album from its page as usua
   master switch (`RELEASES_ENABLED`), `SUGGEST_GAPS`, `SUGGEST_ARTISTS`, `SUGGEST_STARS`. Switching a part off
   hides it and stops fetching what it needs (no "related" calls without the artists list, no star reads
   without the stars switch); what was already learned is kept for when you turn it back on.
+- **ntfy ping** (`RELEASES_NOTIFY`, off by default): one notification per pass listing releases not announced
+  before (up to 8 names, then "and N more"), linking to the New releases page when `UI_PUBLIC_URL` is set.
+  The first time it is switched on, everything already known is marked as announced without a ping; a release
+  older than 30 days when found is never announced. It is one shared topic, so per-account hides do not apply
+  to it, and it is best effort (a failed ping is logged, not retried).
 - Per account, like the releases: *Not interested* on a tile, *Hide artist*, and *Hide from suggestions* on an
   artist's page; a *Hidden suggestions* list undoes them. Nothing here ever downloads on its own.
 
@@ -425,6 +433,7 @@ an environment variable; a few can also be changed at runtime ([Settings](#setti
 | `RELEASES_ENABLED` | `false` | turns on [New releases and suggestions](#new-releases-and-suggestions) (reads Deezer's public catalogue in the background); also a switch in Settings |
 | `SUGGEST_GAPS` | `true` | suggestions: albums you are missing from artists you own (needs `RELEASES_ENABLED`; also in Settings) |
 | `SUGGEST_ARTISTS` | `true` | suggestions: artists you may like (needs `RELEASES_ENABLED`; also in Settings) |
+| `RELEASES_NOTIFY` | `false` | one ntfy ping when new releases from your artists turn up (needs `RELEASES_ENABLED` and ntfy; also in Settings) |
 | `SUGGEST_STARS` | `true` | use the songs you starred in BPM Tagger or Navidrome to weight your taste (`LIBRARY_INDEX=opensubsonic` only; also in Settings) |
 | `RELEASES_REFRESH_HOURS` | `24` | how often each artist's releases are re-read |
 | `HOOK_DEBOUNCE_SECONDS` / `HOOK_MAX_WAIT_SECONDS` / `HOOK_MIN_INTERVAL_SECONDS` | `45` / `600` / `60` | hook coalescing |
