@@ -98,10 +98,9 @@ def test_shared_folder_examples_really_share_one_folder(name):
 
 
 @pytest.mark.parametrize("name", ["with-bpm-tagger.yml", "full-stack.yml"])
-def test_examples_use_the_bpm_tagger_beta_channel_until_its_stable_release(name):
-    """:latest is still the old BPM Tagger with the grabber built in. When BPM Tagger's stable
-    release ships, change both examples to :latest and update this test."""
-    assert _services(COMPOSE_DIR / name)["bpm-tagger"]["image"] == "gatoserio/bpm-tagger:beta"
+def test_examples_use_the_stable_bpm_tagger_image(name):
+    """BPM Tagger 2.19+ (the grabber-free build) is :latest; the examples must not point at a beta."""
+    assert _services(COMPOSE_DIR / name)["bpm-tagger"]["image"] == "gatoserio/bpm-tagger:latest"
 
 
 def test_full_stack_index_points_at_bpm_taggers_subsonic_api():

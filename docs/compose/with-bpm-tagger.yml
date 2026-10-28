@@ -13,9 +13,8 @@
 #  * Music Grabber's Navidrome hook stays off: BPM Tagger triggers the rescan after tagging.
 services:
   bpm-tagger:
-    # Use the :beta channel (BPM Tagger without its own grabber) until BPM Tagger's stable release:
-    # :latest is still the older image that has the grabber built in. Switch to :latest after that.
-    image: gatoserio/bpm-tagger:beta
+    # BPM Tagger 2.19+ has no grabber of its own (Music Grabber replaces it).
+    image: gatoserio/bpm-tagger:latest
     container_name: bpm-tagger
     restart: unless-stopped
     environment:
