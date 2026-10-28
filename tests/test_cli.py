@@ -304,3 +304,15 @@ def test_users_commands_create_list_reset_and_protect_the_last_admin(env, capsys
     assert run(["users", "delete", "paulo"], capsys)[0] != 0               # the last admin stays
     assert run(["users", "role", "paulo", "user"], capsys)[0] != 0
     assert run(["users", "delete", "ghost"], capsys)[0] != 0
+
+
+def test_keys_commands_create_list_and_revoke(env, capsys):
+    assert run(["keys", "list"], capsys)[1].startswith("No API keys")
+    code, out, _ = run(["keys", "create", "BPM Tagger", "--scopes", "request,library"], capsys)
+    assert code == 0 and "mgk_" in out and "not shown again" in out
+    code, out, _ = run(["keys", "list"], capsys)
+    assert "BPM Tagger" in out and "request,library" in out and "active" in out and "mgk_" not in out
+    assert run(["keys", "create", "bad", "--scopes", "root"], capsys)[0] != 0
+    assert run(["keys", "revoke", "1"], capsys)[0] == 0
+    assert "revoked" in run(["keys", "list"], capsys)[1]
+    assert run(["keys", "revoke", "1"], capsys)[0] != 0

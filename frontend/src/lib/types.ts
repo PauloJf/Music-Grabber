@@ -67,6 +67,7 @@ export interface QueueItem {
   error: string | null;
   final_path: string | null;
   updated_at: string | null;
+  requested_by?: string | null;
 }
 
 export interface Candidate {
@@ -119,6 +120,7 @@ export interface Activity {
 export interface QueueResult { ok: boolean; queued: number; item_ids: number[]; results: { dz_id: string; result: string }[]; album?: string }
 
 export interface User { id: number | null; username: string; role: "admin" | "user"; prefs: { theme?: "system" | "light" | "dark"; preview_volume?: number }; created_at?: string | null; last_login?: string | null }
+export interface ApiKey { id: number; name: string; scopes: string[]; created_by: string | null; created_at: string | null; last_used_at: string | null; revoked_at: string | null }
 export interface Me { user: User; via: "token" | "session" }
 
 export interface OwnedTrack { path: string; title: string | null; artist: string | null; album: string | null; album_artist: string | null; duration_ms: number | null; year: number | null }

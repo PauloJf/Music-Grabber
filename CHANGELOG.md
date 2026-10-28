@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+- **Integration API for other apps.** Administrators create named API keys (Account page, or `keys
+  create NAME --scopes request,browse,library`); the key is shown once and stored hashed, can be revoked,
+  and works only on the new `/api/v1`: `GET /search`, `/artist/<id>`, `/album/<id>`, `POST /requests`
+  (by Deezer id, ISRC, or title + artist; answers `queued`, `in_library`, `already_queued` or, for a
+  repeated `source_ref`, `already_requested`), `GET /requests/<id>` (a key sees only its own) and
+  `GET /library/has`. Queue items record who asked (`requested_by`, `source_ref`) and the Queue shows it.
+  Design: `docs/plans/integration-and-suggestions.md`.
+
 ## 1.0.0 (2026-10-25)
 
 First stable release. It is 1.0.0-rc.4 plus the fixes below; the stability promise in the README

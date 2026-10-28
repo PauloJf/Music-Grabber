@@ -9,7 +9,7 @@ from .constants import GRAB_NONTERMINAL, GRAB_TERMINAL
 GRAB_COLUMNS = frozenset(
     "playlist_track_id spotify_track_id title artist album album_artist duration_ms isrc track_no "
     "disc_no year cover_url status provider chosen_candidate_id search_override error attempts "
-    "progress tmp_path final_path priority created_at updated_at note".split())
+    "progress tmp_path final_path priority created_at updated_at note requested_by source_ref".split())
 
 
 class QueueMixin:
@@ -67,7 +67,14 @@ class QueueMixin:
 
     _GRAB_INSERT_COLS = ("playlist_track_id, spotify_track_id, title, artist, album, "
                          "album_artist, duration_ms, isrc, track_no, disc_no, year, "
-                         "cover_url, status, priority, created_at, updated_at")
+                         "cover_url, status, priority, created_at, updated_at, requested_by, source_ref")
+
+    def find_request(self, requested_by: str, source_ref: str) -> Optional[dict]:
+        """The newest queue item an integration filed under this ``source_ref``."""
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM grab_queue WHERE requested_by=? AND source_ref=? "
+                               "ORDER BY id DESC LIMIT 1", (requested_by, source_ref)).fetchone()
+        return dict(row) if row else None
 
     def enqueue_grab(self, meta: dict) -> Optional[int]:
         """Insert a pending grab_queue item unless a non-terminal one already exists
@@ -86,13 +93,13 @@ class QueueMixin:
                 meta.get("album"), meta.get("album_artist"), meta.get("duration_ms"),
                 meta.get("isrc"), meta.get("track_no"), meta.get("disc_no"),
                 meta.get("year"), meta.get("cover_url"), "pending",
-                meta.get("priority", 0), now, now)
+                meta.get("priority", 0), now, now, meta.get("requested_by"), meta.get("source_ref"))
         with self._connect() as conn:
             if sid:
                 placeholders = ",".join("?" * len(GRAB_NONTERMINAL))
                 cur = conn.execute(
                     f"INSERT INTO grab_queue ({self._GRAB_INSERT_COLS}) "
-                    f"SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? "
+                    f"SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? "
                     f"WHERE NOT EXISTS (SELECT 1 FROM grab_queue "
                     f"WHERE spotify_track_id = ? AND status IN ({placeholders}))",
                     (*vals, sid, *GRAB_NONTERMINAL),
@@ -111,7 +118,7 @@ class QueueMixin:
                             return None
                 cur = conn.execute(
                     f"INSERT INTO grab_queue ({self._GRAB_INSERT_COLS}) "
-                    f"VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", vals)
+                    f"VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", vals)
             item_id = cur.lastrowid
             self._append_event(conn, item_id, "enqueued", meta.get("title", ""), now)
             conn.commit()

@@ -142,6 +142,7 @@ python -m music_grabber inbox show 12           # candidates with scores, plus t
 python -m music_grabber inbox choose 12 41      # download candidate 41 for item 12
 python -m music_grabber inbox search 12 "weeknd blinding lights"   # try another search
 python -m music_grabber settings set output_format flac
+python -m music_grabber keys list               # API keys for other apps (create, revoke too)
 python -m music_grabber ledger rebuild          # re-add ledger rows for files carrying our Spotify id tag
 ```
 
@@ -182,12 +183,36 @@ Set `API_TOKEN` and the API listens on `API_PORT`. Every `/api/*` call needs
 `GET /api/status`; `/api/playlists` (`POST {"value": url}`, `PATCH {"enabled": false}`, `DELETE`,
 `POST /api/playlists/<id>/sync`, `/enqueue-missing`); `POST /api/sync`; `/api/queue` and
 `/api/queue/<id>/{retry,cancel,priority}`; `/api/inbox` and `/api/inbox/<id>/{choose,search,research,skip}`;
-`/api/browse/{search,artist/<id>,album/<id>,queue,undo}` (catalogue + queueing) and `/api/activity`; accounts: `/api/auth/{state,login,setup,logout}`, `/api/me`, `/api/users` (admin); `/api/settings` (secrets come back masked); `/api/spotify/*`; `GET /api/library?q=&limit=&offset=` (the tracks the index knows), `POST /api/library/refresh`; open:
+`/api/browse/{search,artist/<id>,album/<id>,queue,undo}` (catalogue + queueing) and `/api/activity`; accounts: `/api/auth/{state,login,setup,logout}`, `/api/me`, `/api/users` (admin); `/api/settings` (secrets come back masked); `/api/spotify/*`; `GET /api/library?q=&limit=&offset=` (the tracks the index knows), `POST /api/library/refresh`; `/api/keys` (admin; see below); open:
 `GET /healthz` (just `{"ok": true}`) and the Spotify `/callback` (which only accepts a single-use `state` this instance
 issued). Errors are `{"error": "<code>", "message": "..."}` with a matching HTTP status. Publish
 the port on loopback only, and put TLS in front before exposing it further. Ten wrong tokens in a minute
 lock that address out for a minute (HTTP 429). The token is an always-admin key; people sign in with
 an account (below). See [`docs/security.md`](docs/security.md) for the review and residual risks.
+
+### Integration API (for other apps)
+
+To let another app (BPM Tagger, a script) request music without handing it the admin token, create an
+**API key**: Account page, or `python -m music_grabber keys create "BPM Tagger" --scopes request`. The key
+(`mgk_...`) is shown once, stored hashed, named, revocable (`keys revoke ID`), and limited to scopes:
+`request` (create and read requests), `browse` (search the catalogue) and `library` (is it owned?). A key can
+only call `/api/v1`; every other route answers 403. Use it as `Authorization: Bearer mgk_...`, from a server
+(not from a browser page).
+
+```bash
+curl -H "Authorization: Bearer $KEY" -H "Content-Type: application/json"   -d '{"dz_id": "3135556", "source_ref": "bpm:42"}' http://host:8099/api/v1/requests
+```
+
+- `POST /api/v1/requests` takes `dz_id` (a Deezer track id), or `isrc`, or `title` + `artist` (+ `album`,
+  `duration_ms`, `isrc`), and an optional `source_ref` of yours. It answers `queued` (201, with `id`),
+  `in_library`, `already_queued`, or `already_requested` (the same `source_ref` again; a failed one may be
+  requested again). `"force": true` queues a track you already own.
+- `GET /api/v1/requests/<id>`: `status` (`pending`, `searching`, `downloading`, `awaiting_user`, `done`,
+  `failed`...), `progress`, `error`. A key sees only the requests it made.
+- `GET /api/v1/library/has?isrc=...` (or `title` + `artist`): `{"have": true|false}`.
+- `GET /api/v1/search?q=&type=track|artist|album`, `/artist/<id>`, `/album/<id>`: the Discover data.
+
+The queue shows who asked ("requested by BPM Tagger").
 
 ### Accounts and signing in
 
