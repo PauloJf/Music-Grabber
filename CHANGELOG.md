@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+- A track Deezer has no preview for is marked **No preview on Deezer** (with a hover note that Deezer then usually
+  cannot download it either, so it comes from YouTube), on search results, artist pages and album pages.
+
 ## 1.1.3 (2026-10-28)
 
 ### Fixed

@@ -132,6 +132,6 @@ describe("tile previews", () => {
       "GET /api/browse/artist/20": { artist: {}, top: [trk("1", "")], albums: [], related: [] } });
     renderApp(<App />, { route: "/" });
     fireEvent.click((await screen.findAllByRole("button", { name: "Preview artist" }))[0]);
-    await screen.findByText("No preview available for this one");
+    await screen.findByText("No preview on Deezer for this one, so it probably can't be downloaded from there");
   });
 });

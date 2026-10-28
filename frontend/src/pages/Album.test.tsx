@@ -29,6 +29,8 @@ describe("album page", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Preview A" }));
     await waitFor(() => expect(srcs).toEqual(["https://cdn/a.mp3"]));
     expect(screen.queryByRole("button", { name: "Preview B" })).toBeNull();
+    expect(screen.getAllByText("No preview on Deezer")).toHaveLength(1);              // only B, and it says why on hover
+    expect(screen.getByText("No preview on Deezer").getAttribute("title")).toMatch(/can't download/);
     expect(screen.getByRole("button", { name: "Pause A" })).toBeTruthy();
   });
 
