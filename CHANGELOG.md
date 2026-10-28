@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- The Settings gear and the Help "?" in the header are plain icons (underlined when current) instead of circled.
+
 ## 1.1.1 (2026-10-28)
 
 A small follow-up to 1.1.0: the new pages move to the front of the app. No database or configuration changes.
