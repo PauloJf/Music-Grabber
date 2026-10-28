@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Empty, ErrorState, Skeleton, TileCard } from "../components/ui";
+import { Empty, ErrorState, Skeleton, TileCard, TilePreview } from "../components/ui";
 import { del, errorText, get, post, put } from "../lib/api";
 import { ago } from "../lib/hooks";
 import { useToast } from "../lib/toast";
@@ -47,6 +47,7 @@ export default function Releases() {
             ? <Empty title={`Nothing new in ${d.days} days`}>Releases show up here after the first pass has looked at your artists. Follow an artist from its page to include one you don't own.</Empty>
             : <div className="grid">{d.releases.map((r) => (
               <TileCard key={r.dz_album_id} to={`/album/${r.dz_album_id}`} cover={r.cover_url} title={r.title} sub={`${r.artist_name} · ${KIND[r.kind] ?? r.kind} · ${r.release_date}`}>
+                  <TilePreview kind="album" id={r.dz_album_id} />
                   <button className="btn quiet sm" style={{ paddingLeft: 0 }} onClick={() => hideArtist.mutate({ id: r.dz_artist_id, name: r.artist_name, on: true })}>Hide artist</button>
                   <button className="btn quiet sm" style={{ paddingLeft: 0 }} onClick={() => dismiss.mutate({ id: r.dz_album_id, on: true })}>Not interested</button>
                 </TileCard>))}</div>}

@@ -100,3 +100,38 @@ describe("the menu", () => {
     for (const nav of screen.getAllByRole("navigation", { name: "Main" })) expect(within(nav).queryByText("For you")).toBeNull();
   });
 });
+
+describe("tile previews", () => {
+  const trk = (id: string, url: string) => ({ dz_id: id, title: `T${id}`, artist: "A", artist_id: "20", album: "L", album_id: "702", duration_ms: 1000, preview_url: url, cover_url: "", explicit: false, track_no: 1, disc_no: 1, year: 2020, state: { kind: "none" } });
+  const withAudio = () => {
+    const play = vi.fn().mockResolvedValue(undefined);
+    const srcs: string[] = [];
+    vi.stubGlobal("Audio", class { set src(v: string) { srcs.push(v); } play = play; pause = vi.fn(); addEventListener = vi.fn(); volume = 1; });
+    return { play, srcs };
+  };
+
+  it("plays the first previewable track of an artist and of an album, fetching only when pressed", async () => {
+    const { play, srcs } = withAudio();
+    const calls = mockApi({ ...base, "GET /api/suggest": reply(on), "GET /api/releases": reply({ enabled: false, days: 90, releases: [], following: [], status: null }),
+      "GET /api/browse/artist/20": { artist: {}, top: [trk("1", ""), trk("2", "https://cdn/a.mp3")], albums: [], related: [] },
+      "GET /api/browse/album/702": { album: {}, tracks: [trk("3", "https://cdn/b.mp3")] } });
+    renderApp(<App />, { route: "/" });
+    await screen.findByText("Dojja");
+    expect(calls.some((c) => c.path.startsWith("/api/browse/"))).toBe(false);
+    const buttons = screen.getAllByRole("button", { name: /^Preview/ });
+    fireEvent.click(buttons[0]);                                             // the artist
+    await waitFor(() => expect(srcs).toContain("https://cdn/a.mp3"));
+    fireEvent.click(screen.getAllByRole("button", { name: /Preview album/ })[0]);
+    await waitFor(() => expect(srcs).toContain("https://cdn/b.mp3"));
+    expect(play).toHaveBeenCalledTimes(2);
+  });
+
+  it("says so when there is nothing to play", async () => {
+    withAudio();
+    mockApi({ ...base, "GET /api/suggest": reply(on), "GET /api/releases": reply({ enabled: false, days: 90, releases: [], following: [], status: null }),
+      "GET /api/browse/artist/20": { artist: {}, top: [trk("1", "")], albums: [], related: [] } });
+    renderApp(<App />, { route: "/" });
+    fireEvent.click((await screen.findAllByRole("button", { name: "Preview artist" }))[0]);
+    await screen.findByText("No preview available for this one");
+  });
+});

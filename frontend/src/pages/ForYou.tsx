@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { Empty, ErrorState, Skeleton, Tile, TileCard } from "../components/ui";
+import { Empty, ErrorState, Skeleton, TileCard, TilePreview } from "../components/ui";
 import { del, errorText, get, post, put } from "../lib/api";
 import { fmtCount } from "../lib/hooks";
 import { useToast } from "../lib/toast";
@@ -41,7 +41,9 @@ export default function ForYou() {
           {feed.data.releases.length === 0
             ? <Empty title={`Nothing new in ${feed.data.days} days`}>Releases show up after the first pass has looked at your artists{feed.data.status?.more_to_do ? " (still working through them)" : ""}.</Empty>
             : <div className="grid">{feed.data.releases.slice(0, 8).map((r) => (
-              <Tile key={r.dz_album_id} to={`/album/${r.dz_album_id}`} cover={r.cover_url} title={r.title} sub={`${r.artist_name} · ${r.release_date}`} />))}</div>}
+              <TileCard key={r.dz_album_id} to={`/album/${r.dz_album_id}`} cover={r.cover_url} title={r.title} sub={`${r.artist_name} · ${r.release_date}`}>
+                <TilePreview kind="album" id={r.dz_album_id} />
+              </TileCard>))}</div>}
         </section>
       )}
 
@@ -52,6 +54,7 @@ export default function ForYou() {
             ? <Empty title="Nothing yet">It needs a pass over your top artists first{d.status?.more_to_do ? " (still working through them)" : ""}.</Empty>
             : <div className="grid">{d.artists.map((a) => (
               <TileCard key={a.dz_id} to={`/artist/${a.dz_id}`} cover={a.image_url} title={a.name} sub={`Because you have ${a.because.join(" and ")}${a.fans ? ` · ${fmtCount(a.fans)} fans` : ""}`} round>
+                  <TilePreview kind="artist" id={a.dz_id} />
                   <button className="btn quiet sm" style={{ paddingLeft: 0 }} onClick={() => dismiss.mutate({ kind: "artist", id: a.dz_id, on: true })}>Not interested</button>
                 </TileCard>))}</div>}
         </section>
@@ -65,6 +68,7 @@ export default function ForYou() {
             : <div className="grid">{d.gaps.map((g) => (
               <TileCard key={g.dz_album_id} to={`/album/${g.dz_album_id}`} cover={g.cover_url} title={g.title}
                   sub={`${g.artist_name}${g.release_date ? ` · ${g.release_date.slice(0, 4)}` : ""} · ${g.state === "partial" ? `you have ${g.owned} of ${g.track_count}` : "none of it"}`}>
+                  <TilePreview kind="album" id={g.dz_album_id} />
                   <button className="btn quiet sm" style={{ paddingLeft: 0 }} onClick={() => dismiss.mutate({ kind: "album", id: g.dz_album_id, on: true })}>Not interested</button>
                   <button className="btn quiet sm" style={{ paddingLeft: 0 }} onClick={() => hideArtist.mutate({ id: g.dz_artist_id, name: g.artist_name, on: true })}>Hide artist</button>
                 </TileCard>))}</div>}

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.1.2 (2026-10-28)
+
+A small follow-up: previews on the suggestion tiles, and a tidier header. No database or configuration changes.
+
+### Added
+- **Preview on the tiles** of For you and New releases: a Preview button plays 30 seconds of an artist's most
+  popular track, or of an album's first track, without leaving the page. The track list is read from Deezer
+  when you press it (and cached), and the button says so when there is no preview.
+
 ### Changed
 - The Settings gear and the Help "?" in the header are plain icons (underlined when current) instead of circled.
 
