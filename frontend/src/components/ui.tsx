@@ -9,6 +9,8 @@ import { useToast } from "../lib/toast";
 import type { CatAlbum, CatTrack, TrackState } from "../lib/types";
 import { Check, Explicit, Pause, Play, Plus, Retry, X } from "./icons";
 
+const NO_PREVIEW_HINT = "Deezer has no preview for this track. That usually means Deezer can't download it either, so it will have to come from YouTube.";
+
 export function Cover({ src, name, size = "", round = false }: { src?: string; name: string; size?: "lg" | "xl" | ""; round?: boolean }) {
   const [bad, setBad] = useState(false);
   const cls = `cover ${size} ${round ? "round" : ""}`;
@@ -40,8 +42,8 @@ export function Skeleton({ rows = 6 }: { rows?: number }) {
   );
 }
 
-export function Pill({ kind, children }: { kind: "ok" | "warn" | "err" | "signal" | "mute"; children: ReactNode }) {
-  return <span className={`pill ${kind}`}>{children}</span>;
+export function Pill({ kind, children, title }: { kind: "ok" | "warn" | "err" | "signal" | "mute"; children: ReactNode; title?: string }) {
+  return <span className={`pill ${kind}`} title={title}>{children}</span>;
 }
 
 const STATUS_WORD: Record<string, string> = { searching: "Searching", downloading: "Downloading", transcoding: "Converting", tagging: "Tagging", placing: "Filing" };
@@ -127,6 +129,7 @@ export function TrackRow({ track, ord, selected, onSelect, hideAlbum = false, hi
               !hideArtist && track.artist ? (track.artist_id ? <Link key="ar" to={`/artist/${track.artist_id}`}>{track.artist}</Link> : track.artist) : null,
               !hideAlbum && track.album ? (track.album_id ? <Link key="al" to={`/album/${track.album_id}`}>{track.album}</Link> : track.album) : null,
               track.duration_ms ? <span key="d" className="mono">{fmtDuration(track.duration_ms)}</span> : null,
+              !track.preview_url ? <Pill key="np" kind="mute" title={NO_PREVIEW_HINT}>No preview on Deezer</Pill> : null,
             ].filter(Boolean).flatMap((x, i) => (i ? [" · ", x] : [x]))}
           </div>
         </div>
@@ -163,7 +166,7 @@ export function TilePreview({ kind, id }: { kind: "artist" | "album"; id: string
         ? (await qc.fetchQuery({ ...opts, queryFn: () => get<{ top: CatTrack[] }>(`/api/browse/artist/${id}`) })).top
         : (await qc.fetchQuery({ ...opts, queryFn: () => get<{ album: CatAlbum; tracks: CatTrack[] }>(`/api/browse/album/${id}`) })).tracks;
       const t = tracks.find((x) => x.preview_url);
-      if (t) toggle(key, t.preview_url); else toast.push({ kind: "info", text: "No preview available for this one" });
+      if (t) toggle(key, t.preview_url); else toast.push({ kind: "info", text: "No preview on Deezer for this one, so it probably can't be downloaded from there" });
     } catch (e) {
       toast.push({ kind: "err", text: errorText(e) });
     } finally {
