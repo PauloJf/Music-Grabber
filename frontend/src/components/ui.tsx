@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { errorText, post } from "../lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { errorText, get, post } from "../lib/api";
 import { fmtDuration, useRefreshJobs } from "../lib/hooks";
 import { usePlayer } from "../lib/player";
 import { useQueueing } from "../lib/queueing";
 import { useToast } from "../lib/toast";
-import type { CatTrack, TrackState } from "../lib/types";
+import type { CatAlbum, CatTrack, TrackState } from "../lib/types";
 import { Check, Explicit, Pause, Play, Plus, Retry, X } from "./icons";
 
 export function Cover({ src, name, size = "", round = false }: { src?: string; name: string; size?: "lg" | "xl" | ""; round?: boolean }) {
@@ -128,6 +129,38 @@ export function Tile({ to, cover, title, sub, round }: { to: string; cover?: str
       <Cover src={cover} name={title} size="xl" round={round} />
       <div><div className="tn">{title}</div>{sub && <div className="ts">{sub}</div>}</div>
     </Link>
+  );
+}
+
+/** A 30-second preview for a tile: an artist plays its most popular track, an album its first. The track list is
+ * fetched when you press play (and cached under the same keys the artist and album pages use). */
+export function TilePreview({ kind, id }: { kind: "artist" | "album"; id: string }) {
+  const { playing, toggle } = usePlayer();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const key = `tile:${kind}:${id}`;
+  const on = playing === key;
+  const go = async () => {
+    if (on) { toggle(key, ""); return; }
+    setBusy(true);
+    try {
+      const opts = { queryKey: ["browse", kind, id], staleTime: 5 * 60_000 };
+      const tracks: CatTrack[] = kind === "artist"
+        ? (await qc.fetchQuery({ ...opts, queryFn: () => get<{ top: CatTrack[] }>(`/api/browse/artist/${id}`) })).top
+        : (await qc.fetchQuery({ ...opts, queryFn: () => get<{ album: CatAlbum; tracks: CatTrack[] }>(`/api/browse/album/${id}`) })).tracks;
+      const t = tracks.find((x) => x.preview_url);
+      if (t) toggle(key, t.preview_url); else toast.push({ kind: "info", text: "No preview available for this one" });
+    } catch (e) {
+      toast.push({ kind: "err", text: errorText(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button className="btn quiet sm" style={{ paddingLeft: 0 }} aria-pressed={on} aria-label={`${on ? "Pause" : "Preview"} ${kind}`} disabled={busy} onClick={go}>
+      {on ? <Pause width={16} height={16} /> : <Play width={16} height={16} />}{on ? "Pause" : "Preview"}
+    </button>
   );
 }
 
