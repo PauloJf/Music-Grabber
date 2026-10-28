@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 MIN_TOKEN_LENGTH = 16
 ADMIN_PREFIXES = ("/api/settings", "/api/users", "/api/spotify", "/api/keys")      # administrators only
 # Writes that reach outside this app (Navidrome) or rebuild its ledger: administrators only too.
-ADMIN_WRITE_PREFIXES = ("/api/mirror", "/api/ledger")
+ADMIN_WRITE_PREFIXES = ("/api/mirror", "/api/ledger", "/api/releases/refresh")
 # After this many wrong tokens inside the window, that address is refused (429) until the
 # window passes, whatever it sends. Per address, in memory.
 AUTH_MAX_FAILURES = 10
@@ -327,6 +327,38 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
     def v1_library_has():
         need("library")
         return jsonify(ops.library_has(request.args))
+
+    # ── new releases, follows and hides (per user) ────────────────────────────
+    def uid() -> int:
+        return g.principal["id"] or 0                # 0: the shared API token
+
+    @app.get("/api/releases")
+    def releases():
+        return jsonify(ops.releases_feed(uid(), request.args.get("days", "")))
+
+    @app.post("/api/releases/refresh")
+    def releases_refresh():
+        return jsonify(ops.releases_refresh())
+
+    @app.get("/api/releases/hidden")
+    def releases_hidden():
+        return jsonify(ops.releases_hidden(uid()))
+
+    @app.post("/api/releases/<album_id>/dismiss")
+    def release_dismiss(album_id):
+        return jsonify(ops.release_dismiss(uid(), album_id, True))
+
+    @app.delete("/api/releases/<album_id>/dismiss")
+    def release_undismiss(album_id):
+        return jsonify(ops.release_dismiss(uid(), album_id, False))
+
+    @app.get("/api/artist-prefs")
+    def artist_prefs():
+        return jsonify(ops.artist_prefs(uid()))
+
+    @app.put("/api/artist-prefs/<dz_id>")
+    def artist_pref_set(dz_id):
+        return jsonify(ops.artist_pref_set(uid(), dz_id, body()))
 
     # ── status / library / settings ───────────────────────────────────────────
     @app.get("/api/status")

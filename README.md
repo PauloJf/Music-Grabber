@@ -183,7 +183,7 @@ Set `API_TOKEN` and the API listens on `API_PORT`. Every `/api/*` call needs
 `GET /api/status`; `/api/playlists` (`POST {"value": url}`, `PATCH {"enabled": false}`, `DELETE`,
 `POST /api/playlists/<id>/sync`, `/enqueue-missing`); `POST /api/sync`; `/api/queue` and
 `/api/queue/<id>/{retry,cancel,priority}`; `/api/inbox` and `/api/inbox/<id>/{choose,search,research,skip}`;
-`/api/browse/{search,artist/<id>,album/<id>,queue,undo}` (catalogue + queueing) and `/api/activity`; accounts: `/api/auth/{state,login,setup,logout}`, `/api/me`, `/api/users` (admin); `/api/settings` (secrets come back masked); `/api/spotify/*`; `GET /api/library?q=&limit=&offset=` (the tracks the index knows), `POST /api/library/refresh`; `/api/keys` (admin; see below); open:
+`/api/browse/{search,artist/<id>,album/<id>,queue,undo}` (catalogue + queueing) and `/api/activity`; accounts: `/api/auth/{state,login,setup,logout}`, `/api/me`, `/api/users` (admin); `/api/settings` (secrets come back masked); `/api/spotify/*`; `GET /api/library?q=&limit=&offset=` (the tracks the index knows), `POST /api/library/refresh`; `/api/keys` (admin; see below); `/api/releases`, `/api/artist-prefs/<deezer artist id>` (new releases, below); open:
 `GET /healthz` (just `{"ok": true}`) and the Spotify `/callback` (which only accepts a single-use `state` this instance
 issued). Errors are `{"error": "<code>", "message": "..."}` with a matching HTTP status. Publish
 the port on loopback only, and put TLS in front before exposing it further. Ten wrong tokens in a minute
@@ -239,6 +239,26 @@ runtime: `output_format`, `path_template`, `provider_order`, `deezer_quality`, `
 and applied to the running instance without a restart (`grab_workers` and `spotify_sync_minutes`
 need one). Settings saved this way override the environment from then on. Credentials that come
 from the environment (Spotify secret, API token, library/hook keys) are never written to the file.
+
+## New releases
+
+Off by default. With `RELEASES_ENABLED=true` a background job (first pass about a minute after start,
+then every `RELEASES_REFRESH_HOURS`) looks at **your artists**: library artists with at least 3 tracks,
+artists with at least 2 tracks on a watched playlist, and the artists you **follow**. It finds each one on
+Deezer, reads their albums, singles and EPs, and the **New releases** page (link on Discover) lists what came
+out in the last 90 days, newest first. Queue a whole album from its page as usual.
+
+- **Matching is careful.** A track's ISRC names its Deezer artist exactly; failing that, a name search is
+  accepted only when the name is equal (with the most fans winning among namesakes). Anything less sure is
+  left out and re-tried after 30 days, never guessed. A big library is worked through a few dozen artists
+  per pass; the page says how many are matched.
+- **Hide and follow are per account.** *Hide artist* and *Not interested* (one release) take things off your
+  page only; a *Hidden* list brings them back. *Follow new releases* on an artist's page adds an artist you
+  do not own. The shared API token acts as one extra user.
+- **Light on Deezer.** Calls share the existing rate limiter; each artist is read at most once per refresh
+  period; if Deezer is unreachable the page keeps showing what it last learned.
+- `python -m music_grabber releases [list|refresh]` and `GET /api/releases` do the same from a script;
+  `POST /api/releases/refresh` (administrators) checks now.
 
 ## Library and the ledger
 
@@ -386,6 +406,8 @@ an environment variable; a few can also be changed at runtime ([Settings](#setti
 | `NAVIDROME_URL`, `NAVIDROME_USER`, `NAVIDROME_PASS` | | for the `navidrome` hook and the playlist mirror |
 | `PLAYLIST_MIRROR` | | `navidrome` writes watched playlists to Navidrome (off when empty); see [the mirror](#spotify-playlists-in-navidrome-the-mirror) |
 | `MIRROR_PREFIX` | `Spotify: ` | prefix of the mirrored playlists' names |
+| `RELEASES_ENABLED` | `false` | turns on [New releases](#new-releases) (reads Deezer's public catalogue in the background) |
+| `RELEASES_REFRESH_HOURS` | `24` | how often each artist's releases are re-read |
 | `HOOK_DEBOUNCE_SECONDS` / `HOOK_MAX_WAIT_SECONDS` / `HOOK_MIN_INTERVAL_SECONDS` | `45` / `600` / `60` | hook coalescing |
 | `NTFY_URL`, `NTFY_TOPIC` | | an empty topic disables ntfy |
 | `NTFY_NOTIFY_DONE` | `true` | a ping per finished track; ambiguity, failures and credential problems always ping |

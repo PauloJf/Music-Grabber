@@ -121,6 +121,13 @@ export interface QueueResult { ok: boolean; queued: number; item_ids: number[]; 
 
 export interface User { id: number | null; username: string; role: "admin" | "user"; prefs: { theme?: "system" | "light" | "dark"; preview_volume?: number }; created_at?: string | null; last_login?: string | null }
 export interface ApiKey { id: number; name: string; scopes: string[]; created_by: string | null; created_at: string | null; last_used_at: string | null; revoked_at: string | null }
+export interface Release { dz_artist_id: string; dz_album_id: string; title: string; kind: string; release_date: string; cover_url: string; artist_name: string }
+export interface ReleaseFeed {
+  enabled: boolean; days: number; releases: Release[]; following: string[];
+  status: { artists: number; mapped: number; last_run: string | null; last_checked: string | null; last_error: string; more_to_do: boolean } | null;
+}
+export interface ArtistPref { dz_artist_id: string; name: string; follow: number; hide_releases: number; hide_suggestions: number }
+export interface ReleasesHidden { artists: ArtistPref[]; releases: Release[] }
 export interface Me { user: User; via: "token" | "session" }
 
 export interface OwnedTrack { path: string; title: string | null; artist: string | null; album: string | null; album_artist: string | null; duration_ms: number | null; year: number | null }

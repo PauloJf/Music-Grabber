@@ -119,6 +119,10 @@ def build_config() -> dict:
         # Write the Spotify track id into grabbed files (never into existing ones).
         "write_spotify_id_tag":  _bool("WRITE_SPOTIFY_ID_TAG", "true"),
 
+        # New releases from artists you own or follow (off by default; Deezer's public API).
+        "releases_enabled":      _bool("RELEASES_ENABLED"),
+        "releases_refresh_hours": float(os.environ.get("RELEASES_REFRESH_HOURS", "24")),
+
         # Notifications.
         "ntfy_url":              os.environ.get("NTFY_URL", ""),
         "ntfy_topic":            os.environ.get("NTFY_TOPIC", ""),

@@ -48,6 +48,10 @@ services:
       # NAVIDROME_PASS: ""
       # MIRROR_PREFIX: "Spotify: "
 
+      # --- New releases from artists you own or follow (off by default; reads Deezer's public catalogue) ---
+      # RELEASES_ENABLED: "true"
+      # RELEASES_REFRESH_HOURS: "24"
+
       # ntfy: leave empty to disable
       NTFY_URL: https://ntfy.sh
       NTFY_TOPIC: ""

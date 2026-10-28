@@ -24,6 +24,7 @@ inbox [list|show|preview|choose|search|research|research-all|skip]
 settings [show|set|test-deezer|test-ntfy]
 users [list|add|passwd|role|delete]   accounts for the web UI (also the way back in after a lost password)
 keys [list|create|revoke]             API keys for other apps (scoped; the key is shown once)
+releases [list|refresh]   new releases from your artists (needs RELEASES_ENABLED)
 library list [QUERY]      the tracks the library index knows (what search marks as owned)
 library refresh           reload the library index
 ledger rebuild            re-add ledger rows for files carrying our Spotify id tag
@@ -122,6 +123,10 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("pairs", nargs="+", metavar="KEY VALUE")
     st.add("test-deezer")
     st.add("test-ntfy")
+
+    rl = top.nested(top.add("releases"))
+    rl.add("list").add_argument("--days", type=int, default=0)
+    rl.add("refresh")
 
     ks = top.nested(top.add("keys"))
     ks.add("list")
@@ -284,6 +289,8 @@ def _dispatch(args, ops, out) -> int:
         _users(args, a or "list", ops, emit)
     elif c == "keys":
         _keys(args, a or "list", ops, emit)
+    elif c == "releases":
+        _releases(args, a or "list", ops, emit)
     else:
         print(f"unknown command: {c}", file=sys.stderr)
         return 2
@@ -431,6 +438,19 @@ def _users(args, a, ops, emit):
     elif a == "delete":
         ops.users_delete(uid)
         emit({"ok": True}, f"Deleted '{match[0]['username']}'")
+
+
+def _releases(args, a, ops, emit):
+    if a == "refresh":
+        emit(ops.releases_refresh(), "Refresh started (it keeps going in the background).")
+        return
+    d = ops.releases_feed(0, args.days)
+    if not d["enabled"]:
+        emit(d, "New releases are off: set RELEASES_ENABLED=true (and run the server; it fills in over a few passes).")
+        return
+    rows = d["releases"]
+    emit(d, _table(rows, [("DATE", "release_date"), ("ARTIST", "artist_name"), ("TITLE", "title"), ("KIND", "kind")])
+         if rows else f"Nothing new in the last {d['days']} days.")
 
 
 def _keys(args, a, ops, emit):
