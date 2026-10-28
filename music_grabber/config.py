@@ -122,6 +122,11 @@ def build_config() -> dict:
         # New releases from artists you own or follow (off by default; Deezer's public API).
         "releases_enabled":      _bool("RELEASES_ENABLED"),
         "releases_refresh_hours": float(os.environ.get("RELEASES_REFRESH_HOURS", "24")),
+        # Part of the same feature: "albums you are missing" from artists you own (can be switched off in Settings).
+        "suggest_gaps":          _bool("SUGGEST_GAPS", "true"),
+        "suggest_artists":       _bool("SUGGEST_ARTISTS", "true"),
+        # Read starred songs from the library server (LIBRARY_INDEX=opensubsonic) to weight your taste.
+        "suggest_stars":         _bool("SUGGEST_STARS", "true"),
 
         # Notifications.
         "ntfy_url":              os.environ.get("NTFY_URL", ""),

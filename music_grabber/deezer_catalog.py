@@ -220,3 +220,8 @@ def artist_albums(dz_id: str, limit: int = 100) -> list:
             seen.add(x["id"])
             out.append(album_view(x))
     return out
+
+
+def artist_related(dz_id: str, limit: int = 12) -> list:
+    """Deezer's "fans also like" list for an artist, most related first."""
+    return [artist_view(x) for x in _call(f"artist/{dz_id}/related", {"limit": limit}).get("data", []) if x and x.get("id")]

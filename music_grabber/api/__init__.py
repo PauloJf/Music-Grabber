@@ -352,6 +352,22 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
     def release_undismiss(album_id):
         return jsonify(ops.release_dismiss(uid(), album_id, False))
 
+    @app.get("/api/suggest")
+    def suggestions():
+        return jsonify(ops.suggestions(uid()))
+
+    @app.get("/api/suggest/hidden")
+    def suggest_hidden():
+        return jsonify(ops.suggest_hidden(uid()))
+
+    @app.post("/api/suggest/<kind>/<ref>/dismiss")
+    def suggest_dismiss(kind, ref):
+        return jsonify(ops.suggest_dismiss(uid(), kind, ref, True))
+
+    @app.delete("/api/suggest/<kind>/<ref>/dismiss")
+    def suggest_undismiss(kind, ref):
+        return jsonify(ops.suggest_dismiss(uid(), kind, ref, False))
+
     @app.get("/api/artist-prefs")
     def artist_prefs():
         return jsonify(ops.artist_prefs(uid()))

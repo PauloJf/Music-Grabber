@@ -49,9 +49,8 @@ def build_service(config: dict) -> GrabberService:
         service.mirror = mirror
         service.sync.on_synced = mirror.request
     service.analysis = analysis
-    if config.get("releases_enabled"):
-        from .releases import ReleaseTracker
-        service.releases = ReleaseTracker(config, db)
+    from .releases import ReleaseTracker              # always built: RELEASES_ENABLED is also a Settings switch
+    service.releases = ReleaseTracker(config, db)
     if analysis.name in ("intake", "api"):
         from .analysis_watch import AnalysisWatcher
         service.analysis_watcher = AnalysisWatcher(db, config.get("library_dir") or config["music_dir"], index=index)
