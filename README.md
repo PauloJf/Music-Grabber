@@ -466,7 +466,8 @@ Decided, not forgotten (the questions are in [`docs/plans/extraction.md`](docs/p
 - **A "scan just these files" trigger in BPM Tagger.** `ANALYSIS=api` can only start a full-library
   scan (and not with admin two-factor). The supported setup is BPM Tagger in watch mode with
   `ANALYSIS=intake`; Music Grabber then reads back the BPM and loudness BPM Tagger wrote.
-- **The Suggestions page** BPM Tagger's grabber had. Discover, Library and Owned tracks cover most of it.
+- **BPM Tagger's old Suggestions page**, as such. Since 1.1 the *For you* page (albums you're missing, artists you may
+  like) and *New releases* replace it; see [New releases and suggestions](#new-releases-and-suggestions).
 - **A verified Mediarium contract.** The scan hook treats any 2xx answer from `POST /api/music/import/scan`
   as success and does not read the body, and it uses the API key you give it as is.
 
