@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.1.0 (2026-10-28)
+
+Adds an integration API for other apps (BPM Tagger can request a track), New releases from your artists, and
+"For you" suggestions. Everything new is off by default or additive: nothing changes for an existing
+install until you create an API key or switch New releases on (Settings, or `RELEASES_ENABLED=true`). The
+database gains tables and two queue columns on first start (additive; a `.bak-1.1.0` copy is written first).
+
 ### Added
 - **ntfy ping for new releases** (`RELEASES_NOTIFY`, off by default, also in Settings): one notification per
   pass for releases not announced yet; the first run only records what is already known.
@@ -27,6 +34,7 @@
   Design: `docs/plans/integration-and-suggestions.md`.
 
 ### Changed
+- CI keeps pytest below 9.2 (streamrip's pytest-asyncio 0.21 breaks collection on it).
 - The compose examples use `gatoserio/bpm-tagger:latest` again: BPM Tagger 2.19.0, the grabber-free build, is stable.
 
 ## 1.0.0 (2026-10-25)
