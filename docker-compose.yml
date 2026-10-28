@@ -54,6 +54,7 @@ services:
       # SUGGEST_GAPS: "true"              # albums you are missing from artists you own
       # SUGGEST_ARTISTS: "true"           # artists you may like
       # SUGGEST_STARS: "true"             # use starred songs (LIBRARY_INDEX=opensubsonic)
+      # RELEASES_NOTIFY: "true"           # one ntfy ping when new releases turn up
       # (all four switches are also in Settings and apply without a restart)
 
       # ntfy: leave empty to disable

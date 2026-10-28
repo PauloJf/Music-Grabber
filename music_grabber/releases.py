@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from . import deezer_catalog as dz
+from .notify import Notifier
 from .subsonic import SubsonicError, call
 from .suggest import seeds
 from .text import normalize_artist
@@ -29,6 +30,7 @@ MAP_BATCH = 40                # artists mapped per pass (a big library takes a f
 POLL_BATCH = 60               # artists whose albums are read per pass
 RELATED_BATCH = 15            # artists whose related list is read per pass
 RELATED_DAYS = 7
+NOTIFY_DAYS = 30              # a release older than this is never announced, even if never seen before
 RETRY_UNMAPPED_DAYS = 30
 FAILURES_BEFORE_GIVING_UP = 3
 IDLE_SECONDS = 300            # how often a switched-off tracker looks at its switch
@@ -129,12 +131,37 @@ class ReleaseTracker:
             self._read_stars()
         if self.config.get("suggest_artists", True):
             self._read_related(stats, force)
+        if self.config.get("releases_notify"):
+            stats["notified"] = self._notify()
         stats["ok"] = stats["failed"] == 0                         # a partial pass is reported, and retried next time
         if stats["ok"]:
             self.last_error = ""
         self.last_run = datetime.now(timezone.utc).isoformat()
         log.info("New releases: %s", stats)
         return stats
+
+    def _notify(self) -> int:
+        """One ntfy ping for releases not announced yet. The first time this runs everything already known
+        is marked as announced without a ping (the back catalogue is not news). Best effort: a failed
+        ping is logged by the Notifier and not retried. Returns how many releases were announced."""
+        if not self.db.notify_baseline_done():
+            self.db.mark_notified([r["dz_album_id"] for r in self.db.unnotified_releases("0000")])
+            self.db.set_notify_baseline()
+            return 0
+        rows = self.db.unnotified_releases(_stamp(NOTIFY_DAYS)[:10])
+        if not rows:
+            return 0
+        notifier = Notifier.from_config(self.config)
+        if notifier:
+            lines = [f"{r['artist_name']}: {r['title']} ({r['release_date']})" for r in rows[:8]]
+            if len(rows) > 8:
+                lines.append(f"and {len(rows) - 8} more")
+            base = (self.config.get("ui_public_url") or "").rstrip("/")
+            notifier.send_grabber(f"{len(rows)} new release{'s' if len(rows) != 1 else ''} from your artists",
+                                  "\n".join(lines), click_url=f"{base}/releases" if base else "",
+                                  tags="musical_note")
+        self.db.mark_notified([r["dz_album_id"] for r in rows])
+        return len(rows)
 
     def _read_related(self, stats: dict, force: bool) -> None:
         ids = [s["dz_id"] for s in seeds(self.db)]

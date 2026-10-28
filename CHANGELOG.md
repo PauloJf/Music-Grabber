@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- **ntfy ping for new releases** (`RELEASES_NOTIFY`, off by default, also in Settings): one notification per
+  pass for releases not announced yet; the first run only records what is already known.
+- **`GET /api/v1/suggestions` and `/api/v1/releases`** for other apps, behind a new `suggestions` key scope
+  (read-only, unfiltered by any account's hides).
 - **Suggestions ("For you")**, on the same switch as New releases and each part with its own switch in
   Settings (applied without a restart): *albums you're missing* from artists you own, and *artists you may
   like* (Deezer's related artists of your top artists, weighted by tracks owned and songs you starred in

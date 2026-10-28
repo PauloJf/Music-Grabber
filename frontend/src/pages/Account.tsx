@@ -112,6 +112,7 @@ function Users({ meId }: { meId: number | null }) {
 
 const KEY_SCOPES: { id: string; label: string }[] = [
   { id: "request", label: "Request tracks" }, { id: "browse", label: "Search the catalogue" }, { id: "library", label: "Check the library" },
+  { id: "suggestions", label: "Read suggestions and new releases" },
 ];
 
 function ApiKeys() {

@@ -250,3 +250,31 @@ class ReleasesMixin:
                 "SELECT a.dz_album_id, a.dz_artist_id, a.title, a.artist_name FROM item_dismissals d "
                 "JOIN album_cache a ON a.dz_album_id = d.ref WHERE d.user_id=? AND d.kind='album'", (user_id,))]
         return {"artists": artists, "albums": albums}
+
+    # ── the ntfy ping ─────────────────────────────────────────────────────────
+    def notify_baseline_done(self) -> bool:
+        with self._connect() as conn:
+            return conn.execute("SELECT 1 FROM app_counters WHERE key='releases_notify_baseline'").fetchone() is not None
+
+    def set_notify_baseline(self) -> None:
+        with self._connect() as conn:
+            conn.execute("INSERT OR IGNORE INTO app_counters (key, value) VALUES ('releases_notify_baseline', 1)")
+            conn.commit()
+
+    def unnotified_releases(self, since: str) -> list[dict]:
+        """Releases dated ``since`` or later by anyone's artists (library/playlist artists and followed ones)
+        that no ping has mentioned yet, oldest first."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT r.* FROM release_cache r WHERE r.release_date >= ? "
+                "AND r.dz_album_id NOT IN (SELECT dz_album_id FROM release_notified) "
+                "AND (r.dz_artist_id IN (SELECT dz_artist_id FROM artist_map WHERE active=1 AND dz_artist_id IS NOT NULL) "
+                "     OR r.dz_artist_id IN (SELECT dz_artist_id FROM artist_prefs WHERE follow=1)) "
+                "ORDER BY r.release_date, r.title", (since,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def mark_notified(self, album_ids: list[str]) -> None:
+        with self._connect() as conn:
+            conn.executemany("INSERT OR IGNORE INTO release_notified (dz_album_id, notified_at) VALUES (?,?)",
+                             [(i, _now()) for i in album_ids])
+            conn.commit()

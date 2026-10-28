@@ -384,6 +384,13 @@ class _DBBase:
                 starred   INTEGER NOT NULL
             )
         """)
+        # Which new releases the ntfy ping has already mentioned (so each is announced once).
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS release_notified (
+                dz_album_id TEXT PRIMARY KEY,
+                notified_at TEXT
+            )
+        """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS item_dismissals (
                 user_id INTEGER NOT NULL,
