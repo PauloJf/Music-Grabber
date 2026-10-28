@@ -119,6 +119,17 @@ def build_config() -> dict:
         # Write the Spotify track id into grabbed files (never into existing ones).
         "write_spotify_id_tag":  _bool("WRITE_SPOTIFY_ID_TAG", "true"),
 
+        # New releases from artists you own or follow (off by default; Deezer's public API).
+        "releases_enabled":      _bool("RELEASES_ENABLED"),
+        "releases_refresh_hours": float(os.environ.get("RELEASES_REFRESH_HOURS", "24")),
+        # Part of the same feature: "albums you are missing" from artists you own (can be switched off in Settings).
+        "suggest_gaps":          _bool("SUGGEST_GAPS", "true"),
+        # One ntfy ping when new releases from your artists turn up (needs NTFY_URL/NTFY_TOPIC).
+        "releases_notify":       _bool("RELEASES_NOTIFY"),
+        "suggest_artists":       _bool("SUGGEST_ARTISTS", "true"),
+        # Read starred songs from the library server (LIBRARY_INDEX=opensubsonic) to weight your taste.
+        "suggest_stars":         _bool("SUGGEST_STARS", "true"),
+
         # Notifications.
         "ntfy_url":              os.environ.get("NTFY_URL", ""),
         "ntfy_topic":            os.environ.get("NTFY_TOPIC", ""),

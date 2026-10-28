@@ -48,6 +48,15 @@ services:
       # NAVIDROME_PASS: ""
       # MIRROR_PREFIX: "Spotify: "
 
+      # --- New releases from artists you own or follow (off by default; reads Deezer's public catalogue) ---
+      # RELEASES_ENABLED: "true"
+      # RELEASES_REFRESH_HOURS: "24"
+      # SUGGEST_GAPS: "true"              # albums you are missing from artists you own
+      # SUGGEST_ARTISTS: "true"           # artists you may like
+      # SUGGEST_STARS: "true"             # use starred songs (LIBRARY_INDEX=opensubsonic)
+      # RELEASES_NOTIFY: "true"           # one ntfy ping when new releases turn up
+      # (all four switches are also in Settings and apply without a restart)
+
       # ntfy: leave empty to disable
       NTFY_URL: https://ntfy.sh
       NTFY_TOPIC: ""

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Search, X } from "../components/icons";
 import { Empty, ErrorState, Skeleton, Tile, TrackRow } from "../components/ui";
 import { ApiError, get } from "../lib/api";
@@ -64,7 +64,7 @@ export default function Discover() {
       <section className="hero">
         <div className="eyebrow">Discover</div>
         <h1>Find it, then<br />queue it.</h1>
-        <p>Search Deezer for songs, artists and albums. Preview 30 seconds, see what you already own, and queue the rest.</p>
+        <p>Search Deezer for songs, artists and albums. Preview 30 seconds, see what you already own, and queue the rest. <Link to="/releases">New releases</Link> · <Link to="/for-you">For you</Link></p>
       </section>
       <form role="search" onSubmit={(e) => { e.preventDefault(); const n = new URLSearchParams(params); text.trim() ? n.set("q", text.trim()) : n.delete("q"); setParams(n); }}>
         <div className="search">

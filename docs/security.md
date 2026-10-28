@@ -57,6 +57,9 @@ web pages visited from the owner's browser.
 
 ## Residual risks and advice
 
+- **API keys** (for other apps) are scoped (`request`, `browse`, `library`), stored as SHA-256 hashes, shown
+  once, revocable, and refused on every route outside `/api/v1`; wrong keys share the lockout. A leaked
+  key can still queue downloads within its scopes: revoke it, and keep keys on a server, never in a browser.
 - The `API_TOKEN` is still a full-admin key. Use a long random value; rotate it by changing `API_TOKEN` and restarting.
 - Plain HTTP exposes the token on the wire. Use TLS (reverse proxy) beyond loopback/LAN.
 - The lockout is per source address; behind a reverse proxy all clients share the proxy's address,

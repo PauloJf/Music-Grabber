@@ -142,6 +142,7 @@ python -m music_grabber inbox show 12           # candidates with scores, plus t
 python -m music_grabber inbox choose 12 41      # download candidate 41 for item 12
 python -m music_grabber inbox search 12 "weeknd blinding lights"   # try another search
 python -m music_grabber settings set output_format flac
+python -m music_grabber keys list               # API keys for other apps (create, revoke too)
 python -m music_grabber ledger rebuild          # re-add ledger rows for files carrying our Spotify id tag
 ```
 
@@ -182,12 +183,39 @@ Set `API_TOKEN` and the API listens on `API_PORT`. Every `/api/*` call needs
 `GET /api/status`; `/api/playlists` (`POST {"value": url}`, `PATCH {"enabled": false}`, `DELETE`,
 `POST /api/playlists/<id>/sync`, `/enqueue-missing`); `POST /api/sync`; `/api/queue` and
 `/api/queue/<id>/{retry,cancel,priority}`; `/api/inbox` and `/api/inbox/<id>/{choose,search,research,skip}`;
-`/api/browse/{search,artist/<id>,album/<id>,queue,undo}` (catalogue + queueing) and `/api/activity`; accounts: `/api/auth/{state,login,setup,logout}`, `/api/me`, `/api/users` (admin); `/api/settings` (secrets come back masked); `/api/spotify/*`; `GET /api/library?q=&limit=&offset=` (the tracks the index knows), `POST /api/library/refresh`; open:
+`/api/browse/{search,artist/<id>,album/<id>,queue,undo}` (catalogue + queueing) and `/api/activity`; accounts: `/api/auth/{state,login,setup,logout}`, `/api/me`, `/api/users` (admin); `/api/settings` (secrets come back masked); `/api/spotify/*`; `GET /api/library?q=&limit=&offset=` (the tracks the index knows), `POST /api/library/refresh`; `/api/keys` (admin; see below); `/api/releases`, `/api/suggest`, `/api/artist-prefs/<deezer artist id>` (new releases and suggestions, below); open:
 `GET /healthz` (just `{"ok": true}`) and the Spotify `/callback` (which only accepts a single-use `state` this instance
 issued). Errors are `{"error": "<code>", "message": "..."}` with a matching HTTP status. Publish
 the port on loopback only, and put TLS in front before exposing it further. Ten wrong tokens in a minute
 lock that address out for a minute (HTTP 429). The token is an always-admin key; people sign in with
 an account (below). See [`docs/security.md`](docs/security.md) for the review and residual risks.
+
+### Integration API (for other apps)
+
+To let another app (BPM Tagger, a script) request music without handing it the admin token, create an
+**API key**: Account page, or `python -m music_grabber keys create "BPM Tagger" --scopes request`. The key
+(`mgk_...`) is shown once, stored hashed, named, revocable (`keys revoke ID`), and limited to scopes:
+`request` (create and read requests), `browse` (search the catalogue), `library` (is it owned?) and
+`suggestions` (read the suggestions and new releases). A key can
+only call `/api/v1`; every other route answers 403. Use it as `Authorization: Bearer mgk_...`, from a server
+(not from a browser page).
+
+```bash
+curl -H "Authorization: Bearer $KEY" -H "Content-Type: application/json"   -d '{"dz_id": "3135556", "source_ref": "bpm:42"}' http://host:8099/api/v1/requests
+```
+
+- `POST /api/v1/requests` takes `dz_id` (a Deezer track id), or `isrc`, or `title` + `artist` (+ `album`,
+  `duration_ms`, `isrc`), and an optional `source_ref` of yours. It answers `queued` (201, with `id`),
+  `in_library`, `already_queued`, or `already_requested` (the same `source_ref` again; a failed one may be
+  requested again). `"force": true` queues a track you already own.
+- `GET /api/v1/requests/<id>`: `status` (`pending`, `searching`, `downloading`, `awaiting_user`, `done`,
+  `failed`...), `progress`, `error`. A key sees only the requests it made.
+- `GET /api/v1/library/has?isrc=...` (or `title` + `artist`): `{"have": true|false}`.
+- `GET /api/v1/search?q=&type=track|artist|album`, `/artist/<id>`, `/album/<id>`: the Discover data.
+- `GET /api/v1/suggestions` (`gaps` and `artists`, each empty when its switch is off) and
+  `GET /api/v1/releases?days=`: read-only, the unfiltered view (no account's hides or dismissals apply).
+
+The queue shows who asked ("requested by BPM Tagger").
 
 ### Accounts and signing in
 
@@ -210,10 +238,51 @@ python -m music_grabber users passwd alice              # also the way back afte
 runtime: `output_format`, `path_template`, `provider_order`, `deezer_quality`, `deezer_arl`,
 `auto_accept_threshold`, `ask_threshold`, `grab_dry_run`, `lyrics_enabled`, `write_spotify_id_tag`,
 `spotify_sync_minutes`, `grab_workers`, `ntfy_url`, `ntfy_topic`, `ntfy_notify_done`,
-`ui_public_url`. Values are validated, saved to `settings.json` (mode 0600, next to the database)
+`ui_public_url`, `releases_enabled`, `releases_notify`, `suggest_gaps`, `suggest_artists`, `suggest_stars`. Values are validated, saved to `settings.json` (mode 0600, next to the database)
 and applied to the running instance without a restart (`grab_workers` and `spotify_sync_minutes`
 need one). Settings saved this way override the environment from then on. Credentials that come
 from the environment (Spotify secret, API token, library/hook keys) are never written to the file.
+
+## New releases and suggestions
+
+Off by default. With `RELEASES_ENABLED=true` a background job (first pass about a minute after start,
+then every `RELEASES_REFRESH_HOURS`) looks at **your artists**: library artists with at least 3 tracks,
+artists with at least 2 tracks on a watched playlist, and the artists you **follow**. It finds each one on
+Deezer, reads their albums, singles and EPs, and the **New releases** page (link on Discover) lists what came
+out in the last 90 days, newest first. Queue a whole album from its page as usual.
+
+- **Matching is careful.** A track's ISRC names its Deezer artist exactly; failing that, a name search is
+  accepted only when the name is equal (with the most fans winning among namesakes). Anything less sure is
+  left out and re-tried after 30 days, never guessed. A big library is worked through a few dozen artists
+  per pass; the page says how many are matched.
+- **Hide and follow are per account.** *Hide artist* and *Not interested* (one release) take things off your
+  page only; a *Hidden* list brings them back. *Follow new releases* on an artist's page adds an artist you
+  do not own. The shared API token acts as one extra user.
+- **Light on Deezer.** Calls share the existing rate limiter; each artist is read at most once per refresh
+  period; if Deezer is unreachable the page keeps showing what it last learned.
+- `python -m music_grabber releases [list|refresh]` and `GET /api/releases` do the same from a script;
+  `POST /api/releases/refresh` (administrators) checks now.
+
+**For you** (the same background pass, its own page) adds two lists, each with its own switch:
+
+- **Albums you're missing**: albums by artists you own (3+ tracks) that nothing in your library matches, or
+  that you own at most half of when Deezer gives the album's length ("you have 2 of 10"). A deluxe edition
+  counts as the album; singles and EPs are not suggested. Up to 5 per artist, newest first.
+- **Artists you may like**: Deezer's "fans also like" lists for your top 30 artists, weighted by how many
+  tracks you own and, with `LIBRARY_INDEX=opensubsonic`, how many you **starred** (read from BPM Tagger or
+  Navidrome with the library key: that is that library user's taste, not each Grabber account's). Artists
+  you own, follow, hid or dismissed never appear; each tile says who it is "because" of.
+- **Switches**, all in Settings (*New releases and suggestions*) and applied at once, no restart: the
+  master switch (`RELEASES_ENABLED`), `SUGGEST_GAPS`, `SUGGEST_ARTISTS`, `SUGGEST_STARS`. Switching a part off
+  hides it and stops fetching what it needs (no "related" calls without the artists list, no star reads
+  without the stars switch); what was already learned is kept for when you turn it back on.
+- **ntfy ping** (`RELEASES_NOTIFY`, off by default): one notification per pass listing releases not announced
+  before (up to 8 names, then "and N more"), linking to the New releases page when `UI_PUBLIC_URL` is set.
+  The first time it is switched on, everything already known is marked as announced without a ping; a release
+  older than 30 days when found is never announced. It is one shared topic, so per-account hides do not apply
+  to it, and it is best effort (a failed ping is logged, not retried).
+- Per account, like the releases: *Not interested* on a tile, *Hide artist*, and *Hide from suggestions* on an
+  artist's page; a *Hidden suggestions* list undoes them. Nothing here ever downloads on its own.
 
 ## Library and the ledger
 
@@ -361,6 +430,12 @@ an environment variable; a few can also be changed at runtime ([Settings](#setti
 | `NAVIDROME_URL`, `NAVIDROME_USER`, `NAVIDROME_PASS` | | for the `navidrome` hook and the playlist mirror |
 | `PLAYLIST_MIRROR` | | `navidrome` writes watched playlists to Navidrome (off when empty); see [the mirror](#spotify-playlists-in-navidrome-the-mirror) |
 | `MIRROR_PREFIX` | `Spotify: ` | prefix of the mirrored playlists' names |
+| `RELEASES_ENABLED` | `false` | turns on [New releases and suggestions](#new-releases-and-suggestions) (reads Deezer's public catalogue in the background); also a switch in Settings |
+| `SUGGEST_GAPS` | `true` | suggestions: albums you are missing from artists you own (needs `RELEASES_ENABLED`; also in Settings) |
+| `SUGGEST_ARTISTS` | `true` | suggestions: artists you may like (needs `RELEASES_ENABLED`; also in Settings) |
+| `RELEASES_NOTIFY` | `false` | one ntfy ping when new releases from your artists turn up (needs `RELEASES_ENABLED` and ntfy; also in Settings) |
+| `SUGGEST_STARS` | `true` | use the songs you starred in BPM Tagger or Navidrome to weight your taste (`LIBRARY_INDEX=opensubsonic` only; also in Settings) |
+| `RELEASES_REFRESH_HOURS` | `24` | how often each artist's releases are re-read |
 | `HOOK_DEBOUNCE_SECONDS` / `HOOK_MAX_WAIT_SECONDS` / `HOOK_MIN_INTERVAL_SECONDS` | `45` / `600` / `60` | hook coalescing |
 | `NTFY_URL`, `NTFY_TOPIC` | | an empty topic disables ntfy |
 | `NTFY_NOTIFY_DONE` | `true` | a ping per finished track; ambiguity, failures and credential problems always ping |

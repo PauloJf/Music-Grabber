@@ -5,7 +5,7 @@ import { del, errorText, get, patch, post } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { ago, useMe } from "../lib/hooks";
 import { useToast } from "../lib/toast";
-import type { User } from "../lib/types";
+import type { ApiKey, User } from "../lib/types";
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return <section style={{ margin: "30px 0", maxWidth: 560 }}><h2>{title}</h2>{hint && <p className="muted" style={{ margin: "2px 0 12px" }}>{hint}</p>}<div className="stack" style={{ marginTop: 12 }}>{children}</div></section>;
@@ -110,6 +110,51 @@ function Users({ meId }: { meId: number | null }) {
   );
 }
 
+const KEY_SCOPES: { id: string; label: string }[] = [
+  { id: "request", label: "Request tracks" }, { id: "browse", label: "Search the catalogue" }, { id: "library", label: "Check the library" },
+  { id: "suggestions", label: "Read suggestions and new releases" },
+];
+
+function ApiKeys() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const q = useQuery({ queryKey: ["api-keys"], queryFn: () => get<{ keys: ApiKey[] }>("/api/keys") });
+  const [name, setName] = useState("");
+  const [scopes, setScopes] = useState<string[]>(["request"]);
+  const [shown, setShown] = useState("");
+  const [error, setError] = useState("");
+  const refresh = () => qc.invalidateQueries({ queryKey: ["api-keys"] });
+  const create = useMutation({ mutationFn: () => post<{ token: string }>("/api/keys", { name, scopes }), onError: (e) => setError(errorText(e)),
+    onSuccess: (d) => { setShown(d.token); setName(""); setError(""); refresh(); } });
+  const revoke = useMutation({ mutationFn: (id: number) => del(`/api/keys/${id}`), onSuccess: () => { toast.push({ kind: "ok", text: "Key revoked" }); refresh(); },
+    onError: (e) => toast.push({ kind: "err", text: errorText(e) }) });
+  const toggle = (id: string) => setScopes(scopes.includes(id) ? scopes.filter((s) => s !== id) : [...scopes, id]);
+  return (
+    <Section title="API keys" hint="Let another app (BPM Tagger, say) search and request music. A key only works on /api/v1, never on settings or accounts.">
+      {q.isLoading && <Skeleton rows={2} />}
+      {q.isError && <ErrorState error={q.error} retry={() => q.refetch()} />}
+      <ul className="stack" style={{ listStyle: "none", padding: 0, margin: 0, gap: 10 }}>
+        {(q.data?.keys ?? []).map((k) => (
+          <li key={k.id} className="row" style={{ justifyContent: "space-between", borderBottom: "1px solid var(--rule)", paddingBottom: 10 }}>
+            <div><b>{k.name}</b><br /><span className="muted" style={{ fontSize: 13 }}>{k.scopes.join(", ")} · {k.last_used_at ? `used ${ago(k.last_used_at)}` : "never used"}</span></div>
+            {k.revoked_at ? <Pill kind="mute">revoked</Pill>
+              : <button className="btn sm" onClick={() => { if (window.confirm(`Revoke ${k.name}? The app using it stops working.`)) revoke.mutate(k.id); }}>Revoke</button>}
+          </li>
+        ))}
+      </ul>
+      {shown && <Banner kind="warn">Copy this key now, it is not shown again: <code style={{ wordBreak: "break-all" }}>{shown}</code></Banner>}
+      <form className="stack" onSubmit={(e) => { e.preventDefault(); setError(""); setShown(""); create.mutate(); }} aria-label="Create an API key">
+        <h3 style={{ margin: "10px 0 0" }}>Create a key</h3>
+        {error && <div className="banner err" role="alert">{error}</div>}
+        <label className="field"><span>Name</span><input autoComplete="off" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} required /></label>
+        <div className="stack" style={{ gap: 6 }}>{KEY_SCOPES.map((s) => (
+          <label key={s.id} className="row tight"><input type="checkbox" checked={scopes.includes(s.id)} onChange={() => toggle(s.id)} /> {s.label}</label>))}</div>
+        <div><button className="btn primary" disabled={create.isPending || scopes.length === 0}>{create.isPending ? "Creating…" : "Create key"}</button></div>
+      </form>
+    </Section>
+  );
+}
+
 export default function Account() {
   const { logout } = useAuth();
   const me = useMe();
@@ -126,6 +171,7 @@ export default function Account() {
         ? <div style={{ maxWidth: 560, marginTop: 16 }}><Banner kind="warn">You signed in with the shared API token, which has no personal profile. Sign out and sign in with an account to set preferences or a password.</Banner></div>
         : <><Preferences user={user} /><ChangePassword /></>}
       {user.role === "admin" && <Users meId={user.id} />}
+      {user.role === "admin" && <ApiKeys />}
       <div style={{ margin: "10px 0 70px" }}><button className="btn" onClick={logout}>Sign out</button></div>
     </>
   );

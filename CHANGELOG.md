@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### Added
+- **ntfy ping for new releases** (`RELEASES_NOTIFY`, off by default, also in Settings): one notification per
+  pass for releases not announced yet; the first run only records what is already known.
+- **`GET /api/v1/suggestions` and `/api/v1/releases`** for other apps, behind a new `suggestions` key scope
+  (read-only, unfiltered by any account's hides).
+- **Suggestions ("For you")**, on the same switch as New releases and each part with its own switch in
+  Settings (applied without a restart): *albums you're missing* from artists you own, and *artists you may
+  like* (Deezer's related artists of your top artists, weighted by tracks owned and songs you starred in
+  BPM Tagger/Navidrome). Per account: not interested, hide artist, a hidden list to undo.
+  `RELEASES_ENABLED`, `SUGGEST_GAPS`, `SUGGEST_ARTISTS` and `SUGGEST_STARS` are all runtime settings now.
+- **New releases** (off by default, `RELEASES_ENABLED=true`): a page, linked from Discover, of albums,
+  singles and EPs from the last 90 days by artists you own (3+ tracks), artists on watched playlists and
+  artists you follow. Artists are matched to Deezer by ISRC, else by an equal name, else left out. Per
+  account: follow an artist from its page, hide an artist, or dismiss one release, with a list to undo.
+  Reads Deezer's public catalogue in the background (once per artist per `RELEASES_REFRESH_HOURS`).
+  CLI `releases list|refresh`. Design: `docs/plans/integration-and-suggestions.md`.
+- **Integration API for other apps.** Administrators create named API keys (Account page, or `keys
+  create NAME --scopes request,browse,library`); the key is shown once and stored hashed, can be revoked,
+  and works only on the new `/api/v1`: `GET /search`, `/artist/<id>`, `/album/<id>`, `POST /requests`
+  (by Deezer id, ISRC, or title + artist; answers `queued`, `in_library`, `already_queued` or, for a
+  repeated `source_ref`, `already_requested`), `GET /requests/<id>` (a key sees only its own) and
+  `GET /library/has`. Queue items record who asked (`requested_by`, `source_ref`) and the Queue shows it.
+  Design: `docs/plans/integration-and-suggestions.md`.
+
 ### Changed
 - The compose examples use `gatoserio/bpm-tagger:latest` again: BPM Tagger 2.19.0, the grabber-free build, is stable.
 

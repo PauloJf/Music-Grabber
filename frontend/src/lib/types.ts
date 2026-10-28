@@ -67,6 +67,7 @@ export interface QueueItem {
   error: string | null;
   final_path: string | null;
   updated_at: string | null;
+  requested_by?: string | null;
 }
 
 export interface Candidate {
@@ -119,6 +120,24 @@ export interface Activity {
 export interface QueueResult { ok: boolean; queued: number; item_ids: number[]; results: { dz_id: string; result: string }[]; album?: string }
 
 export interface User { id: number | null; username: string; role: "admin" | "user"; prefs: { theme?: "system" | "light" | "dark"; preview_volume?: number }; created_at?: string | null; last_login?: string | null }
+export interface ApiKey { id: number; name: string; scopes: string[]; created_by: string | null; created_at: string | null; last_used_at: string | null; revoked_at: string | null }
+export interface Release { dz_artist_id: string; dz_album_id: string; title: string; kind: string; release_date: string; cover_url: string; artist_name: string }
+export interface ReleaseFeed {
+  enabled: boolean; days: number; releases: Release[]; following: string[];
+  status: { artists: number; mapped: number; last_run: string | null; last_checked: string | null; last_error: string; more_to_do: boolean } | null;
+}
+export interface ArtistPref { dz_artist_id: string; name: string; follow: number; hide_releases: number; hide_suggestions: number }
+export interface ReleasesHidden { artists: ArtistPref[]; releases: Release[] }
+export interface SuggestedArtist { dz_id: string; name: string; image_url: string; fans: number | null; score: number; because: string[] }
+export interface AlbumGap { dz_artist_id: string; dz_album_id: string; title: string; release_date: string; cover_url: string; artist_name: string; track_count: number | null; owned: number; state: "missing" | "partial" }
+export interface Suggestions {
+  enabled: boolean; gaps_enabled: boolean; artists_enabled: boolean; gaps: AlbumGap[]; artists: SuggestedArtist[];
+  status: { more_to_do: boolean } | null;
+}
+export interface SuggestHidden {
+  artists: { dz_artist_id: string; name: string; hide_suggestions?: number }[];
+  albums: { dz_album_id: string; dz_artist_id: string; title: string; artist_name: string }[];
+}
 export interface Me { user: User; via: "token" | "session" }
 
 export interface OwnedTrack { path: string; title: string | null; artist: string | null; album: string | null; album_artist: string | null; duration_ms: number | null; year: number | null }

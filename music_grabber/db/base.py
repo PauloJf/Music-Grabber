@@ -279,3 +279,123 @@ class _DBBase:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lt_isrc ON library_tracks(isrc)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lt_norm_artist ON library_tracks(norm_artist)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lt_norm_title ON library_tracks(norm_title)")
+        # Integration API (docs/plans/integration-and-suggestions.md, part 1): scoped keys for
+        # other apps (stored hashed), and where a queue item came from.
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS api_keys (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                name         TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                key_hash     TEXT NOT NULL UNIQUE,
+                scopes       TEXT NOT NULL,
+                created_by   TEXT,
+                created_at   TEXT,
+                last_used_at TEXT,
+                revoked_at   TEXT
+            )
+        """)
+        queue_cols = {r[1] for r in conn.execute("PRAGMA table_info(grab_queue)")}
+        for col in ("requested_by", "source_ref"):
+            if col not in queue_cols:
+                conn.execute(f"ALTER TABLE grab_queue ADD COLUMN {col} TEXT")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_gq_source ON grab_queue(requested_by, source_ref)")
+        # New releases (docs/plans/integration-and-suggestions.md, part 2). artist_map answers
+        # "which Deezer artist is this library artist?" (a row with no dz_artist_id caches "no
+        # confident match"); artist_checks and release_cache hold what Deezer last said; the prefs
+        # and dismissals are per user (user 0 is the API token).
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS artist_map (
+                norm_name    TEXT PRIMARY KEY,
+                name         TEXT,
+                dz_artist_id TEXT,
+                confidence   REAL,
+                source       TEXT,
+                active       INTEGER DEFAULT 0,
+                mapped_at    TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS artist_checks (
+                dz_artist_id TEXT PRIMARY KEY,
+                name         TEXT,
+                checked_at   TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS release_cache (
+                dz_artist_id  TEXT NOT NULL,
+                dz_album_id   TEXT NOT NULL,
+                title         TEXT,
+                kind          TEXT,
+                release_date  TEXT,
+                cover_url     TEXT,
+                artist_name   TEXT,
+                first_seen_at TEXT,
+                PRIMARY KEY (dz_artist_id, dz_album_id)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_rc_date ON release_cache(release_date)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS artist_prefs (
+                user_id          INTEGER NOT NULL,
+                dz_artist_id     TEXT NOT NULL,
+                name             TEXT,
+                follow           INTEGER DEFAULT 0,
+                hide_releases    INTEGER DEFAULT 0,
+                hide_suggestions INTEGER DEFAULT 0,
+                PRIMARY KEY (user_id, dz_artist_id)
+            )
+        """)
+        # Suggestions: every album of a mapped artist (gaps), related artists (artists you may like),
+        # and the stars read from the library server (taste).
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS album_cache (
+                dz_artist_id TEXT NOT NULL,
+                dz_album_id  TEXT NOT NULL,
+                title        TEXT,
+                norm_title   TEXT,
+                kind         TEXT,
+                release_date TEXT,
+                cover_url    TEXT,
+                track_count  INTEGER,
+                artist_name  TEXT,
+                PRIMARY KEY (dz_artist_id, dz_album_id)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS related_cache (
+                dz_artist_id TEXT NOT NULL,
+                rel_id       TEXT NOT NULL,
+                rel_name     TEXT,
+                image_url    TEXT,
+                fans         INTEGER,
+                rank         INTEGER,
+                PRIMARY KEY (dz_artist_id, rel_id)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS related_checks (
+                dz_artist_id TEXT PRIMARY KEY,
+                checked_at   TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS artist_taste (
+                norm_name TEXT PRIMARY KEY,
+                starred   INTEGER NOT NULL
+            )
+        """)
+        # Which new releases the ntfy ping has already mentioned (so each is announced once).
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS release_notified (
+                dz_album_id TEXT PRIMARY KEY,
+                notified_at TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS item_dismissals (
+                user_id INTEGER NOT NULL,
+                kind    TEXT NOT NULL,
+                ref     TEXT NOT NULL,
+                PRIMARY KEY (user_id, kind, ref)
+            )
+        """)

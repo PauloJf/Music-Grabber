@@ -52,6 +52,19 @@ describe("account", () => {
     expect(calls.find((c) => c.method === "POST" && c.path === "/api/users")?.body).toEqual({ username: "carol", password: "temporary-pass", role: "user" });
   });
 
+  it("admins create an API key and see it once", async () => {
+    const keys = [{ id: 1, name: "BPM Tagger", scopes: ["request"], last_used_at: null, revoked_at: null }];
+    const calls = mockApi({ ...base, "GET /api/me": user("admin"), "GET /api/users": { users: [] }, "GET /api/keys": { keys },
+      "POST /api/keys": { key: keys[0], token: "mgk_secret-value" } });
+    renderApp(<App />, { route: "/account" });
+    await screen.findByText("BPM Tagger");
+    fill("Name", "Other app");
+    fireEvent.click(screen.getByLabelText("Check the library"));
+    fireEvent.click(screen.getByRole("button", { name: /create key/i }));
+    await screen.findByText(/mgk_secret-value/);
+    expect(calls.find((c) => c.method === "POST" && c.path === "/api/keys")?.body).toEqual({ name: "Other app", scopes: ["request", "library"] });
+  });
+
   it("the API token session explains it has no profile", async () => {
     mockApi({ ...base, "GET /api/me": { user: { id: null, username: "api-token", role: "admin", prefs: {} }, via: "token" }, "GET /api/users": { users: [] } });
     renderApp(<App />, { route: "/account" });

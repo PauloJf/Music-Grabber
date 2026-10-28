@@ -6,6 +6,7 @@ import Album from "./pages/Album";
 import Account from "./pages/Account";
 import Artist from "./pages/Artist";
 import Discover from "./pages/Discover";
+import ForYou from "./pages/ForYou";
 import Help from "./pages/Help";
 import Inbox from "./pages/Inbox";
 import Login from "./pages/Login";
@@ -13,6 +14,7 @@ import PlaylistDetail from "./pages/PlaylistDetail";
 import Owned from "./pages/Owned";
 import Playlists from "./pages/Playlists";
 import Queue from "./pages/Queue";
+import Releases from "./pages/Releases";
 import Settings from "./pages/Settings";
 
 export default function App() {
@@ -31,6 +33,8 @@ function Authed() {
         <Route path="/artist/:id" element={<Artist />} />
         <Route path="/album/:id" element={<Album />} />
         <Route path="/queue" element={<Queue />} />
+        <Route path="/releases" element={<Releases />} />
+        <Route path="/for-you" element={<ForYou />} />
         <Route path="/inbox" element={<Inbox />} />
         <Route path="/inbox/:id" element={<Inbox />} />
         <Route path="/playlists" element={<Playlists />} />
