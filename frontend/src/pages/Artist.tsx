@@ -87,6 +87,6 @@ export default function Artist() {
 }
 
 function BackLink() {
-  return <Link to="/" className="btn quiet sm" style={{ marginTop: 10, paddingLeft: 0 }} onClick={(e) => { if (window.history.length > 1) { e.preventDefault(); window.history.back(); } }}><Back width={16} height={16} />Back</Link>;
+  return <Link to="/discover" className="btn quiet sm" style={{ marginTop: 10, paddingLeft: 0 }} onClick={(e) => { if (window.history.length > 1) { e.preventDefault(); window.history.back(); } }}><Back width={16} height={16} />Back</Link>;
 }
 export { BackLink };

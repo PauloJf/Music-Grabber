@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { Banner, ErrorState, Pill, Skeleton } from "../components/ui";
 import { del, errorText, get, patch, post } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -172,7 +173,10 @@ export default function Account() {
         : <><Preferences user={user} /><ChangePassword /></>}
       {user.role === "admin" && <Users meId={user.id} />}
       {user.role === "admin" && <ApiKeys />}
-      <div style={{ margin: "10px 0 70px" }}><button className="btn" onClick={logout}>Sign out</button></div>
+      <div className="row" style={{ margin: "10px 0 70px" }}>
+        {user.role === "admin" && <Link className="btn" to="/settings">Settings</Link>}
+        <button className="btn" onClick={logout}>Sign out</button>
+      </div>
     </>
   );
 }

@@ -171,6 +171,7 @@ class Ops:
                 "queued": sum(p.get("queued_count", 0) for p in playlists),
             },
             "dry_run": bool(self.config.get("grab_dry_run")),
+            "releases_enabled": bool(self.config.get("releases_enabled")),
         }
 
     # ── playlists ─────────────────────────────────────────────────────────────

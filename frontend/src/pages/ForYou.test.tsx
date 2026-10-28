@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "../App";
 import Settings from "./Settings";
@@ -16,7 +16,7 @@ const on = { enabled: true, gaps_enabled: true, artists_enabled: true, gaps: [ga
 describe("for you", () => {
   it("shows artists and gaps with why, and dismisses one", async () => {
     const calls = mockApi({ ...base, "GET /api/suggest": reply(on), "POST /api/suggest/artist/20/dismiss": { ok: true } });
-    renderApp(<App />, { route: "/for-you" });
+    renderApp(<App />, { route: "/" });
     await screen.findByText("Dojja");
     expect(screen.getByText(/Because you have Dua Lipa and Prince/)).toBeTruthy();
     expect(screen.getByText(/you have 2 of 10/)).toBeTruthy();
@@ -26,15 +26,29 @@ describe("for you", () => {
 
   it("a switched-off part is not shown, and everything off says so", async () => {
     mockApi({ ...base, "GET /api/suggest": reply({ ...on, gaps_enabled: false, gaps: [] }) });
-    renderApp(<App />, { route: "/for-you" });
+    renderApp(<App />, { route: "/" });
     await screen.findByText("Artists you may like");
     expect(screen.queryByText("Albums you're missing")).toBeNull();
   });
 
-  it("explains itself when the feature is off", async () => {
+  it("is the home page, with a preview of the new releases", async () => {
+    mockApi({ ...base, "GET /api/suggest": reply(on),
+      "GET /api/releases": reply({ enabled: true, days: 90, releases: [{ dz_artist_id: "7", dz_album_id: "701", title: "New Album", kind: "album", release_date: "2026-10-18", cover_url: "", artist_name: "Dua Lipa" }], following: [], status: { more_to_do: false } }) });
+    renderApp(<App />, { route: "/" });
+    await screen.findByText("New Album");
+    expect(screen.getByRole("link", { name: "See all and manage" })).toBeTruthy();
+  });
+
+  it("falls back to Discover when the feature is off", async () => {
     mockApi({ ...base, "GET /api/suggest": reply({ ...on, enabled: false, gaps_enabled: false, artists_enabled: false, gaps: [], artists: [], status: null }) });
+    renderApp(<App />, { route: "/" });
+    await screen.findByLabelText("Search Deezer");
+  });
+
+  it("the old /for-you address lands on the home page", async () => {
+    mockApi({ ...base, "GET /api/suggest": reply(on), "GET /api/releases": reply({ enabled: true, days: 90, releases: [], following: [], status: null }) });
     renderApp(<App />, { route: "/for-you" });
-    await screen.findByText("Suggestions are off");
+    await screen.findByText("Artists you may like");
   });
 });
 
@@ -58,5 +72,31 @@ describe("settings switches", () => {
     const gaps = await screen.findByLabelText(/Albums you're missing/);
     expect((gaps as HTMLInputElement).disabled).toBe(true);
     expect((screen.getByLabelText(/Artists you may like/) as HTMLInputElement).disabled).toBe(true);
+  });
+});
+
+describe("the menu", () => {
+  const on2 = { ...STATUS, releases_enabled: true };
+  it("has For you first while the feature is on, and Settings in the header, not the tab bar", async () => {
+    mockApi({ ...base, "GET /api/status": on2, "GET /api/suggest": reply(on), "GET /api/releases": reply({ enabled: true, days: 90, releases: [], following: [], status: null }) });
+    renderApp(<App />, { route: "/discover" });
+    await screen.findByLabelText("Search Deezer");
+    await waitFor(() => expect(within(screen.getAllByRole("navigation", { name: "Main" })[0]).queryByText("For you")).not.toBeNull());
+    const main = screen.getAllByRole("navigation", { name: "Main" });
+    for (const nav of main) {
+      const names = Array.from(nav.querySelectorAll("a")).map((a) => a.textContent);
+      expect(names[0]).toBe("For you");
+      expect(names).toContain("Discover");
+      expect(names).not.toContain("Settings");
+    }
+    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/settings");
+  });
+
+  it("hides For you while the feature is off", async () => {
+    mockApi({ ...base });
+    renderApp(<App />, { route: "/discover" });
+    await screen.findByLabelText("Search Deezer");
+    await waitFor(() => expect(screen.getAllByRole("navigation", { name: "Main" })[0].textContent).toContain("Queue"));
+    for (const nav of screen.getAllByRole("navigation", { name: "Main" })) expect(within(nav).queryByText("For you")).toBeNull();
   });
 });

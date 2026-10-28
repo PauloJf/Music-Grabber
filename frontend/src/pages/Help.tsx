@@ -48,7 +48,7 @@ export default function Help() {
 
         <Section id="find" title="Finding and queueing music">
           <ul>
-            <li>Type in the search box on <Link to="/">Discover</Link> (press <kbd>/</kbd> anywhere to jump to it). Results are grouped into songs, artists and albums.</li>
+            <li>Type in the search box on <Link to="/discover">Discover</Link> (press <kbd>/</kbd> anywhere to jump to it). Results are grouped into songs, artists and albums.</li>
             <li>Open an <b>artist</b> to see top songs, albums and related artists. Open an <b>album</b> to see every track.</li>
             <li>Press <b>▶</b> on a song for a 30-second preview. Only one plays at a time.</li>
             <li>Press the <b>download</b> button on a song, or <b>Queue album</b> on an album. You get an instant confirmation with an <b>Undo</b> for a few seconds.</li>

@@ -71,7 +71,7 @@ export default function Queue() {
     <>
       <section className="hero" style={{ paddingBottom: 0 }}><div className="eyebrow">Queue</div><h1>What's happening</h1></section>
       {all.isSuccess && items.length === 0 && (hist.data?.items.length ?? 0) === 0 && (
-        <Empty title="The queue is empty"><Link className="btn signal" to="/" style={{ marginTop: 10 }}>Find something to queue</Link></Empty>
+        <Empty title="The queue is empty"><Link className="btn signal" to="/discover" style={{ marginTop: 10 }}>Find something to queue</Link></Empty>
       )}
       {review.length > 0 && (
         <div className="banner warn row" role="status"><span className="grow"><b>{review.length}</b> track{review.length > 1 ? "s" : ""} need{review.length > 1 ? "" : "s"} your choice.</span><Link className="btn sm" to="/inbox">Open inbox</Link></div>

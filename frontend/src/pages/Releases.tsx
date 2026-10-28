@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Empty, ErrorState, Skeleton, Tile } from "../components/ui";
+import { Empty, ErrorState, Skeleton, TileCard } from "../components/ui";
 import { del, errorText, get, post, put } from "../lib/api";
 import { ago } from "../lib/hooks";
 import { useToast } from "../lib/toast";
@@ -29,7 +29,7 @@ export default function Releases() {
       <section className="hero">
         <div className="eyebrow">New releases</div>
         <h1>What your artists<br />put out lately.</h1>
-        <p>Albums, singles and EPs from artists you own a few tracks of, artists on your watched playlists, and ones you follow. <Link to="/for-you">Suggestions for you</Link></p>
+        <p>Albums, singles and EPs from artists you own a few tracks of, artists on your watched playlists, and ones you follow. <Link to="/">Suggestions for you</Link></p>
       </section>
       {feed.isLoading && <Skeleton />}
       {feed.isError && <ErrorState error={feed.error} retry={() => feed.refetch()} />}
@@ -46,13 +46,10 @@ export default function Releases() {
           {d.releases.length === 0
             ? <Empty title={`Nothing new in ${d.days} days`}>Releases show up here after the first pass has looked at your artists. Follow an artist from its page to include one you don't own.</Empty>
             : <div className="grid">{d.releases.map((r) => (
-              <div key={r.dz_album_id}>
-                <Tile to={`/album/${r.dz_album_id}`} cover={r.cover_url} title={r.title} sub={`${r.artist_name} · ${KIND[r.kind] ?? r.kind} · ${r.release_date}`} />
-                <div className="row tight" style={{ marginTop: 6 }}>
-                  <button className="btn quiet sm" onClick={() => hideArtist.mutate({ id: r.dz_artist_id, name: r.artist_name, on: true })}>Hide artist</button>
-                  <button className="btn quiet sm" onClick={() => dismiss.mutate({ id: r.dz_album_id, on: true })}>Not interested</button>
-                </div>
-              </div>))}</div>}
+              <TileCard key={r.dz_album_id} to={`/album/${r.dz_album_id}`} cover={r.cover_url} title={r.title} sub={`${r.artist_name} · ${KIND[r.kind] ?? r.kind} · ${r.release_date}`}>
+                  <button className="btn quiet sm" style={{ paddingLeft: 0 }} onClick={() => hideArtist.mutate({ id: r.dz_artist_id, name: r.artist_name, on: true })}>Hide artist</button>
+                  <button className="btn quiet sm" style={{ paddingLeft: 0 }} onClick={() => dismiss.mutate({ id: r.dz_album_id, on: true })}>Not interested</button>
+                </TileCard>))}</div>}
           <div style={{ margin: "26px 0 70px" }}>
             <button className="btn quiet sm" aria-expanded={showHidden} onClick={() => setShowHidden(!showHidden)}>{showHidden ? "Hide the hidden list" : "Hidden artists and releases"}</button>
             {showHidden && hidden.isLoading && <Skeleton rows={2} />}

@@ -3,14 +3,14 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useActivity, useMe, useStatus } from "../lib/hooks";
 import { usePlayer } from "../lib/player";
 import ActivityTray from "./ActivityTray";
-import { Gear, Inbox, Library, Queue, Search } from "./icons";
+import { Gear, Inbox, Library, Queue, Search, Spark } from "./icons";
 
 const TABS = [
-  { to: "/", label: "Discover", icon: Search, end: true },
+  { to: "/", label: "For you", icon: Spark, end: true },          // only while New releases and suggestions are on
+  { to: "/discover", label: "Discover", icon: Search },
   { to: "/queue", label: "Queue", icon: Queue },
   { to: "/inbox", label: "Inbox", icon: Inbox },
   { to: "/playlists", label: "Library", icon: Library },
-  { to: "/settings", label: "Settings", icon: Gear },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -18,21 +18,22 @@ export default function Layout({ children }: { children: ReactNode }) {
   const player = usePlayer();
   const user = me.data?.user;
   const isAdmin = !user || user.role === "admin";          // until we know, don't flash the tab away
-  const tabs = TABS.filter((t) => t.to !== "/settings" || isAdmin);
+  const status = useStatus();
+  const forYou = !!status.data?.releases_enabled;
+  const tabs = TABS.filter((t) => t.to !== "/" || forYou);
   const theme = user?.prefs.theme, volume = user?.prefs.preview_volume;
   useEffect(() => {
     const root = document.documentElement;
     if (theme === "light" || theme === "dark") root.setAttribute("data-theme", theme); else root.removeAttribute("data-theme");
   }, [theme]);
   useEffect(() => { player.setVolume(volume ?? 1); }, [volume, player.setVolume]);
-  const status = useStatus();
   const { data: act } = useActivity();
   const nav = useNavigate();
   const loc = useLocation();
   const [q, setQ] = useState("");
   const pips: Record<string, number> = { "/queue": act?.active.length ?? 0, "/inbox": act?.inbox ?? 0 };
   const sp = status.data?.spotify;
-  const submit = (e: FormEvent) => { e.preventDefault(); if (q.trim()) nav(`/?q=${encodeURIComponent(q.trim())}`); };
+  const submit = (e: FormEvent) => { e.preventDefault(); if (q.trim()) nav(`/discover?q=${encodeURIComponent(q.trim())}`); };
 
   return (
     <>
@@ -45,12 +46,13 @@ export default function Layout({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <div className="grow" />
-          {loc.pathname !== "/" && (
+          {loc.pathname !== "/discover" && (
             <form className="search topsearch" role="search" onSubmit={submit}>
               <Search />
               <input type="search" data-search aria-label="Search Deezer" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} style={{ minHeight: 36 }} />
             </form>
           )}
+          {isAdmin && <NavLink to="/settings" className="helplink" aria-label="Settings" title="Settings"><Gear width={18} height={18} /></NavLink>}
           <NavLink to="/account" className="acctlink" title="Account">{user?.username ?? "Account"}</NavLink>
           <NavLink to="/help" className="helplink" aria-label="Help" title="Help">?</NavLink>
           <div id="tray-slot" className="tray" />
