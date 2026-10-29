@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.3.0 (2026-10-29)
+
+Browse your own library by artist and album. The database gains one nullable column (`artist_map.image_url`) on first start; a `.bak-1.3.0` copy is written first.
+
 ### Added
 - **Library browser.** The Library page now switches between **Playlists / Artists / Albums / Tracks** (Tracks is the
   old Owned tracks list). Artists lists everyone in your library (filterable); an artist page shows the albums you have
