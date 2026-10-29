@@ -2,10 +2,14 @@
 
 ## Unreleased
 
-### Fixed
-- Drop-down lists (Settings, Account) showed light text on a white list in dark mode; the options now use the page colours.
+## 1.2.1 (2026-10-29)
+
+Layout and colour fixes. No database or configuration changes.
 
 ### Fixed
+- The "N downloading" button no longer sits inside the header row, where it pushed the header past the edge of a
+  narrower window (and added a horizontal scrollbar). On a wide screen it now floats just under the header, top right.
+- Drop-down lists (Settings, Account) showed light text on a white list in dark mode; the options now use the page colours.
 - **Owned tracks: "Fans also like" no longer overflows the page.** An opened Related row stretched the whole list wider
   than the screen on phones; the artist chips now scroll sideways inside the row instead.
 
