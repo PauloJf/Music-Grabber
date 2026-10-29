@@ -45,6 +45,12 @@ class LibraryMixin:
             conn.commit()
         return n
 
+    def browse_rows(self) -> list[dict]:
+        """What the Artists and Albums views need from every cached track."""
+        with self._connect() as conn:
+            return [dict(r) for r in conn.execute(
+                "SELECT path, title, artist, album, album_artist, track_no, disc_no, year, duration_ms FROM library_tracks")]
+
     def library_track(self, path: str):
         """One cached library row by its path, or None."""
         with self._connect() as conn:

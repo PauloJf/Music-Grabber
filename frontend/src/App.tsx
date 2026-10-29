@@ -9,6 +9,7 @@ import Discover from "./pages/Discover";
 import ForYou from "./pages/ForYou";
 import Help from "./pages/Help";
 import Inbox from "./pages/Inbox";
+import { LibraryAlbum, LibraryAlbums, LibraryArtist, LibraryArtists } from "./pages/LibraryBrowse";
 import Login from "./pages/Login";
 import PlaylistDetail from "./pages/PlaylistDetail";
 import Owned from "./pages/Owned";
@@ -38,6 +39,10 @@ function Authed() {
         <Route path="/releases" element={<Releases />} />
         <Route path="/inbox" element={<Inbox />} />
         <Route path="/inbox/:id" element={<Inbox />} />
+        <Route path="/library/artists" element={<LibraryArtists />} />
+        <Route path="/library/artists/:name" element={<LibraryArtist />} />
+        <Route path="/library/albums" element={<LibraryAlbums />} />
+        <Route path="/library/albums/:artist/:album" element={<LibraryAlbum />} />
         <Route path="/playlists" element={<Playlists />} />
         <Route path="/playlists/owned" element={<Owned />} />
         <Route path="/playlists/:id" element={<PlaylistDetail />} />

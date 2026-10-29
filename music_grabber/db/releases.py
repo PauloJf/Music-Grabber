@@ -48,15 +48,41 @@ class ReleasesMixin:
         return dict(row) if row else None
 
     def save_artist_map(self, norm: str, name: str, dz_artist_id: Optional[str], confidence: float,
-                        source: str, active: bool = True) -> None:
+                        source: str, active: bool = True, image_url: str = "") -> None:
         with self._connect() as conn:
             conn.execute(
-                "INSERT INTO artist_map (norm_name, name, dz_artist_id, confidence, source, active, mapped_at) "
-                "VALUES (?,?,?,?,?,?,?) ON CONFLICT(norm_name) DO UPDATE SET name=excluded.name, "
+                "INSERT INTO artist_map (norm_name, name, dz_artist_id, confidence, source, active, mapped_at, image_url) "
+                "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(norm_name) DO UPDATE SET name=excluded.name, "
                 "dz_artist_id=excluded.dz_artist_id, confidence=excluded.confidence, source=excluded.source, "
-                "active=excluded.active, mapped_at=excluded.mapped_at",
-                (norm, name, dz_artist_id, confidence, source, int(active), _now()))
+                "active=excluded.active, mapped_at=excluded.mapped_at, "
+                "image_url=COALESCE(NULLIF(excluded.image_url, ''), artist_map.image_url)",
+                (norm, name, dz_artist_id, confidence, source, int(active), _now(), image_url))
             conn.commit()
+
+    def artist_art(self) -> dict:
+        """{normalised artist name: {dz_id, image_url}} for every artist matched on Deezer."""
+        with self._connect() as conn:
+            return {r["norm_name"]: {"dz_id": r["dz_artist_id"], "image_url": r["image_url"] or ""} for r in conn.execute(
+                "SELECT norm_name, dz_artist_id, image_url FROM artist_map WHERE dz_artist_id IS NOT NULL")}
+
+    def artists_missing_image(self, limit: int) -> list[dict]:
+        with self._connect() as conn:
+            return [dict(r) for r in conn.execute(
+                "SELECT norm_name, name, dz_artist_id FROM artist_map WHERE dz_artist_id IS NOT NULL AND active=1 "
+                "AND (image_url IS NULL OR image_url='') LIMIT ?", (limit,))]
+
+    def set_artist_image(self, dz_artist_id: str, image_url: str) -> None:
+        with self._connect() as conn:
+            conn.execute("UPDATE artist_map SET image_url=? WHERE dz_artist_id=?", (image_url, dz_artist_id))
+            conn.commit()
+
+    def album_art_all(self) -> dict:
+        """{dz artist id: [(normalised title, cover url, dz album id)]} from the cached discographies."""
+        out: dict = {}
+        with self._connect() as conn:
+            for r in conn.execute("SELECT dz_artist_id, norm_title, cover_url, dz_album_id FROM album_cache WHERE kind IN ('album','ep','single','compile')"):
+                out.setdefault(r["dz_artist_id"], []).append((r["norm_title"], r["cover_url"] or "", r["dz_album_id"]))
+        return out
 
     def artist_map_counts(self) -> dict:
         with self._connect() as conn:

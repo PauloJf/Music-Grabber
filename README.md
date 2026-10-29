@@ -168,7 +168,9 @@ first (tab bar, thumb-sized targets, safe areas) and works as well on a desktop.
 - **Queue**: Now / Up next / Failed / Finished, retry, cancel, move to front, per-item event log.
 - **Inbox**: ambiguous matches with scored candidates: hear 30 seconds of each (and of the original), then download one, search again, or skip.
 - **Library**: watched Spotify playlists with coverage, sync, queue missing, tracks by status.
-  *Owned tracks* lists everything the index knows; open a row's **Related** to jump to its artist and album on Deezer and see "fans also like".
+  Switch between **Playlists / Artists / Albums / Tracks**: browse what you own by artist and album (read-only pages with the
+  tracks you have, linking across to Deezer to see and queue the rest), or the flat *Tracks* list, where **Related** on a row
+  jumps to its local artist and album and to its Deezer artist, album and "fans also like".
 - **Settings**: Spotify, Deezer ARL (with a test button), ntfy, formats, thresholds, path template
   with a live example; changes apply without a restart.
 
@@ -184,7 +186,7 @@ Set `API_TOKEN` and the API listens on `API_PORT`. Every `/api/*` call needs
 `GET /api/status`; `/api/playlists` (`POST {"value": url}`, `PATCH {"enabled": false}`, `DELETE`,
 `POST /api/playlists/<id>/sync`, `/enqueue-missing`); `POST /api/sync`; `/api/queue` and
 `/api/queue/<id>/{retry,cancel,priority}`; `/api/inbox` and `/api/inbox/<id>/{choose,search,research,skip}`;
-`/api/browse/{search,artist/<id>,album/<id>,queue,undo}` (catalogue + queueing) and `/api/activity`; accounts: `/api/auth/{state,login,setup,logout}`, `/api/me`, `/api/users` (admin); `/api/settings` (secrets come back masked); `/api/spotify/*`; `GET /api/library?q=&limit=&offset=` (the tracks the index knows), `GET /api/library/related?path=` (its Deezer artist, album and related artists), `POST /api/library/refresh`; `/api/keys` (admin; see below); `/api/releases`, `/api/suggest`, `/api/artist-prefs/<deezer artist id>` (new releases and suggestions, below); open:
+`/api/browse/{search,artist/<id>,album/<id>,queue,undo}` (catalogue + queueing) and `/api/activity`; accounts: `/api/auth/{state,login,setup,logout}`, `/api/me`, `/api/users` (admin); `/api/settings` (secrets come back masked); `/api/spotify/*`; `GET /api/library?q=&limit=&offset=` (the tracks the index knows), `GET /api/library/{artists,artist?name=,albums,album?artist=&album=}` (browse by name), `GET /api/library/related?path=` (its Deezer artist, album and related artists), `POST /api/library/refresh`; `/api/keys` (admin; see below); `/api/releases`, `/api/suggest`, `/api/artist-prefs/<deezer artist id>` (new releases and suggestions, below); open:
 `GET /healthz` (just `{"ok": true}`) and the Spotify `/callback` (which only accepts a single-use `state` this instance
 issued). Errors are `{"error": "<code>", "message": "..."}` with a matching HTTP status. Publish
 the port on loopback only, and put TLS in front before exposing it further. Ten wrong tokens in a minute

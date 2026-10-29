@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlsplit
 
-from . import accounts, deezer_catalog, suggest
+from . import accounts, deezer_catalog, library_browse, suggest
 from .config import SECRET_KEYS, __version__, masked, save_settings, settings_file_path
 from .db import GRAB_TERMINAL
 from .notify import Notifier
@@ -479,6 +479,51 @@ class Ops:
         tracks, total = self.db.library_list(str(query or "").strip(), limit, offset)
         return {"tracks": tracks, "total": total, "limit": limit, "offset": offset, "q": str(query or "").strip(),
                 "index": self.svc.index.source.name if self.svc.index.source else None}
+
+    # ── browsing the library by artist / album ────────────────────────────────
+    def _with_art(self, albums: list[dict]) -> list[dict]:
+        """Cover and Deezer ids for album summaries, from what New releases already cached (no Deezer calls)."""
+        art, by_dz = self.db.artist_art(), self.db.album_art_all()
+        for a in albums:
+            info = art.get(normalize_artist(a["artist"]))
+            a.update(cover_url="", dz_album_id=None, dz_artist_id=info["dz_id"] if info else None)
+            if info:
+                nt = normalize_title(a["title"])
+                for norm, cover, aid in by_dz.get(info["dz_id"], []):
+                    if suggest.same_album(norm, nt):
+                        a["cover_url"], a["dz_album_id"] = cover, aid
+                        break
+        return albums
+
+    def library_artists(self, query: str = "") -> dict:
+        art = self.db.artist_art()
+        out = library_browse.artists(self.db.browse_rows(), str(query or ""))
+        for a in out:
+            info = art.get(normalize_artist(a["name"]))
+            a["image_url"] = (info["image_url"] if info and info["image_url"] != "-" else "")
+        return {"artists": out, "total": len(out)}
+
+    def library_artist(self, name: str) -> dict:
+        page = library_browse.artist_page(self.db.browse_rows(), str(name or ""))
+        if not page:
+            raise _not_found("artist")
+        info = self.db.artist_art().get(normalize_artist(page["name"]))
+        page["dz_artist_id"] = info["dz_id"] if info else None
+        page["image_url"] = info["image_url"] if info and info["image_url"] != "-" else ""
+        self._with_art(page["albums"])
+        self._with_art(page["appears_on"])
+        return page
+
+    def library_albums(self, query: str = "") -> dict:
+        out = self._with_art(library_browse.albums(self.db.browse_rows(), str(query or "")))
+        return {"albums": out, "total": len(out)}
+
+    def library_album(self, artist: str, album: str) -> dict:
+        page = library_browse.album_page(self.db.browse_rows(), str(artist or ""), str(album or ""))
+        if not page:
+            raise _not_found("album")
+        self._with_art([page])
+        return page
 
     def library_related(self, path: str) -> dict:
         """Where an owned track lives on Deezer, and who is related to its artist. The ISRC names the track,

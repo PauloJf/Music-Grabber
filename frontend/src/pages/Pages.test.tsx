@@ -270,6 +270,8 @@ describe("owned tracks", () => {
     expect(screen.getByRole("link", { name: "Artist: Band" }).getAttribute("href")).toBe("/artist/7");
     expect(screen.getByRole("link", { name: "Album: LP" }).getAttribute("href")).toBe("/album/55");
     expect(screen.getByRole("link", { name: "Track on Deezer" }).getAttribute("href")).toBe("https://www.deezer.com/track/101");
+    expect(screen.getByRole("link", { name: "Band" }).getAttribute("href")).toBe("/library/artists/Band");            // the local pages
+    expect(screen.getByRole("link", { name: "LP" }).getAttribute("href")).toBe("/library/albums/Band/LP");
     expect(calls.filter((c) => c.path.startsWith("/api/library/related"))).toHaveLength(1);
     expect(decodeURIComponent(calls.find((c) => c.path.startsWith("/api/library/related"))!.path)).toContain("path=Band/LP/1.mp3");
   });

@@ -313,6 +313,8 @@ class _DBBase:
                 mapped_at    TEXT
             )
         """)
+        if "image_url" not in {r[1] for r in conn.execute("PRAGMA table_info(artist_map)")}:
+            conn.execute("ALTER TABLE artist_map ADD COLUMN image_url TEXT")        # the artist's photo, for the library browser
         conn.execute("""
             CREATE TABLE IF NOT EXISTS artist_checks (
                 dz_artist_id TEXT PRIMARY KEY,
