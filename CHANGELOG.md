@@ -4,8 +4,9 @@
 
 ### Fixed
 - **A long unbroken title made one tile and its cover bigger than the rest** (an album called "Decksandrumsandrockandroll"
-  widened its grid cell, and the cover, which fills the tile, grew with it). Tiles now stay the width of their column and
-  long words wrap.
+  widened its grid cell, and the cover, which fills the tile, grew with it). Tiles now stay the width of their column. Titles
+  and the line under them are cut after two lines with an ellipsis (hover shows the full text), and each reserves two lines,
+  so a row of tiles is the same height whatever the names are.
 
 ## 1.4.0 (2026-10-29)
 
