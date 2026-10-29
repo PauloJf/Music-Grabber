@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.4.0 (2026-10-29)
+
+No database changes. A `covers/` folder of small thumbnails is created next to the database as albums are shown.
+
 ### Added
 - **Album covers from your own files.** The Albums, Artists and album pages now show the picture embedded in the album's
   tracks (the first of up to three that has one), shrunk to 400 px and cached under `covers/` next to the database, so
