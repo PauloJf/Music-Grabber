@@ -110,7 +110,7 @@ export interface CatTrack {
   track_no: number | null; disc_no: number | null; year: number | null; state: TrackState;
 }
 export interface CatArtist { dz_id: string; name: string; image_url: string; fans: number | null; album_count: number | null }
-export interface CatAlbum { dz_id: string; title: string; artist: string; artist_id: string; cover_url: string; year: number | null; track_count: number | null; kind: string; explicit: boolean }
+export interface CatAlbum { dz_id: string; title: string; artist: string; artist_id: string; cover_url: string; year: number | null; track_count: number | null; kind: string; explicit: boolean; owned?: number; owned_total?: number | null; own_state?: "none" | "some" | "partial" | "full" }
 
 export interface Activity {
   active: { id: number; status: string; progress: number | null; title: string; artist: string }[];

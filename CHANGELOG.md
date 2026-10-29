@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+- **How much of each release you own, on an artist's page.** Albums, singles and EPs get a note: "In library", "2 of 4 in
+  library" or, when Deezer's list does not say how long it is, "2 tracks in library". Matched by title like the suggestions
+  (a "Deluxe" counts as the album; a single counts when its track is anywhere in your library). A release's length is read
+  from Deezer only when you own part of it, at most 12 per page view, and remembered while the app runs.
+
+### Changed
+- "Fans also like" on an artist's page wraps onto several lines instead of scrolling sideways (the Related panel on the
+  Tracks list still scrolls).
+
 ## 1.3.0 (2026-10-29)
 
 Browse your own library by artist and album. The database gains one nullable column (`artist_map.image_url`) on first start; a `.bak-1.3.0` copy is written first.
