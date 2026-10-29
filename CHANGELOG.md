@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.3.1 (2026-10-29)
+
+No database or configuration changes.
+
 ### Added
 - **How much of each release you own, on an artist's page.** Albums, singles and EPs get a note: "In library", "2 of 4 in
   library" or, when Deezer's list does not say how long it is, "2 tracks in library". Matched by title like the suggestions
