@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.3.2 (2026-10-29)
+
+No database or configuration changes.
+
 ### Changed
 - **Photos and covers for the whole library.** The background pass used to look only at the artists New releases cares
   about (3+ tracks), so most of a big library kept letter placeholders. It now also matches every other artist on Deezer
