@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+- **A long unbroken title made one tile and its cover bigger than the rest** (an album called "Decksandrumsandrockandroll"
+  widened its grid cell, and the cover, which fills the tile, grew with it). Tiles now stay the width of their column and
+  long words wrap.
+
 ## 1.4.0 (2026-10-29)
 
 No database changes. A `covers/` folder of small thumbnails is created next to the database as albums are shown.
