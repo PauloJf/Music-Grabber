@@ -68,8 +68,24 @@ class ReleasesMixin:
     def artists_missing_image(self, limit: int) -> list[dict]:
         with self._connect() as conn:
             return [dict(r) for r in conn.execute(
-                "SELECT norm_name, name, dz_artist_id FROM artist_map WHERE dz_artist_id IS NOT NULL AND active=1 "
+                "SELECT norm_name, name, dz_artist_id FROM artist_map WHERE dz_artist_id IS NOT NULL "
                 "AND (image_url IS NULL OR image_url='') LIMIT ?", (limit,))]
+
+    def art_artists_to_poll(self, limit: int) -> list[dict]:
+        """Matched artists outside New releases (inactive) whose albums have never been read."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT m.dz_artist_id AS id, m.name AS name FROM artist_map m "
+                "LEFT JOIN artist_checks c ON c.dz_artist_id = m.dz_artist_id "
+                "WHERE m.active=0 AND m.dz_artist_id IS NOT NULL AND c.checked_at IS NULL LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def mark_checked(self, dz_artist_id: str, name: str) -> None:
+        with self._connect() as conn:
+            conn.execute("INSERT INTO artist_checks (dz_artist_id, name, checked_at) VALUES (?,?,?) "
+                         "ON CONFLICT(dz_artist_id) DO UPDATE SET name=excluded.name, checked_at=excluded.checked_at",
+                         (dz_artist_id, name, _now()))
+            conn.commit()
 
     def set_artist_image(self, dz_artist_id: str, image_url: str) -> None:
         with self._connect() as conn:
@@ -85,10 +101,17 @@ class ReleasesMixin:
         return out
 
     def artist_map_counts(self) -> dict:
+        """New releases' artists, and the whole library's: how many exist, how many are matched on Deezer and how many
+        of those have a photo."""
         with self._connect() as conn:
             r = conn.execute("SELECT COUNT(*) AS active, SUM(dz_artist_id IS NOT NULL) AS mapped "
                              "FROM artist_map WHERE active=1").fetchone()
-        return {"artists": r["active"] or 0, "mapped": r["mapped"] or 0}
+            total = conn.execute("SELECT COUNT(DISTINCT norm_artist) FROM library_tracks WHERE norm_artist <> ''").fetchone()[0]
+            m = conn.execute("SELECT SUM(dz_artist_id IS NOT NULL) AS mapped, "
+                             "SUM(dz_artist_id IS NOT NULL AND image_url IS NOT NULL AND image_url NOT IN ('', '-')) AS photos "
+                             "FROM artist_map WHERE norm_name IN (SELECT DISTINCT norm_artist FROM library_tracks)").fetchone()
+        return {"artists": r["active"] or 0, "mapped": r["mapped"] or 0,
+                "library_artists": total or 0, "library_matched": m["mapped"] or 0, "library_photos": m["photos"] or 0}
 
     # ── polling Deezer ────────────────────────────────────────────────────────
     def artists_to_poll(self, stale_before: str, limit: int) -> list[dict]:

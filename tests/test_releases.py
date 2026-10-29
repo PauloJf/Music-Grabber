@@ -26,6 +26,7 @@ ALBUMS = {
           {"id": 702, "title": "Old Album", "release_date": days_ago(400), "record_type": "album", "cover_medium": "c2", "nb_tracks": 10},
           {"id": 703, "title": "Summer Single", "release_date": days_ago(45), "record_type": "single", "cover_medium": "c3"}],
     "9": [{"id": 901, "title": "Purple Thing", "release_date": days_ago(5), "record_type": "ep", "cover_medium": "c4"}],
+    "31": [{"id": 3101, "title": "Rare LP", "release_date": days_ago(5), "record_type": "album", "cover_medium": "https://cdn/rare.jpg"}],
     "11": [{"id": 1101, "title": "Followed Release", "release_date": days_ago(3), "record_type": "album", "cover_medium": "c5"}],
 }
 CALLS = []
@@ -45,6 +46,8 @@ def fake_get(path, params=None):
         if q == "Prince":
             return {"data": [{"id": 8, "name": "Prince", "nb_fan": 10}, {"id": 9, "name": "Prince", "nb_fan": 5000},
                              {"id": 10, "name": "Prince Royce", "nb_fan": 99999}]}
+        if q == "Seldom Heard":
+            return {"data": [{"id": 31, "name": "Seldom Heard", "nb_fan": 2, "picture_medium": "https://cdn/sh.jpg"}]}
         if q == "Obscure Band":
             return {"data": [{"id": 12, "name": "Obscure Band Tribute", "nb_fan": 3}]}
         return {"data": []}
@@ -108,7 +111,8 @@ def test_mapping_by_isrc_then_by_exact_name_and_unsure_is_left_out(env):
     assert (m["Dua Lipa"]["dz_artist_id"], m["Dua Lipa"]["source"]) == ("7", "isrc")
     assert (m["Prince"]["dz_artist_id"], m["Prince"]["source"]) == ("9", "name")   # exact name, most fans (not "Prince Royce")
     assert m["Obscure Band"]["dz_artist_id"] is None                    # only a look-alike: no guess
-    assert svc.db.get_artist_map(normalize_artist("Seldom Heard")) is None
+    sh = svc.db.get_artist_map(normalize_artist("Seldom Heard"))
+    assert sh["dz_artist_id"] == "31" and sh["active"] == 0                      # one track: matched for its photo, never "yours"
 
 
 def test_feed_has_recent_releases_only_newest_first(env):

@@ -261,6 +261,10 @@ out in the last 90 days, newest first. Queue a whole album from its page as usua
 - **Hide and follow are per account.** *Hide artist* and *Not interested* (one release) take things off your
   page only; a *Hidden* list brings them back. *Follow new releases* on an artist's page adds an artist you
   do not own. The shared API token acts as one extra user.
+- **Photos and covers for the whole library.** The same pass matches the artists that are too small for New releases (fewer
+  than 3 tracks) on Deezer for their photo and reads their albums once for covers, so the Library pages fill in. They
+  never appear in the feed or the suggestions. *Check now* repeats passes until it has looked at everything; the page
+  shows how many library artists are matched.
 - **Light on Deezer.** Calls share the existing rate limiter; each artist is read at most once per refresh
   period; if Deezer is unreachable the page keeps showing what it last learned.
 - `python -m music_grabber releases [list|refresh]` and `GET /api/releases` do the same from a script;

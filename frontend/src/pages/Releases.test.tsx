@@ -8,7 +8,7 @@ const me = { user: { id: 1, username: "paulo", role: "user", prefs: {} }, via: "
 // The mock treats an object with a "status" key as {status, body}, and the feed has one: wrap it.
 const base = { "GET /api/status": STATUS, "GET /api/activity": ACTIVITY, "GET /api/me": me };
 const release = { dz_artist_id: "7", dz_album_id: "701", title: "New Album", kind: "album", release_date: "2026-10-18", cover_url: "", artist_name: "Dua Lipa" };
-const status = { artists: 3, mapped: 2, last_run: null, last_checked: new Date().toISOString(), last_error: "", more_to_do: false };
+const status = { artists: 3, mapped: 2, library_artists: 685, library_matched: 530, library_photos: 400, last_run: null, last_checked: new Date().toISOString(), last_error: "", more_to_do: false };
 
 describe("new releases", () => {
   it("says how to turn it on when it is off", async () => {
@@ -27,6 +27,7 @@ describe("new releases", () => {
     renderApp(<App />, { route: "/releases" });
     await screen.findByText("New Album");
     expect(screen.getByText(/2 of 3 artists matched/)).toBeTruthy();
+    expect(screen.getByText(/530 of 685 artists matched on Deezer, 400 with a photo/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Hide artist" }));
     await waitFor(() => expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ hide_releases: true, name: "Dua Lipa" }));
     fireEvent.click(screen.getByRole("button", { name: "Hidden artists and releases" }));

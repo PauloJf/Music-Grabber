@@ -125,7 +125,7 @@ export interface ApiKey { id: number; name: string; scopes: string[]; created_by
 export interface Release { dz_artist_id: string; dz_album_id: string; title: string; kind: string; release_date: string; cover_url: string; artist_name: string }
 export interface ReleaseFeed {
   enabled: boolean; days: number; releases: Release[]; following: string[];
-  status: { artists: number; mapped: number; last_run: string | null; last_checked: string | null; last_error: string; more_to_do: boolean } | null;
+  status: { artists: number; mapped: number; library_artists?: number; library_matched?: number; library_photos?: number; last_run: string | null; last_checked: string | null; last_error: string; more_to_do: boolean } | null;
 }
 export interface ArtistPref { dz_artist_id: string; name: string; follow: number; hide_releases: number; hide_suggestions: number }
 export interface ReleasesHidden { artists: ArtistPref[]; releases: Release[] }

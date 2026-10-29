@@ -1052,8 +1052,7 @@ class Ops:
     def releases_refresh(self) -> dict:
         if self.svc.releases is None or not self.config.get("releases_enabled"):
             raise OpsError("releases_disabled", "new releases are off: turn them on in Settings (RELEASES_ENABLED)", 409)
-        threading.Thread(target=self.svc.releases.refresh, kwargs={"force": True}, daemon=True,
-                         name="releases-refresh").start()
+        threading.Thread(target=self.svc.releases.run_to_completion, daemon=True, name="releases-refresh").start()
         return {"ok": True, "started": True}
 
     def artist_pref_set(self, user_id: int, dz_id: str, data: dict) -> dict:
