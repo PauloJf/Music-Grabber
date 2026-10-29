@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+- **Owned tracks: "Fans also like" no longer overflows the page.** An opened Related row stretched the whole list wider
+  than the screen on phones; the artist chips now scroll sideways inside the row instead.
+
 ## 1.2.0 (2026-10-28)
 
 ### Added
