@@ -81,6 +81,9 @@ h2 { font-size: 22px; } h3 { font-size: 17px; }
 input[type=text], input[type=search], input[type=password], input[type=number], select, input:not([type]) { font: inherit; color: var(--ink); background: transparent;
   border: 1.5px solid var(--ink); border-radius: 3px; min-height: 42px; padding: 0 12px; min-width: 0; width: 100%; }
 /* iOS Safari zooms the page when a focused control's text is under 16px (the body is 15px, and these inherit it) */
+/* The select itself is transparent, so the browser's drop-down list had no background of its own and drew white
+   behind the (light, in dark mode) inherited text. Give the options the page colours. */
+select option, select optgroup { background-color: var(--paper); color: var(--ink); }
 input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea { font-size: max(16px, 1em); }   /* beats the font shorthand above */
 input::placeholder { color: var(--ink-3); }
 input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--signal); }
