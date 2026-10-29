@@ -16,8 +16,9 @@ import threading
 import time
 from html import escape
 
-from flask import Flask, Response, g, jsonify, request, send_from_directory
+from flask import Flask, Response, g, jsonify, redirect, request, send_file, send_from_directory
 
+from .. import library_covers
 from ..ops import Ops, OpsError
 from ..preview_clips import signed_query, valid_signature
 
@@ -103,6 +104,7 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
     clip_secret = hmac.new(token.encode(), b"music-grabber-preview-clips", "sha256").digest()
+    cover_secret = hmac.new(token.encode(), b"music-grabber-library-covers", "sha256").digest()
     open_paths = {"/healthz", "/callback", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
     throttle = throttle or AuthThrottle()
 
@@ -116,7 +118,7 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
     @app.before_request
     def _auth():
         g.principal, g.bearer = None, ""
-        if request.path in open_paths or not request.path.startswith("/api/") or request.path.startswith("/api/clips/"):
+        if request.path in open_paths or not request.path.startswith("/api/") or request.path.startswith(("/api/clips/", "/api/library/cover/")):
             return None                  # open routes, the UI's static files, and signed preview clips
         who = request.remote_addr or "?"
         locked = too_many(who)
@@ -399,21 +401,52 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
         return jsonify(ops.library_list(request.args.get("q", ""), request.args.get("limit", 100),
                                         request.args.get("offset", 0)))
 
+    def local_cover(a: dict) -> dict:
+        """Point an album at its own embedded cover (a signed, short-lived link; falls back to Deezer's)."""
+        paths = a.pop("cover_paths", None)
+        if paths:
+            name = library_covers.encode(paths, a.get("cover_url") or "")
+            a["cover_url"] = f"/api/library/cover/{name}?{library_covers.query(cover_secret, name)}"
+        return a
+
     @app.get("/api/library/artists")
     def library_artists():
         return jsonify(ops.library_artists(request.args.get("q", "")))
 
     @app.get("/api/library/artist")
     def library_artist():
-        return jsonify(ops.library_artist(request.args.get("name", "")))
+        page = ops.library_artist(request.args.get("name", ""))
+        for a in page["albums"] + page["appears_on"]:
+            local_cover(a)
+        return jsonify(page)
 
     @app.get("/api/library/albums")
     def library_albums():
-        return jsonify(ops.library_albums(request.args.get("q", "")))
+        out = ops.library_albums(request.args.get("q", ""))
+        for a in out["albums"]:
+            local_cover(a)
+        return jsonify(out)
 
     @app.get("/api/library/album")
     def library_album():
-        return jsonify(ops.library_album(request.args.get("artist", ""), request.args.get("album", "")))
+        return jsonify(local_cover(ops.library_album(request.args.get("artist", ""), request.args.get("album", ""))))
+
+    @app.get("/api/library/cover/<name>")
+    def library_cover(name):
+        """Open like the preview clips (an <img> cannot send our login), but only with a link we signed."""
+        if not library_covers.valid(cover_secret, name, request.args.get("exp", ""), request.args.get("sig", "")):
+            return jsonify(error="forbidden", message="bad or expired link"), 403
+        decoded = library_covers.decode(name)
+        if not decoded:
+            return jsonify(error="not_found", message="no such cover"), 404
+        got = ops.library_cover(*decoded)
+        if "file" in got:
+            resp = send_file(got["file"], mimetype=got["mime"])
+            resp.headers["Cache-Control"] = "private, max-age=86400"
+            return resp
+        resp = redirect(got["redirect"], 302)
+        resp.headers["Cache-Control"] = "private, max-age=3600"
+        return resp
 
     @app.get("/api/library/related")
     def library_related():

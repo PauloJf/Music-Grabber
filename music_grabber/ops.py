@@ -14,9 +14,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlsplit
 
-from . import accounts, deezer_catalog, library_browse, suggest
+from . import accounts, deezer_catalog, library_browse, library_covers, suggest
 from .config import SECRET_KEYS, __version__, masked, save_settings, settings_file_path
 from .db import GRAB_TERMINAL
+from .library_covers import CoverCache
 from .notify import Notifier
 from .enqueue import enqueue_track
 from .matching import library_match
@@ -140,6 +141,8 @@ class Ops:
         self._started = time.time()
         self._oauth_states: dict[str, float] = {}
         self._clips: Optional[ClipCache] = None
+        self.covers = CoverCache(config.get("library_dir") or config.get("music_dir") or "",
+                                 os.path.join(os.path.dirname(os.path.abspath(config["db_path"])), "covers"))
         self._totals: dict[str, int] = {}                # Deezer album id -> track count, for "3 of 12 in library"
         self._lock = threading.Lock()
 
@@ -525,6 +528,19 @@ class Ops:
             raise _not_found("album")
         self._with_art([page])
         return page
+
+    def library_cover(self, paths: list, fallback: str = "") -> dict:
+        """Where an album's cover is: the picture embedded in one of its tracks (a cached thumbnail), else the Deezer cover
+        New releases cached, else nothing. Only paths the library index knows are read."""
+        for p in paths[:3]:
+            if self.db.library_track(str(p)) is None:
+                continue
+            got = self.covers.thumbnail(str(p))
+            if got:
+                return {"file": got[0], "mime": got[1]}
+        if fallback and library_covers.deezer_cover(fallback):
+            return {"redirect": fallback}
+        raise _not_found("cover")
 
     def library_related(self, path: str) -> dict:
         """Where an owned track lives on Deezer, and who is related to its artist. The ISRC names the track,

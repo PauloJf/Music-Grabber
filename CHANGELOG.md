@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- **Album covers from your own files.** The Albums, Artists and album pages now show the picture embedded in the album's
+  tracks (the first of up to three that has one), shrunk to 400 px and cached under `covers/` next to the database, so
+  the exact cover of your files appears with no Deezer calls. Albums whose files carry no picture fall back to the Deezer
+  cover New releases cached, then to the letter. Served through short-lived signed links (the same idea as the 30-second
+  clips), since an image tag cannot send the login; only paths the library index knows, inside the library folder, are read.
+
 ## 1.3.2 (2026-10-29)
 
 No database or configuration changes.

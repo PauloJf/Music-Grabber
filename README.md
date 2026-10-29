@@ -168,6 +168,7 @@ first (tab bar, thumb-sized targets, safe areas) and works as well on a desktop.
 - **Queue**: Now / Up next / Failed / Finished, retry, cancel, move to front, per-item event log.
 - **Inbox**: ambiguous matches with scored candidates: hear 30 seconds of each (and of the original), then download one, search again, or skip.
 - **Library**: watched Spotify playlists with coverage, sync, queue missing, tracks by status.
+  Album covers are the pictures embedded in your files (cached thumbnails; a Deezer cover or a letter when a file has none).
   Switch between **Playlists / Artists / Albums / Tracks**: browse what you own by artist and album (read-only pages with the
   tracks you have, linking across to Deezer to see and queue the rest), or the flat *Tracks* list, where **Related** on a row
   jumps to its local artist and album and to its Deezer artist, album and "fans also like".
