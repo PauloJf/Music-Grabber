@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.4.1 (2026-10-29)
+
+Layout only. No database or configuration changes.
+
 ### Fixed
 - **A long unbroken title made one tile and its cover bigger than the rest** (an album called "Decksandrumsandrockandroll"
   widened its grid cell, and the cover, which fills the tile, grew with it). Tiles now stay the width of their column. Titles
