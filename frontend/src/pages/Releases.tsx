@@ -42,6 +42,11 @@ export default function Releases() {
             </span>
             <button className="btn sm" onClick={() => scan.mutate()} disabled={scan.isPending}>Check now</button>
           </div>
+          {d.status && !!d.status.library_artists && (
+            <p className="muted mono" style={{ margin: "0 0 10px" }}>
+              Photos and covers for your library: {d.status.library_matched} of {d.status.library_artists} artists matched on Deezer, {d.status.library_photos} with a photo{d.status.more_to_do ? " · still filling in" : ""}
+            </p>
+          )}
           {d.status?.last_error && <p className="muted">Deezer said: {d.status.last_error}. What is shown may be out of date.</p>}
           {d.releases.length === 0
             ? <Empty title={`Nothing new in ${d.days} days`}>Releases show up here after the first pass has looked at your artists. Follow an artist from its page to include one you don't own.</Empty>

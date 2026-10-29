@@ -30,6 +30,8 @@ MAP_BATCH = 40                # artists mapped per pass (a big library takes a f
 POLL_BATCH = 60               # artists whose albums are read per pass
 RELATED_BATCH = 15            # artists whose related list is read per pass
 RELATED_DAYS = 7
+ART_MAP_BATCH = 40            # artists outside the "yours" rule matched per pass, for photos and covers only
+ART_POLL_BATCH = 60           # ... and their albums read per pass (once each)
 PHOTO_BATCH = 40              # artists whose photo is looked up per pass (only ones matched before photos were kept)
 NOTIFY_DAYS = 30              # a release older than this is never announced, even if never seen before
 RETRY_UNMAPPED_DAYS = 30
@@ -128,7 +130,10 @@ class ReleaseTracker:
             self.db.save_releases(a["id"], a["name"], [x for x in albums if (x.get("release_date") or "") >= cutoff])
             stats["polled"] += 1
 
+        self._read_library_art(cands, retry_before, stats)
         self._read_photos(stats)
+        if self.db.artists_missing_image(1):
+            self.more_to_do = True
         if self.config.get("suggest_stars", True):
             self._read_stars()
         if self.config.get("suggest_artists", True):
@@ -164,6 +169,51 @@ class ReleaseTracker:
                                   tags="musical_note")
         self.db.mark_notified([r["dz_album_id"] for r in rows])
         return len(rows)
+
+    def _read_library_art(self, active: list, retry_before: str, stats: dict) -> None:
+        """Photos and covers for the rest of the library: artists with too few tracks to count for New releases and
+        suggestions. They are matched on Deezer and their albums read once (for covers), kept inactive so they never
+        reach the feed or the suggestions."""
+        active_norms = {c["norm"] for c in active}
+        rest = [c for c in self.db.candidate_artists(1, 10 ** 9) if c["norm"] not in active_norms]
+        need = [c for c in rest if self._needs_mapping(c, retry_before)]
+        failures = 0
+        for c in need[:ART_MAP_BATCH]:
+            try:
+                dz_id, conf, how, image = self.map_artist(c)
+            except dz.CatalogError as exc:
+                failures += 1
+                self.last_error = str(exc)
+                stats["failed"] += 1
+                if failures >= FAILURES_BEFORE_GIVING_UP:
+                    break
+                continue
+            self.db.save_artist_map(c["norm"], c["name"], dz_id, conf, how, active=False, image_url=image)
+            stats["art_mapped"] = stats.get("art_mapped", 0) + 1
+        due = self.db.art_artists_to_poll(ART_POLL_BATCH + 1)
+        failures = 0
+        for a in due[:ART_POLL_BATCH]:
+            try:
+                albums = dz.artist_albums(a["id"])
+            except dz.CatalogError as exc:
+                failures += 1
+                self.last_error = str(exc)
+                stats["failed"] += 1
+                if failures >= FAILURES_BEFORE_GIVING_UP:
+                    break
+                continue
+            self.db.save_albums(a["id"], a["name"], albums)
+            self.db.mark_checked(a["id"], a["name"])
+            stats["art_polled"] = stats.get("art_polled", 0) + 1
+        if len(need) > ART_MAP_BATCH or len(due) > ART_POLL_BATCH:
+            self.more_to_do = True
+
+    def run_to_completion(self, max_passes: int = 80) -> None:
+        """Check now: a forced first pass, then more passes until everything has been looked at (or Deezer says no)."""
+        for i in range(max_passes):
+            out = self.refresh(force=(i == 0))
+            if not out.get("ok") or not self.more_to_do or self._stop.is_set():
+                return
 
     def _read_photos(self, stats: dict) -> None:
         """Photos for artists matched before photos were kept (the library browser shows them). One small call each."""

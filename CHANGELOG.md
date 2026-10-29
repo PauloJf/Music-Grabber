@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 1.3.2 (2026-10-29)
+
+No database or configuration changes.
+
+### Changed
+- **Photos and covers for the whole library.** The background pass used to look only at the artists New releases cares
+  about (3+ tracks), so most of a big library kept letter placeholders. It now also matches every other artist on Deezer
+  for a photo and reads their albums once for covers (40 artists and 60 album lists per pass), without adding them to
+  New releases or the suggestions. **Check now** keeps running passes until everything has been looked at, and the New
+  releases page shows how many library artists are matched and have a photo.
+
 ## 1.3.1 (2026-10-29)
 
 No database or configuration changes.
