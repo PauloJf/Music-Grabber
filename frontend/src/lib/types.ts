@@ -147,4 +147,11 @@ export interface OwnedRelated {
   artist: { dz_id: string; name: string } | null; album: { dz_id: string; title: string } | null; track: { dz_id: string; title: string } | null;
   related: { dz_id: string; name: string; image_url: string; fans: number | null }[];
 }
+export interface LibArtist { key: string; name: string; tracks: number; albums: number; image_url: string }
+export interface LibAlbum { artist_key: string; album_key: string; artist: string; title: string; year: number | null; tracks: number; cover_url: string; dz_album_id: string | null; dz_artist_id: string | null }
+export interface LibArtistPage { key: string; name: string; tracks: number; image_url: string; dz_artist_id: string | null; albums: LibAlbum[]; appears_on: LibAlbum[] }
+export interface LibAlbumPage extends LibAlbum {
+  discs: number;
+  tracks_list: { path: string; title: string; artist: string; track_no: number | null; disc_no: number | null; duration_ms: number | null }[];
+}
 export interface OwnedPage { tracks: OwnedTrack[]; total: number; limit: number; offset: number; q: string; index: string | null }

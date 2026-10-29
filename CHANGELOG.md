@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 1.3.0 (2026-10-29)
+
+Browse your own library by artist and album. The database gains one nullable column (`artist_map.image_url`) on first start; a `.bak-1.3.0` copy is written first.
+
+### Added
+- **Library browser.** The Library page now switches between **Playlists / Artists / Albums / Tracks** (Tracks is the
+  old Owned tracks list). Artists lists everyone in your library (filterable); an artist page shows the albums you have
+  of theirs and the ones they appear on; an album page lists the tracks you own, read-only. Artists and albums are grouped
+  by name, ignoring case and accents, with "feat." and "A, B" credits counted for each name and edition words such as
+  "(Deluxe)" folded into the album; compilations are filed under "Various Artists". Each page links across to the Deezer
+  artist or album (to see and queue what is missing), and an opened row in Tracks links to its local artist and album.
+  Photos and covers are the ones New releases already cached (artist photos are now kept when an artist is matched, and
+  looked up once for artists matched earlier); nothing is fetched while you browse, and what is not matched shows a
+  letter placeholder. `GET /api/library/{artists,artist,albums,album}`.
+
 ## 1.2.1 (2026-10-29)
 
 Layout and colour fixes. No database or configuration changes.

@@ -30,6 +30,7 @@ MAP_BATCH = 40                # artists mapped per pass (a big library takes a f
 POLL_BATCH = 60               # artists whose albums are read per pass
 RELATED_BATCH = 15            # artists whose related list is read per pass
 RELATED_DAYS = 7
+PHOTO_BATCH = 40              # artists whose photo is looked up per pass (only ones matched before photos were kept)
 NOTIFY_DAYS = 30              # a release older than this is never announced, even if never seen before
 RETRY_UNMAPPED_DAYS = 30
 FAILURES_BEFORE_GIVING_UP = 3
@@ -56,19 +57,19 @@ class ReleaseTracker:
         return max(0.25, float(self.config.get("releases_refresh_hours") or 24))
 
     # ── one pass ──────────────────────────────────────────────────────────────
-    def map_artist(self, cand: dict) -> tuple[Optional[str], float, str]:
-        """(Deezer artist id | None, confidence, how). May raise CatalogError (Deezer unreachable)."""
+    def map_artist(self, cand: dict) -> tuple[Optional[str], float, str, str]:
+        """(Deezer artist id | None, confidence, how, photo url). May raise CatalogError (Deezer unreachable)."""
         norm = cand["norm"]
         for isrc in cand["isrcs"]:
             d = dz.track_detail_by_isrc(isrc)
             artist = (d or {}).get("artist") or {}
             if artist.get("id") and normalize_artist(artist.get("name")) == norm:
-                return str(artist["id"]), 1.0, "isrc"
+                return str(artist["id"]), 1.0, "isrc", artist.get("picture_medium") or artist.get("picture") or ""
         hits = [h for h in dz.search("artist", cand["name"], limit=5) if normalize_artist(h["name"]) == norm]
         if hits:
             best = max(hits, key=lambda h: h.get("fans") or 0)
-            return best["dz_id"], 0.8, "name"
-        return None, 0.0, "none"
+            return best["dz_id"], 0.8, "name", best.get("image_url") or ""
+        return None, 0.0, "none", ""
 
     def refresh(self, force: bool = False) -> dict:
         """One pass. Returns what it did; never raises."""
@@ -97,7 +98,7 @@ class ReleaseTracker:
         self.more_to_do = len(need) > MAP_BATCH
         for c in need[:MAP_BATCH]:
             try:
-                dz_id, conf, how = self.map_artist(c)
+                dz_id, conf, how, image = self.map_artist(c)
             except dz.CatalogError as exc:
                 failures += 1
                 self.last_error = str(exc)
@@ -105,7 +106,7 @@ class ReleaseTracker:
                 if failures >= FAILURES_BEFORE_GIVING_UP:
                     break
                 continue
-            self.db.save_artist_map(c["norm"], c["name"], dz_id, conf, how, active=True)
+            self.db.save_artist_map(c["norm"], c["name"], dz_id, conf, how, active=True, image_url=image)
             stats["mapped_now"] += 1
 
         failures = 0
@@ -127,6 +128,7 @@ class ReleaseTracker:
             self.db.save_releases(a["id"], a["name"], [x for x in albums if (x.get("release_date") or "") >= cutoff])
             stats["polled"] += 1
 
+        self._read_photos(stats)
         if self.config.get("suggest_stars", True):
             self._read_stars()
         if self.config.get("suggest_artists", True):
@@ -162,6 +164,22 @@ class ReleaseTracker:
                                   tags="musical_note")
         self.db.mark_notified([r["dz_album_id"] for r in rows])
         return len(rows)
+
+    def _read_photos(self, stats: dict) -> None:
+        """Photos for artists matched before photos were kept (the library browser shows them). One small call each."""
+        failures = 0
+        for a in self.db.artists_missing_image(PHOTO_BATCH):
+            try:
+                image = dz.artist_info(a["dz_artist_id"]).get("image_url") or ""
+            except dz.CatalogError as exc:
+                failures += 1
+                self.last_error = str(exc)
+                stats["failed"] += 1
+                if failures >= FAILURES_BEFORE_GIVING_UP:
+                    return
+                continue
+            self.db.set_artist_image(a["dz_artist_id"], image or "-")        # "-": looked, none, so not asked again
+            stats["photos"] = stats.get("photos", 0) + 1
 
     def _read_related(self, stats: dict, force: bool) -> None:
         ids = [s["dz_id"] for s in seeds(self.db)]

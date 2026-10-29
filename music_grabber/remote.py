@@ -42,6 +42,10 @@ class RemoteOps:
     def status(self): return self._get("/api/status")
     def library_list(self, query="", limit=100, offset=0):
         return self._get("/api/library", q=query, limit=limit, offset=offset)
+    def library_artists(self, query=""): return self._get("/api/library/artists", q=query)
+    def library_artist(self, name): return self._get("/api/library/artist", name=name)
+    def library_albums(self, query=""): return self._get("/api/library/albums", q=query)
+    def library_album(self, artist, album): return self._get("/api/library/album", artist=artist, album=album)
     def library_related(self, path): return self._get("/api/library/related", path=path)
     def library_refresh(self): return self._post("/api/library/refresh")
     def mirror_status(self): return self._get("/api/mirror")

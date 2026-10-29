@@ -399,6 +399,22 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
         return jsonify(ops.library_list(request.args.get("q", ""), request.args.get("limit", 100),
                                         request.args.get("offset", 0)))
 
+    @app.get("/api/library/artists")
+    def library_artists():
+        return jsonify(ops.library_artists(request.args.get("q", "")))
+
+    @app.get("/api/library/artist")
+    def library_artist():
+        return jsonify(ops.library_artist(request.args.get("name", "")))
+
+    @app.get("/api/library/albums")
+    def library_albums():
+        return jsonify(ops.library_albums(request.args.get("q", "")))
+
+    @app.get("/api/library/album")
+    def library_album():
+        return jsonify(ops.library_album(request.args.get("artist", ""), request.args.get("album", "")))
+
     @app.get("/api/library/related")
     def library_related():
         return jsonify(ops.library_related(request.args.get("path", "")))

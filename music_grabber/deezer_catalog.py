@@ -222,6 +222,11 @@ def artist_albums(dz_id: str, limit: int = 100) -> list:
     return out
 
 
+def artist_info(dz_id: str) -> dict:
+    """One artist in our shape (name, photo, fans)."""
+    return artist_view(_call(f"artist/{dz_id}"))
+
+
 def artist_related(dz_id: str, limit: int = 12) -> list:
     """Deezer's "fans also like" list for an artist, most related first."""
     return [artist_view(x) for x in _call(f"artist/{dz_id}/related", {"limit": limit}).get("data", []) if x and x.get("id")]

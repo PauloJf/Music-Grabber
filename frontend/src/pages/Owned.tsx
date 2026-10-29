@@ -5,6 +5,7 @@ import { Cover, Empty, ErrorState, Skeleton } from "../components/ui";
 import { get } from "../lib/api";
 import { fmtDuration } from "../lib/hooks";
 import type { OwnedPage, OwnedRelated, OwnedTrack } from "../lib/types";
+import { albumPath, artistPath } from "./LibraryBrowse";
 
 const PAGE = 100;
 
@@ -12,7 +13,9 @@ export function LibraryTabs() {
   return (
     <nav className="seg" aria-label="Library" style={{ marginTop: 14 }}>
       <NavLink to="/playlists" end className={({ isActive }) => (isActive ? "on" : "")}>Playlists</NavLink>
-      <NavLink to="/playlists/owned" className={({ isActive }) => (isActive ? "on" : "")}>Owned tracks</NavLink>
+      <NavLink to="/library/artists" className={({ isActive }) => (isActive ? "on" : "")}>Artists</NavLink>
+      <NavLink to="/library/albums" className={({ isActive }) => (isActive ? "on" : "")}>Albums</NavLink>
+      <NavLink to="/playlists/owned" className={({ isActive }) => (isActive ? "on" : "")}>Tracks</NavLink>
     </nav>
   );
 }
@@ -24,9 +27,18 @@ function Related({ track }: { track: OwnedTrack }) {
   if (q.isLoading) return <Skeleton rows={2} />;
   if (q.isError) return <ErrorState error={q.error} retry={() => q.refetch()} />;
   const d = q.data!;
-  if (!d.found) return <p className="muted" style={{ margin: 0 }}>Can't find this artist on Deezer with certainty, so there is nothing to show.</p>;
+  const owner = track.album_artist || track.artist || "";
+  const local = owner && (
+    <div className="row tight">
+      <span className="muted" style={{ fontSize: 13 }}>In your library:</span>
+      <Link className="btn quiet sm" to={artistPath(owner)}>{owner}</Link>
+      {track.album && <Link className="btn quiet sm" to={albumPath(owner, track.album)}>{track.album}</Link>}
+    </div>
+  );
+  if (!d.found) return <div className="stack" style={{ gap: 10, minWidth: 0 }}>{local}<p className="muted" style={{ margin: 0 }}>Can't find this artist on Deezer with certainty, so there is nothing more to show.</p></div>;
   return (
     <div className="stack" style={{ gap: 10, minWidth: 0 }}>
+      {local}
       <div className="row tight">
         {d.artist && <Link className="btn sm" to={`/artist/${d.artist.dz_id}`}>Artist: {d.artist.name}</Link>}
         {d.album && <Link className="btn sm" to={`/album/${d.album.dz_id}`}>Album: {d.album.title}</Link>}
