@@ -152,7 +152,9 @@ input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--signal); }
 .skel { background: linear-gradient(90deg, var(--paper-2), var(--rule), var(--paper-2)); background-size: 200% 100%; animation: sh 1.2s linear infinite; border-radius: 2px; }
 @keyframes sh { to { background-position: -200% 0; } }
 .tray { position: fixed; z-index: 40; right: 14px; bottom: calc(var(--tab-h) + var(--safe-b) + 12px); }
-@media (min-width: 760px) { .tray { position: static; } .traybtn { box-shadow: 2px 2px 0 var(--signal); } }
+/* On a wide screen the tray floats just under the header, top right. It used to sit inside the header's flex row
+   and pushed the row past the window edge whenever the window was not wide enough for it. */
+@media (min-width: 760px) { .tray { top: calc(66px + env(safe-area-inset-top, 0px)); bottom: auto; right: 16px; } .traybtn { box-shadow: 2px 2px 0 var(--signal); } }
 .traybtn { display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 10px; background: var(--ink); color: var(--paper); border: 0; border-radius: 3px; cursor: pointer; font-weight: 600; box-shadow: 3px 3px 0 var(--signal); }
 .sheet { position: fixed; z-index: 50; left: 0; right: 0; bottom: 0; background: var(--paper); border-top: 2px solid var(--ink); max-height: 72vh; overflow: auto; padding: 14px 16px calc(16px + var(--safe-b)); }
 @media (min-width: 760px) { .sheet { right: 20px; left: auto; top: 62px; bottom: auto; width: 400px; border: 2px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); } }
