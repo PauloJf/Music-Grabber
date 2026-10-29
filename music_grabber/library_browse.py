@@ -69,9 +69,10 @@ def _album_groups(rows: list[dict]) -> dict:
 
 def _album_summary(key: tuple, rows: list[dict]) -> dict:
     years = [r["year"] for r in rows if r.get("year")]
+    first = sorted(rows, key=lambda r: (r.get("disc_no") or 1, r.get("track_no") or 10_000))[:3]
     return {"artist_key": key[0], "album_key": key[1], "artist": _common(owner_of(r) for r in rows),
             "title": _common((r.get("album") or "").strip() for r in rows) or NO_ALBUM, "year": max(years) if years else None,
-            "tracks": len(rows)}
+            "tracks": len(rows), "cover_paths": [r["path"] for r in first if r.get("path")]}
 
 
 def artists(rows: list[dict], query: str = "") -> list[dict]:

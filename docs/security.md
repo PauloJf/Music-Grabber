@@ -60,6 +60,11 @@ web pages visited from the owner's browser.
 - **API keys** (for other apps) are scoped (`request`, `browse`, `library`), stored as SHA-256 hashes, shown
   once, revocable, and refused on every route outside `/api/v1`; wrong keys share the lockout. A leaked
   key can still queue downloads within its scopes: revoke it, and keep keys on a server, never in a browser.
+- **Album covers** (`GET /api/library/cover/<name>`) are open like the preview clips: an `<img>` cannot send a bearer token.
+  The link is an opaque bundle of up to three library paths plus an optional Deezer image address, signed with an HMAC of
+  the API token and valid for 6 hours. A link we did not sign is refused; the path must also be in the library index and
+  resolve inside the library folder (no `..`, no absolute paths, symlinks resolved); a redirect goes only to `https` on
+  `dzcdn.net`. Thumbnails are cached under `covers/` beside the database; only JPEG, PNG and WEBP are decoded.
 - The `API_TOKEN` is still a full-admin key. Use a long random value; rotate it by changing `API_TOKEN` and restarting.
 - Plain HTTP exposes the token on the wire. Use TLS (reverse proxy) beyond loopback/LAN.
 - The lockout is per source address; behind a reverse proxy all clients share the proxy's address,
