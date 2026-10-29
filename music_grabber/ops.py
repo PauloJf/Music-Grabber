@@ -140,6 +140,7 @@ class Ops:
         self._started = time.time()
         self._oauth_states: dict[str, float] = {}
         self._clips: Optional[ClipCache] = None
+        self._totals: dict[str, int] = {}                # Deezer album id -> track count, for "3 of 12 in library"
         self._lock = threading.Lock()
 
     # ── status ────────────────────────────────────────────────────────────────
@@ -861,10 +862,38 @@ class Ops:
             self._states(results)
         return {"kind": kind, "query": query, "results": results}
 
+    MAX_TOTAL_LOOKUPS = 12
+
     def browse_artist(self, dz_id: str) -> dict:
         page = self._catalog(deezer_catalog.artist_page, str(dz_id))
         self._states(page["top"])
+        self._ownership(page["artist"]["name"], page["albums"])
         return page
+
+    def _ownership(self, artist: str, albums: list) -> None:
+        """Mark each release with how much of it the library has: ``own_state`` is none, some (a count but no known
+        length), partial (3 of 12) or full. An album is matched by title like the suggestions do (a "Deluxe" counts as the
+        album), a single by its title among the artist's tracks. A release's length is looked up from Deezer only when
+        you own part of it, at most a dozen per page view, and remembered."""
+        per_album, titles = library_browse.owned_index(self.db.browse_rows(), artist)
+        lookups = 0
+        for a in albums:
+            nt = normalize_title(a["title"])
+            owned = sum(n for key, n in per_album.items() if key and suggest.same_album(nt, key))
+            total = a.get("track_count") or self._totals.get(a["dz_id"])
+            if owned == 0 and a.get("kind") == "single" and nt in titles:
+                owned, total = 1, 1                      # the track is in the library, on some other album
+            if owned and not total and lookups < self.MAX_TOTAL_LOOKUPS:
+                lookups += 1
+                try:
+                    detail = deezer_catalog.album_page(a["dz_id"])
+                    total = detail["album"].get("track_count") or len(detail["tracks"]) or None
+                except deezer_catalog.CatalogError:
+                    total = None
+                if total:
+                    self._totals[a["dz_id"]] = total
+            a["owned"], a["owned_total"] = owned, total
+            a["own_state"] = ("none" if not owned else "some" if not total else "full" if owned >= total else "partial")
 
     def browse_album(self, dz_id: str) -> dict:
         page = self._catalog(deezer_catalog.album_page, str(dz_id))

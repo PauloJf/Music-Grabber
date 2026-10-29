@@ -67,6 +67,22 @@ describe("artist page", () => {
     expect(screen.getByRole("link", { name: /dojja/i }).getAttribute("href")).toBe("/artist/8");
   });
 
+  it("says how much of each release the library has, and wraps fans-also-like instead of scrolling", async () => {
+    const rel = (id: string, title: string, over: object) => ({ ...ALBUM, dz_id: id, title, ...over });
+    mockApi({ ...base, "GET /api/browse/artist/7": { artist, top: [], related: [{ dz_id: "8", name: "Dojja", image_url: "", fans: 1, album_count: 1 }],
+      albums: [rel("1", "Whole", { owned: 3, owned_total: 3, own_state: "full" }), rel("2", "Half", { owned: 2, owned_total: 4, own_state: "partial" }),
+        rel("3", "Unknown Length", { owned: 1, owned_total: null, own_state: "some" }), rel("4", "Nothing", { owned: 0, owned_total: null, own_state: "none" }),
+        rel("5", "Plain") ] } });
+    renderApp(<Routes><Route path="/artist/:id" element={<Artist />} /></Routes>, { route: "/artist/7" });
+    await screen.findByRole("heading", { name: "Dua Lipa" });
+    expect(screen.getByText("In library")).toBeTruthy();
+    expect(screen.getByText("2 of 4 in library")).toBeTruthy();
+    expect(screen.getByText("1 track in library")).toBeTruthy();
+    expect(screen.getAllByText(/in library/i)).toHaveLength(3);                           // none of Nothing / Plain
+    const chips = screen.getByRole("link", { name: /dojja/i }).parentElement!;
+    expect(chips.style.flexWrap).toBe("wrap");
+  });
+
   it("an unknown artist shows the error with a retry", async () => {
     mockApi({ ...base, "GET /api/browse/artist/7": { status: 502, body: { error: "deezer_unreachable", message: "no data" } } });
     renderApp(<Routes><Route path="/artist/:id" element={<Artist />} /></Routes>, { route: "/artist/7" });

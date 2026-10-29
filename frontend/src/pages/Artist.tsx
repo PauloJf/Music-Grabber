@@ -2,13 +2,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Back, Plus } from "../components/icons";
-import { Cover, ErrorState, Skeleton, Tile, TrackRow } from "../components/ui";
+import { Cover, ErrorState, Pill, Skeleton, Tile, TrackRow } from "../components/ui";
 import { get, put } from "../lib/api";
 import { fmtCount, hasLive } from "../lib/hooks";
 import { useQueueing } from "../lib/queueing";
 import type { ArtistPref, CatAlbum, CatArtist, CatTrack } from "../lib/types";
 
 interface Page { artist: CatArtist; top: CatTrack[]; albums: CatAlbum[]; related: CatArtist[] }
+
+/** How much of a release the library has, from the server's match by title: "In library", "2 of 4 in library", "2 tracks in library". */
+function OwnNote({ a }: { a: CatAlbum }) {
+  const n = a.owned ?? 0;
+  if (!n || !a.own_state || a.own_state === "none") return null;
+  const text = a.own_state === "full" ? "In library" : a.own_state === "partial" ? `${n} of ${a.owned_total} in library` : `${n} ${n === 1 ? "track" : "tracks"} in library`;
+  return <div style={{ marginTop: 4 }}><Pill kind={a.own_state === "full" ? "ok" : "warn"}>{text}</Pill></div>;
+}
 
 function ArtistPrefs({ id, name }: { id: string; name: string }) {
   const qc = useQueryClient();
@@ -73,13 +81,13 @@ export default function Artist() {
             <button role="tab" aria-selected={kind === "single"} onClick={() => setKind("single")}>Singles &amp; EPs ({singles.length})</button>
           </div>
         </div>
-        {shown.length ? <div className="grid">{shown.map((a) => <Tile key={a.dz_id} to={`/album/${a.dz_id}`} cover={a.cover_url} title={a.title} sub={[a.year, a.track_count ? `${a.track_count} tracks` : ""].filter(Boolean).join(" · ")} />)}</div> : <p className="muted">Nothing here.</p>}
+        {shown.length ? <div className="grid">{shown.map((a) => <Tile key={a.dz_id} to={`/album/${a.dz_id}`} cover={a.cover_url} title={a.title} sub={[a.year, a.track_count ? `${a.track_count} tracks` : ""].filter(Boolean).join(" · ")} note={<OwnNote a={a} />} />)}</div> : <p className="muted">Nothing here.</p>}
       </section>
 
       {related.length > 0 && (
         <section>
           <div className="sectionhead"><h2>Fans also like</h2></div>
-          <div className="chips">{related.map((r) => <Link key={r.dz_id} className="chip" to={`/artist/${r.dz_id}`}><Cover src={r.image_url} name={r.name} round />{r.name}</Link>)}</div>
+          <div className="chips" style={{ flexWrap: "wrap", overflowX: "visible" }}>{related.map((r) => <Link key={r.dz_id} className="chip" to={`/artist/${r.dz_id}`}><Cover src={r.image_url} name={r.name} round />{r.name}</Link>)}</div>
         </section>
       )}
     </>

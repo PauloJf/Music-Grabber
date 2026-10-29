@@ -159,7 +159,7 @@ With `API_TOKEN` set, the same process serves the app at `http://host:8099/`. It
 first (tab bar, thumb-sized targets, safe areas) and works as well on a desktop.
 
 - **Discover**: search Deezer for songs, artists and albums (search as you type, recent searches,
-  `/` to focus). Open an **artist** (popular tracks, albums vs singles and EPs, related artists) or an
+  `/` to focus). Open an **artist** (popular tracks, albums vs singles and EPs with how much of each you already have, related artists) or an
   **album** (track list, select some or queue what's missing). Every song shows its state live:
   *Queue*, *Queued*, a progress ring while it downloads, *In library*, *Needs you*, or *Failed* with a
   retry. Preview 30 seconds before you decide.

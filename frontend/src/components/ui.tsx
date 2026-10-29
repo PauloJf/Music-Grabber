@@ -139,11 +139,11 @@ export function TrackRow({ track, ord, selected, onSelect, hideAlbum = false, hi
   );
 }
 
-export function Tile({ to, cover, title, sub, round }: { to: string; cover?: string; title: string; sub?: string; round?: boolean }) {
+export function Tile({ to, cover, title, sub, round, note }: { to: string; cover?: string; title: string; sub?: string; round?: boolean; note?: ReactNode }) {
   return (
     <Link className="tile" to={to}>
       <Cover src={cover} name={title} size="xl" round={round} />
-      <div><div className="tn">{title}</div>{sub && <div className="ts">{sub}</div>}</div>
+      <div><div className="tn">{title}</div>{sub && <div className="ts">{sub}</div>}{note}</div>
     </Link>
   );
 }

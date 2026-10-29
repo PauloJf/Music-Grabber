@@ -110,6 +110,19 @@ def artist_page(rows: list[dict], name: str) -> Optional[dict]:
     return {"key": key, "name": display, "tracks": len(own) + len(appears), "albums": summarise(own), "appears_on": summarise(appears)}
 
 
+def owned_index(rows: list[dict], artist: str) -> tuple[Counter, set]:
+    """What you own by one artist (credited on the track, so collaborations count): tracks per normalised album title,
+    and the normalised titles of all their tracks."""
+    key = akey(artist)
+    per_album: Counter = Counter()
+    titles: set = set()
+    for r in rows:
+        if any(akey(n) == key for n in credited(r)):
+            per_album[albkey(r.get("album"))] += 1
+            titles.add(normalize_title(r.get("title")))
+    return per_album, titles
+
+
 def albums(rows: list[dict], query: str = "") -> list[dict]:
     out = [_album_summary(k, g) for k, g in _album_groups(rows).items() if k[1]]
     q = akey(query)
