@@ -200,7 +200,7 @@ To let another app (BPM Tagger, a script) request music without handing it the a
 **API key**: Account page, or `python -m music_grabber keys create "BPM Tagger" --scopes request`. The key
 (`mgk_...`) is shown once, stored hashed, named, revocable (`keys revoke ID`), and limited to scopes:
 `request` (create and read requests), `browse` (search the catalogue), `library` (is it owned?) and
-`suggestions` (read the suggestions and new releases). A key can
+`suggestions` (read the suggestions and new releases) and `stats` (read the dashboard numbers, below). A key can
 only call `/api/v1`; every other route answers 403. Use it as `Authorization: Bearer mgk_...`, from a server
 (not from a browser page).
 
@@ -216,6 +216,8 @@ curl -H "Authorization: Bearer $KEY" -H "Content-Type: application/json"   -d '{
   `failed`...), `progress`, `error`. A key sees only the requests it made.
 - `GET /api/v1/library/has?isrc=...` (or `title` + `artist`): `{"have": true|false}`.
 - `GET /api/v1/search?q=&type=track|artist|album`, `/artist/<id>`, `/album/<id>`: the Discover data.
+- `GET /api/v1/stats` (scope `stats`): flat JSON for a dashboard such as Glance's `custom-api` widget, see
+  [Stats for dashboards](#stats-for-dashboards).
 - `GET /api/v1/suggestions` (`gaps` and `artists`, each empty when its switch is off) and
   `GET /api/v1/releases?days=`: read-only, the unfiltered view (no account's hides or dismissals apply).
 
@@ -246,6 +248,29 @@ runtime: `output_format`, `path_template`, `provider_order`, `deezer_quality`, `
 and applied to the running instance without a restart (`grab_workers` and `spotify_sync_minutes`
 need one). Settings saved this way override the environment from then on. Credentials that come
 from the environment (Spotify secret, API token, library/hook keys) are never written to the file.
+
+
+### Stats for dashboards
+
+`GET /api/v1/stats` needs a key with the `stats` scope (`python -m music_grabber keys create "Glance" --scopes stats`;
+a key's scopes cannot be edited, so an existing key without `stats` means minting a new one). Counts only, nothing per
+user, never cached. Calendar windows use Europe/Lisbon (weeks start on Monday); timestamps are UTC RFC 3339.
+
+| Key | Meaning |
+|---|---|
+| `queue_pending`, `queue_searching`, `queue_awaiting_user`, `queue_downloading`, `queue_transcoding`, `queue_tagging`, `queue_placing`, `queue_done`, `queue_failed`, `queue_skipped` | grab queue items by state (always present, 0 when none) |
+| `queue_in_flight`, `queue_total` | the first seven states summed / all items |
+| `grabbed_week`, `grabbed_month`, `grabbed_year`, `grabbed_all` | files placed in the library (the ledger), per calendar window |
+| `last_grab_at`, `last_grab_epoch` | the last successful grab (UTC; `""` / `0` when there is none) |
+| `grabs_done`, `grabs_failed`, `provider_success_rate_pct` | finished queue items and the share that succeeded (0 when none) |
+| `providers.<name>.{done,failed,success_rate_pct}` | the same per download provider (`deezer`, `ytdlp`) |
+| `playlists_total`, `playlists_watched`, `playlists_missing_tracks` | Spotify playlists, those being watched, and tracks of watched ones not in the library |
+| `library_tracks`, `library_artists`, `managed_files` | library index size, its distinct artists, files Music Grabber filed itself |
+| `releases_enabled` | whether New releases is on |
+| `releases_new` | releases from the last 90 days by your or followed artists, not dismissed |
+| `releases_unannounced`, `releases_announced`, `releases_announced_week` | of those, not yet in an ntfy ping / pinged ever / pinged in the last 7 days |
+| `dismissed`, `artists_starred` | dismissed items (all accounts) and artists you starred songs of |
+| `generated_at`, `timezone` | when the answer was computed (UTC) and the window time zone |
 
 ## New releases and suggestions
 

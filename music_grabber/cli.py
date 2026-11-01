@@ -132,7 +132,7 @@ def build_parser() -> argparse.ArgumentParser:
     ks.add("list")
     x = ks.add("create")
     x.add_argument("name")
-    x.add_argument("--scopes", default="request", help="comma list of: browse, request, library")
+    x.add_argument("--scopes", default="request", help="comma list of: browse, request, library, suggestions, stats")
     ks.add("revoke").add_argument("key_id", type=int)
 
     us = top.nested(top.add("users"))

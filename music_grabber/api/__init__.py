@@ -338,6 +338,11 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
         return jsonify(ops.releases_feed(INTEGRATION_USER if g.principal["role"] == "key" else uid(),
                                          request.args.get("days", "")))
 
+    @app.get("/api/v1/stats")
+    def v1_stats():
+        need("stats")
+        return jsonify(ops.stats_summary()), 200, {"Cache-Control": "no-store"}
+
     @app.get("/api/v1/library/has")
     def v1_library_has():
         need("library")

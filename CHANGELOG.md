@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+- **A read-only stats feed for dashboards.** `GET /api/v1/stats` returns flat JSON: queue counts by state, files grabbed this
+  week/month/year/ever (Europe/Lisbon calendar, weeks from Monday), the last successful grab, the provider success rate,
+  watched playlists, library size and the new-release counts. It needs an API key with the new `stats` scope
+  (`keys create NAME --scopes stats`). See the README's "Stats for dashboards".
+
 ## 1.4.1 (2026-10-29)
 
 Layout only. No database or configuration changes.
