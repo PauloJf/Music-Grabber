@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.5.0 (2026-11-01)
+
+No database or configuration changes.
+
 ### Added
 - **A read-only stats feed for dashboards.** `GET /api/v1/stats` returns flat JSON: queue counts by state, files grabbed this
   week/month/year/ever (Europe/Lisbon calendar, weeks from Monday), the last successful grab, the provider success rate,
