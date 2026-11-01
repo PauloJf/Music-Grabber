@@ -76,6 +76,3 @@ def validate_api(config: dict) -> None:
     if token and len(token) < 16:
         raise ConfigError("API_TOKEN must be at least 16 characters "
                           "(python -c \"import secrets; print(secrets.token_urlsafe(32))\")")
-    stats = config.get("stats_api_token") or ""
-    if stats and len(stats) < 16:
-        raise ConfigError("STATS_API_TOKEN must be at least 16 characters")

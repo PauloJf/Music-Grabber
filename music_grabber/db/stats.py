@@ -1,4 +1,4 @@
-"""Read-only aggregates behind ``GET /api/stats/summary`` (see ``music_grabber/stats.py``)."""
+"""Read-only aggregates behind ``GET /api/v1/stats`` (see ``music_grabber/stats.py``)."""
 
 from typing import Optional
 

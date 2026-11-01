@@ -15,5 +15,5 @@ waitress>=3.0
 # Download providers. Imported lazily, so tests never need them installed.
 yt-dlp>=2024.8.0
 streamrip>=2.1.0
-# Europe/Lisbon calendar windows for GET /api/stats/summary (the slim image has no tz database)
+# Europe/Lisbon calendar windows for GET /api/v1/stats (the slim image has no tz database)
 tzdata>=2024.1

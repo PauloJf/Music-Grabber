@@ -3,10 +3,10 @@
 ## Unreleased
 
 ### Added
-- **A read-only stats feed for dashboards.** Set `STATS_API_TOKEN` and `GET /api/stats/summary` returns flat JSON: queue counts
-  by state, files grabbed this week/month/year/ever (Europe/Lisbon calendar, weeks from Monday), the last successful grab, the
-  provider success rate, watched playlists, library size and the new-release counts. It has its own bearer token (the admin
-  `API_TOKEN` does not open it) and answers 404 while the variable is empty. See the README's "Stats feed for dashboards".
+- **A read-only stats feed for dashboards.** `GET /api/v1/stats` returns flat JSON: queue counts by state, files grabbed this
+  week/month/year/ever (Europe/Lisbon calendar, weeks from Monday), the last successful grab, the provider success rate,
+  watched playlists, library size and the new-release counts. It needs an API key with the new `stats` scope
+  (`keys create NAME --scopes stats`). See the README's "Stats for dashboards".
 
 ## 1.4.1 (2026-10-29)
 

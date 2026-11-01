@@ -37,7 +37,7 @@ MASK = "********"
 OAUTH_STATE_TTL = 600
 SESSION_DAYS = 14
 # Integration API keys: what a key may do (docs/plans/integration-and-suggestions.md).
-API_SCOPES = ("browse", "request", "library", "suggestions")
+API_SCOPES = ("browse", "request", "library", "suggestions", "stats")
 KEY_PREFIX = "mgk_"
 # Per-user preferences: key -> (kind, allowed values or range).
 PREFS = {"theme": ("enum", ("system", "light", "dark")), "preview_volume": ("float", (0.0, 1.0))}
@@ -179,7 +179,7 @@ class Ops:
         }
 
     def stats_summary(self) -> dict:
-        """The dashboard feed: counts and recency only, nothing per user (``GET /api/stats/summary``)."""
+        """The dashboard feed: counts and recency only, nothing per user (``GET /api/v1/stats``)."""
         from . import stats
         return stats.summary(self.db, self.config)
 

@@ -1,4 +1,4 @@
-"""The read-only numbers behind ``GET /api/stats/summary`` (a dashboard feed, e.g. Glance's custom-api).
+"""The read-only numbers behind ``GET /api/v1/stats`` (a dashboard feed, e.g. Glance's custom-api).
 
 Flat JSON: numbers are numbers, sizes would be bytes, the calendar windows (``week`` from Monday, ``month``,
 ``year``) follow Europe/Lisbon, and every timestamp is UTC RFC 3339.

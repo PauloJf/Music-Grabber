@@ -1,28 +1,33 @@
-"""GET /api/stats/summary: its own token, 404 when disabled, the JSON shape and the Lisbon calendar windows."""
+"""GET /api/v1/stats: the `stats` API-key scope, the JSON shape and the Lisbon calendar windows."""
 
 from datetime import datetime, timezone
 
 import pytest
 import test_api
-from test_api import H, TOKEN
+from test_api import H
 
 from music_grabber import stats
 
 app_ops = test_api.app_ops          # the API fixture, reused
-STATS_TOKEN = "s" * 10 + "-a-stats-token"
-SH = {"Authorization": f"Bearer {STATS_TOKEN}"}
-URL = "/api/stats/summary"
+URL = "/api/v1/stats"
 
 
 def utc(*a):
     return datetime(*a, tzinfo=timezone.utc)
 
 
+def mint(ops, scopes):
+    return {"Authorization": "Bearer " + ops.keys_create("glance-" + "-".join(scopes), scopes)["token"]}
+
+
 @pytest.fixture
 def client(app_ops):
-    app, ops = app_ops
-    ops.config["stats_api_token"] = STATS_TOKEN
-    return app.test_client()
+    return app_ops[0].test_client()
+
+
+@pytest.fixture
+def SH(app_ops):
+    return mint(app_ops[1], ["stats"])
 
 
 def put(db, sql, *args):
@@ -40,61 +45,61 @@ def queue(db, status, provider=None, updated="2026-11-01T10:00:00+00:00"):
     put(db, "INSERT INTO grab_queue (status, provider, updated_at) VALUES (?,?,?)", status, provider, updated)
 
 
-# ── auth ──────────────────────────────────────────────────────────────────────
-def test_disabled_without_a_token_is_404_even_for_the_admin_token(app_ops):
-    app, ops = app_ops
-    c = app.test_client()
-    assert c.get(URL).status_code == 404
-    assert c.get(URL, headers=H).status_code == 404
-    assert c.get(URL, headers={"Authorization": "Bearer "}).status_code == 404
+# ── auth: an API key with the `stats` scope ───────────────────────────────────
+def test_scope_is_known():
+    from music_grabber.ops import API_SCOPES
+    assert "stats" in API_SCOPES
+
+
+def test_a_stats_key_reads_it_and_it_is_not_cached(client, SH):
+    r = client.get(URL, headers=SH)
+    assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
 
 
 def test_missing_and_wrong_tokens_are_401(client):
     assert client.get(URL).status_code == 401
     assert client.get(URL, headers={"Authorization": "Bearer nope"}).status_code == 401
-    assert client.get(URL, headers={"Authorization": STATS_TOKEN}).status_code == 401
-    assert client.get(URL, headers={"Authorization": f"Bearer {STATS_TOKEN}x"}).status_code == 401
+    assert client.get(URL, headers={"Authorization": "Bearer mgk_nope"}).status_code == 401
 
 
-def test_the_admin_token_does_not_open_it(client):
-    assert client.get(URL, headers=H).status_code == 401
+def test_a_key_without_the_stats_scope_is_403(app_ops, client):
+    for scopes in (["request"], ["browse", "library", "suggestions"]):
+        r = client.get(URL, headers=mint(app_ops[1], scopes))
+        assert r.status_code == 403 and "stats" in r.get_json()["message"]
 
 
-def test_the_stats_token_opens_nothing_else(client):
-    assert client.get("/api/status", headers=SH).status_code == 401
-    assert client.get("/api/library", headers=SH).status_code == 401
+def test_a_stats_key_opens_nothing_else(client, SH):
+    for path in ("/api/status", "/api/library", "/api/v1/releases", "/api/v1/suggestions"):
+        assert client.get(path, headers=SH).status_code == 403, path
 
 
-def test_the_right_token_works_without_a_session_and_is_not_cached(client):
-    r = client.get(URL, headers=SH)
-    assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
+def test_a_revoked_key_is_refused(app_ops, client):
+    ops = app_ops[1]
+    made = ops.keys_create("old", ["stats"])
+    hdr = {"Authorization": "Bearer " + made["token"]}
+    assert client.get(URL, headers=hdr).status_code == 200
+    ops.keys_revoke(made["key"]["id"])
+    assert client.get(URL, headers=hdr).status_code == 401
 
 
-def test_wrong_tokens_count_towards_the_lockout(app_ops):
+def test_the_api_token_still_reads_it(client):
+    assert client.get(URL, headers=H).status_code == 200
+
+
+def test_wrong_keys_count_towards_the_lockout(app_ops, SH):
     from music_grabber.api import AuthThrottle, create_app
-    _, ops = app_ops
-    ops.config["stats_api_token"] = STATS_TOKEN
-    c = create_app(ops, TOKEN, throttle=AuthThrottle(max_failures=3)).test_client()
+    c = create_app(app_ops[1], test_api.TOKEN, throttle=AuthThrottle(max_failures=3)).test_client()
     for _ in range(3):
         assert c.get(URL, headers={"Authorization": "Bearer bad"}).status_code == 401
     assert c.get(URL, headers=SH).status_code == 429
 
 
-def test_a_short_stats_token_is_a_config_error():
-    from music_grabber import wiring
-    with pytest.raises(wiring.ConfigError, match="STATS_API_TOKEN"):
-        wiring.validate_api({"stats_api_token": "short"})
-    wiring.validate_api({"stats_api_token": STATS_TOKEN})
-    wiring.validate_api({})
-
-
-def test_the_token_is_a_masked_env_only_secret():
-    from music_grabber import config
-    assert "stats_api_token" in config.ENV_ONLY_KEYS and "stats_api_token" in config.SECRET_KEYS
+def test_the_old_standalone_route_is_gone(client, SH):
+    assert client.get("/api/stats/summary", headers=SH).status_code in (403, 404)
 
 
 # ── shape ─────────────────────────────────────────────────────────────────────
-def test_shape_on_an_empty_install(client):
+def test_shape_on_an_empty_install(client, SH):
     d = client.get(URL, headers=SH).get_json()
     for k in ("queue_pending", "queue_awaiting_user", "queue_in_flight", "queue_done", "queue_failed", "queue_total",
               "grabbed_week", "grabbed_month", "grabbed_year", "grabbed_all", "last_grab_at", "last_grab_epoch",

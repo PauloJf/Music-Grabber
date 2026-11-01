@@ -105,8 +105,7 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
     app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
     clip_secret = hmac.new(token.encode(), b"music-grabber-preview-clips", "sha256").digest()
     cover_secret = hmac.new(token.encode(), b"music-grabber-library-covers", "sha256").digest()
-    open_paths = {"/healthz", "/callback", "/api/auth/state", "/api/auth/login", "/api/auth/setup",
-                  "/api/stats/summary"}      # the last one checks its own STATS_API_TOKEN (see stats_summary)
+    open_paths = {"/healthz", "/callback", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
     throttle = throttle or AuthThrottle()
 
     def too_many(who: str):
@@ -339,6 +338,11 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
         return jsonify(ops.releases_feed(INTEGRATION_USER if g.principal["role"] == "key" else uid(),
                                          request.args.get("days", "")))
 
+    @app.get("/api/v1/stats")
+    def v1_stats():
+        need("stats")
+        return jsonify(ops.stats_summary()), 200, {"Cache-Control": "no-store"}
+
     @app.get("/api/v1/library/has")
     def v1_library_has():
         need("library")
@@ -393,25 +397,6 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
         return jsonify(ops.artist_pref_set(uid(), dz_id, body()))
 
     # ── status / library / settings ───────────────────────────────────────────
-    @app.get("/api/stats/summary")
-    def stats_summary():
-        """Dashboard feed. Its own STATS_API_TOKEN only: neither the admin token, a session nor an API key opens
-        it. Unset token = no such route."""
-        stats_token = ops.config.get("stats_api_token") or ""
-        if not stats_token:
-            return jsonify(error="not_found", message="not found"), 404
-        who = request.remote_addr or "?"
-        locked = too_many(who)
-        if locked:
-            return locked
-        header = request.headers.get("Authorization", "")
-        supplied = header[7:] if header.lower().startswith("bearer ") else ""
-        if not (supplied and hmac.compare_digest(supplied.encode(), stats_token.encode())):
-            throttle.fail(who)
-            return (jsonify(error="unauthorized", message="send 'Authorization: Bearer <STATS_API_TOKEN>'"),
-                    401, {"WWW-Authenticate": "Bearer"})
-        return jsonify(ops.stats_summary()), 200, {"Cache-Control": "no-store"}
-
     @app.get("/api/status")
     def status():
         return jsonify(ops.status())
