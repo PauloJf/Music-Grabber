@@ -194,6 +194,32 @@ the port on loopback only, and put TLS in front before exposing it further. Ten 
 lock that address out for a minute (HTTP 429). The token is an always-admin key; people sign in with
 an account (below). See [`docs/security.md`](docs/security.md) for the review and residual risks.
 
+### Stats feed for dashboards
+
+Set `STATS_API_TOKEN` (16+ characters, env only) and `GET /api/stats/summary` returns the numbers a dashboard
+such as Glance wants, as flat JSON. It takes `Authorization: Bearer <STATS_API_TOKEN>` and nothing else: the admin
+`API_TOKEN`, a session or an API key do not open it, and the stats token opens no other route. Unset, the route
+answers 404. It needs no account and shows no per-user data. Wrong tokens count towards the same 429 lockout as
+the rest of the API.
+
+Calendar windows use Europe/Lisbon (weeks start on Monday); timestamps are UTC RFC 3339; counts are numbers.
+
+| Key | Meaning |
+|---|---|
+| `queue_pending`, `queue_searching`, `queue_awaiting_user`, `queue_downloading`, `queue_transcoding`, `queue_tagging`, `queue_placing`, `queue_done`, `queue_failed`, `queue_skipped` | grab queue items by state (always present, 0 when none) |
+| `queue_in_flight`, `queue_total` | the first seven states summed / all items |
+| `grabbed_week`, `grabbed_month`, `grabbed_year`, `grabbed_all` | files placed in the library (the ledger), per calendar window |
+| `last_grab_at`, `last_grab_epoch` | the last successful grab (UTC; `""` / `0` when there is none) |
+| `grabs_done`, `grabs_failed`, `provider_success_rate_pct` | finished queue items and the share that succeeded (0 when none) |
+| `providers.<name>.{done,failed,success_rate_pct}` | the same per download provider (`deezer`, `ytdlp`) |
+| `playlists_total`, `playlists_watched`, `playlists_missing_tracks` | Spotify playlists, those being watched, and tracks of watched ones not in the library |
+| `library_tracks`, `library_artists`, `managed_files` | library index size, its distinct artists, files Music Grabber filed itself |
+| `releases_enabled` | whether New releases is on |
+| `releases_new` | releases from the last 90 days by your or followed artists, not dismissed |
+| `releases_unannounced`, `releases_announced`, `releases_announced_week` | of those, not yet in an ntfy ping / pinged ever / pinged in the last 7 days |
+| `dismissed`, `artists_starred` | dismissed items (all accounts) and artists you starred songs of |
+| `generated_at`, `timezone` | when the answer was computed (UTC) and the window time zone |
+
 ### Integration API (for other apps)
 
 To let another app (BPM Tagger, a script) request music without handing it the admin token, create an
@@ -449,12 +475,13 @@ an environment variable; a few can also be changed at runtime ([Settings](#setti
 | `NTFY_NOTIFY_DONE` | `true` | a ping per finished track; ambiguity, failures and credential problems always ping |
 | `UI_PUBLIC_URL` | | makes pings link to the item in the web UI |
 | `API_TOKEN` | | enables the API and UI; 16+ characters; env only |
+| `STATS_API_TOKEN` | | turns on the read-only dashboard feed `GET /api/stats/summary` ([below](#stats-feed-for-dashboards)); 16+ characters; env only; empty = 404 |
 | `API_HOST` / `API_PORT` | `127.0.0.1` (`0.0.0.0` in the image) / `8099` | |
 | `UI_DIR` | `frontend/dist` | where the built web UI is looked for |
 | `MG_REMOTE_URL` | | CLI only: default for `--remote` |
 
 Secrets (`SPOTIFY_CLIENT_SECRET`, `LIBRARY_API_KEY`, `LIBRARY_PASS`, `BPM_TAGGER_PASSWORD`,
-`MEDIARIUM_API_KEY`, `NAVIDROME_PASS`, `API_TOKEN`) are read from the environment only. A
+`MEDIARIUM_API_KEY`, `NAVIDROME_PASS`, `API_TOKEN`, `STATS_API_TOKEN`) are read from the environment only. A
 configuration that cannot work (unknown index, `intake` without `INTAKE_DIR`, a listed hook with no
 URL, a short `API_TOKEN`) makes `run` exit with code 2 and say what to set.
 

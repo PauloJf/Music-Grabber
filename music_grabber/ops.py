@@ -178,6 +178,11 @@ class Ops:
             "releases_enabled": bool(self.config.get("releases_enabled")),
         }
 
+    def stats_summary(self) -> dict:
+        """The dashboard feed: counts and recency only, nothing per user (``GET /api/stats/summary``)."""
+        from . import stats
+        return stats.summary(self.db, self.config)
+
     # ── playlists ─────────────────────────────────────────────────────────────
     def playlists_list(self) -> dict:
         playlists = self.db.list_playlists()

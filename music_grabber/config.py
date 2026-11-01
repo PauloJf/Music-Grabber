@@ -27,11 +27,11 @@ __version__ = _read_version()
 
 # Secrets that are only ever read from the environment (never written to settings.json).
 ENV_ONLY_KEYS = ("spotify_client_id", "spotify_client_secret", "library_api_key", "library_pass",
-                 "bpm_tagger_password", "mediarium_api_key", "navidrome_pass", "api_token")
+                 "bpm_tagger_password", "mediarium_api_key", "navidrome_pass", "api_token", "stats_api_token")
 
 # Keys that carry credentials: masked in any API/CLI output.
 SECRET_KEYS = ("spotify_client_secret", "deezer_arl", "library_api_key", "library_pass",
-               "bpm_tagger_password", "mediarium_api_key", "navidrome_pass", "api_token",
+               "bpm_tagger_password", "mediarium_api_key", "navidrome_pass", "api_token", "stats_api_token",
                "ntfy_topic")
 
 
@@ -91,6 +91,9 @@ def build_config() -> dict:
 
         # Headless API (Phase 3). Off unless API_TOKEN is set. Bearer-token auth.
         "api_token":             os.environ.get("API_TOKEN", ""),
+        # Read-only dashboard feed (GET /api/stats/summary). Its own bearer token, so a dashboard never
+        # holds the admin key; empty = the route does not exist (404). Needs the API (API_TOKEN) running.
+        "stats_api_token":       os.environ.get("STATS_API_TOKEN", ""),
         "api_host":              os.environ.get("API_HOST", "127.0.0.1"),
         "api_port":              int(os.environ.get("API_PORT", "8099")),
         # Where the built web UI lives (default: frontend/dist next to the package).

@@ -8,9 +8,10 @@ from .mirror import MirrorMixin
 from .playlists import PlaylistsMixin
 from .queue import QueueMixin
 from .releases import ReleasesMixin
+from .stats import StatsMixin
 from .users import UsersMixin
 
 
 class Database(QueueMixin, PlaylistsMixin, LedgerMixin, LibraryMixin, MirrorMixin, UsersMixin, ApiKeysMixin,
-               ReleasesMixin, _DBBase):
+               ReleasesMixin, StatsMixin, _DBBase):
     pass

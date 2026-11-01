@@ -65,6 +65,9 @@ services:
       # JSON API + remote CLI. Off unless API_TOKEN is set (16+ characters):
       #   python -c "import secrets; print(secrets.token_urlsafe(32))"
       API_TOKEN: ""
+      # Optional read-only dashboard feed (GET /api/stats/summary), e.g. for Glance. Its own bearer token
+      # (16+ characters); empty = the route returns 404. Needs the API above to be running.
+      STATS_API_TOKEN: ""
     # Only needed if you want the API from outside the container, or the Spotify login
     # callback in a browser (SPOTIFY_REDIRECT_URI=http://127.0.0.1:8099/callback). Loopback
     # only; put TLS in front before exposing it further. Management also works without it:
