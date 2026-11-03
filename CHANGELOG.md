@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.5.1 (2026-11-03)
+
+UI only. No database or configuration changes.
+
 ### Fixed
 - **The Account page could not create a `stats` API key.** The key form listed only four scopes, so the `stats` scope added in 1.5.0 was
   reachable only from the CLI. It is now a checkbox ("Read dashboard stats").
