@@ -10,8 +10,12 @@ const TABS = [
   { to: "/discover", label: "Discover", icon: Search },
   { to: "/queue", label: "Queue", icon: Queue },
   { to: "/inbox", label: "Inbox", icon: Inbox },
-  { to: "/playlists", label: "Library", icon: Library },
+  { to: "/playlists", label: "Library", icon: Library, also: ["/library"] },
 ];
+
+/** Library's sub-pages live under /playlists and /library; light the tab on both. */
+const tabClass = (also: string[] | undefined, pathname: string) => ({ isActive }: { isActive: boolean }) =>
+  isActive || (also ?? []).some((p) => pathname === p || pathname.startsWith(p + "/")) ? "active" : "";
 
 export default function Layout({ children }: { children: ReactNode }) {
   const me = useMe();
@@ -42,7 +46,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           <NavLink to="/" className="wordmark">Music<i>·</i>Grabber</NavLink>
           <nav className="navlinks" aria-label="Main">
             {tabs.map((t) => (
-              <NavLink key={t.to} to={t.to} end={t.end}>{t.label}{pips[t.to] ? <span className="pill signal" style={{ marginLeft: 6 }}>{pips[t.to]}</span> : null}</NavLink>
+              <NavLink key={t.to} to={t.to} end={t.end} className={tabClass(t.also, loc.pathname)}>{t.label}{pips[t.to] ? <span className="pill signal" style={{ marginLeft: 6 }}>{pips[t.to]}</span> : null}</NavLink>
             ))}
           </nav>
           <div className="grow" />
@@ -67,7 +71,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <ActivityTray />
       <nav className="tabbar" aria-label="Main">
         {tabs.map((t) => (
-          <NavLink key={t.to} to={t.to} end={t.end}>
+          <NavLink key={t.to} to={t.to} end={t.end} className={tabClass(t.also, loc.pathname)}>
             <t.icon />{t.label}{pips[t.to] ? <span className="pip">{pips[t.to]}</span> : null}
           </NavLink>
         ))}

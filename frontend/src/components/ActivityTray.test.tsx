@@ -14,6 +14,14 @@ describe("layout + activity", () => {
     expect(screen.getAllByRole("link", { name: /queue/i }).length).toBeGreaterThan(0);
   });
 
+  it("lights the Library tab on its artist and album pages", async () => {
+    mockApi({ "GET /api/status": STATUS, "GET /api/activity": ACTIVITY });
+    renderApp(<Layout><p>page</p></Layout>, { route: "/library/artists" });
+    const lib = (await screen.findAllByRole("link", { name: /library/i }))[0];
+    expect(lib.className).toContain("active");
+    expect(screen.getAllByRole("link", { name: /^queue/i })[0].className).not.toContain("active");
+  });
+
   it("toasts the moment a download finishes", async () => {
     let call = 0;
     mockApi({ "GET /api/status": STATUS, "GET /api/activity": () => (++call < 2

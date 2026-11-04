@@ -187,16 +187,75 @@ def test_owned_track_is_reported_not_queued(env, monkeypatch):
     assert forced.json["result"] == "queued"
 
 
-def test_a_key_sees_only_its_own_requests(env):
+def test_request_status_is_readable_by_any_request_key(env):
     _, client = env
     _, a = make_key(client, "A")
     _, b = make_key(client, "B")
+    _, browse_only = make_key(client, "C", scopes=("browse",))
     rid = client.post("/api/v1/requests", json={"dz_id": "101"}, headers=a).json["id"]
     got = client.get(f"/api/v1/requests/{rid}", headers=a).json
     assert got["status"] == "pending" and got["requested_by"] == "A" and "tmp_path" not in got
-    assert client.get(f"/api/v1/requests/{rid}", headers=b).status_code == 404
-    assert client.get(f"/api/v1/requests/{rid}", headers=H).json["id"] == rid        # admins see all
+    assert "final_path" not in got and got["path"] is None and got["needs_choice"] is False
+    assert client.get(f"/api/v1/requests/{rid}", headers=b).json["id"] == rid        # joined requests stay followable
+    assert client.get(f"/api/v1/requests/{rid}", headers=browse_only).status_code == 403
+    assert client.get(f"/api/v1/requests/{rid}", headers=H).json["id"] == rid
     assert client.get("/api/v1/requests/9999", headers=a).status_code == 404
+
+
+def test_already_queued_returns_the_item_it_joined(env):
+    ops, client = env
+    _, a = make_key(client, "A")
+    _, b = make_key(client, "B")
+    first = client.post("/api/v1/requests", json={"dz_id": "101"}, headers=a).json
+    again = client.post("/api/v1/requests", json={"dz_id": "101", "source_ref": "x"}, headers=b).json
+    assert again["result"] == "already_queued" and again["id"] == first["id"] and again["status"] == "pending"
+    assert len(ops.queue_list()["items"]) == 1
+
+
+def test_requested_for_is_recorded_and_capped(env):
+    ops, client = env
+    _, a = make_key(client, "BPM Tagger")
+    r = client.post("/api/v1/requests", json={"dz_id": "101", "requested_for": "ana" + "x" * 200}, headers=a).json
+    item = ops.db.get_grab_item(r["id"])
+    assert item["requested_by"] == "BPM Tagger" and item["requested_for"] == "ana" + "x" * 77
+    assert client.get(f"/api/v1/requests/{r['id']}", headers=a).json["requested_for"].startswith("ana")
+
+
+def test_many_statuses_at_once(env):
+    ops, client = env
+    _, a = make_key(client, "A")
+    rid = client.post("/api/v1/requests", json={"dz_id": "101"}, headers=a).json["id"]
+    got = client.get(f"/api/v1/requests?ids={rid},9999,junk", headers=a).json["requests"]
+    assert [g["id"] for g in got] == [rid]
+    assert client.get("/api/v1/requests", headers=a).json["error"] == "no_ids"
+    many = ",".join(str(i) for i in range(1, 202))
+    assert client.get(f"/api/v1/requests?ids={many}", headers=a).json["error"] == "too_many"
+
+
+def test_done_request_reports_a_path_inside_the_music_folder_only(env, tmp_path):
+    ops, client = env
+    _, a = make_key(client, "A")
+    rid = client.post("/api/v1/requests", json={"dz_id": "101"}, headers=a).json["id"]
+    inside = tmp_path / "music" / "Dua Lipa" / "Future Nostalgia" / "05 - Levitating.mp3"
+    ops.db.update_grab(rid, status="done", final_path=str(inside))
+    assert client.get(f"/api/v1/requests/{rid}", headers=a).json["path"] == "Dua Lipa/Future Nostalgia/05 - Levitating.mp3"
+    ops.db.update_grab(rid, final_path=str(tmp_path / "elsewhere.mp3"))
+    assert client.get(f"/api/v1/requests/{rid}", headers=a).json["path"] is None
+    ops.db.update_grab(rid, status="awaiting_user", final_path=None)
+    assert client.get(f"/api/v1/requests/{rid}", headers=a).json["needs_choice"] is True
+
+
+def test_queueing_from_the_ui_records_the_account(env):
+    ops, client = env
+    ops.users_create("ana", "correct horse battery", "user")
+    tok = ops.login("ana", "correct horse battery")["token"]
+    r = client.post("/api/browse/queue", headers={"Authorization": f"Bearer {tok}"},
+                    json={"tracks": [{"dz_id": "101", "title": "Levitating", "artist": "Dua Lipa"}], "force": True})
+    assert r.status_code == 200
+    assert ops.queue_list()["items"][0]["requested_by"] == "ana"
+    client.post("/api/browse/queue", headers=H,
+                json={"tracks": [{"dz_id": "102", "title": "Other", "artist": "X"}], "force": True})
+    assert {i["requested_by"] for i in ops.queue_list()["items"]} == {"ana", None}
 
 
 def test_library_has(env, monkeypatch):

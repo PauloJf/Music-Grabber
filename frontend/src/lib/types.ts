@@ -69,6 +69,7 @@ export interface QueueItem {
   final_path: string | null;
   updated_at: string | null;
   requested_by?: string | null;
+  requested_for?: string | null;
 }
 
 export interface Candidate {
