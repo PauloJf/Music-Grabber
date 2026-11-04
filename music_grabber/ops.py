@@ -923,7 +923,7 @@ class Ops:
 
     MAX_QUEUE_BATCH = 100
 
-    def browse_queue(self, tracks: list, force: bool = False) -> dict:
+    def browse_queue(self, tracks: list, force: bool = False, requested_by: Optional[str] = None) -> dict:
         """Queue catalogue tracks. Already-owned tracks are skipped unless ``force``; a track
         already in flight is reported, not duplicated. Returns per-track outcomes and the new item
         ids (so the UI can offer undo)."""
@@ -945,7 +945,8 @@ class Ops:
             meta = {"title": t["title"], "artist": t.get("artist") or "", "album": t.get("album") or "",
                     "album_artist": t.get("album_artist") or t.get("artist") or "",
                     "duration_ms": t.get("duration_ms"), "cover_url": t.get("cover_url") or "",
-                    "track_no": t.get("track_no"), "disc_no": t.get("disc_no"), "year": t.get("year")}
+                    "track_no": t.get("track_no"), "disc_no": t.get("disc_no"), "year": t.get("year"),
+                    "requested_by": requested_by or None}
             item_id = enqueue_track(self.db, self.svc, meta, dz_track_id=str(t["dz_id"]))
             if item_id is None:
                 out.append({"dz_id": t["dz_id"], "result": "already_queued"})
@@ -956,9 +957,9 @@ class Ops:
             self.svc.request_sync()
         return {"ok": True, "queued": len(ids), "item_ids": ids, "results": out}
 
-    def browse_queue_album(self, dz_id: str, force: bool = False) -> dict:
+    def browse_queue_album(self, dz_id: str, force: bool = False, requested_by: Optional[str] = None) -> dict:
         page = self._catalog(deezer_catalog.album_page, str(dz_id))
-        return {**self.browse_queue(page["tracks"], force), "album": page["album"]["title"]}
+        return {**self.browse_queue(page["tracks"], force, requested_by), "album": page["album"]["title"]}
 
     def undo_queue(self, item_ids: list) -> dict:
         """Cancel items that were just queued and are still pending (the toast's Undo)."""
@@ -1005,9 +1006,12 @@ class Ops:
 
     def request_track(self, data: dict, requested_by: str) -> dict:
         """Queue one track for another app. Identify it by ``dz_id`` or ``isrc`` (exact), or by
-        ``title`` + ``artist``. Already owned -> ``in_library``; already in flight -> ``already_queued``;
-        the same ``source_ref`` filed twice -> ``already_requested`` (idempotent)."""
+        ``title`` + ``artist``. Already owned -> ``in_library``; already in flight -> ``already_queued``
+        with that item's ``id`` and ``status`` (so the caller can follow it); the same ``source_ref``
+        filed twice -> ``already_requested`` (idempotent). ``requested_for`` names the person in the
+        calling app who asked (shown in the Queue; free text, at most 80 characters)."""
         ref = str(data.get("source_ref") or "").strip()[:200]
+        who_for = str(data.get("requested_for") or "").strip()[:80] or None
         if ref:
             prev = self.db.find_request(requested_by, ref)
             if prev and prev["status"] not in ("failed", "skipped"):
@@ -1032,22 +1036,60 @@ class Ops:
                 {"title": meta["title"], "artist": meta["artist"], "album": meta.get("album"),
                  "duration_ms": meta.get("duration_ms"), "isrc": meta.get("isrc") or ""}, self.svc.index, 0.88):
             return {"ok": True, "result": "in_library"}
-        item_id = enqueue_track(self.db, self.svc, {**meta, "requested_by": requested_by, "source_ref": ref or None},
+        item_id = enqueue_track(self.db, self.svc, {**meta, "requested_by": requested_by, "source_ref": ref or None,
+                                                    "requested_for": who_for},
                                 dz_track_id=dz_id)
         if item_id is None:
-            return {"ok": True, "result": "already_queued"}
+            held = self.db.find_inflight(meta)
+            out = {"ok": True, "result": "already_queued"}
+            if held:
+                out.update(id=held["id"], status=held["status"])
+            return out
         self.svc.request_sync()
         return {"ok": True, "result": "queued", "id": item_id, "status": "pending"}
 
     REQUEST_FIELDS = ("id", "status", "progress", "title", "artist", "album", "error", "source_ref",
-                      "requested_by", "created_at", "updated_at")
+                      "requested_by", "requested_for", "created_at", "updated_at")
+    MAX_STATUS_IDS = 200
 
-    def request_status(self, item_id: int, requested_by: Optional[str] = None) -> dict:
-        """One queue item as an integration sees it. ``requested_by`` limits it to that caller's own."""
+    def _request_view(self, item: dict) -> dict:
+        """What an integration may see of a queue item: no temp paths; the finished file as a path
+        relative to the music folder (``path``) so an app sharing that folder can find it; and
+        ``needs_choice`` when a person has to pick a candidate in the Inbox."""
+        out = {k: item.get(k) for k in self.REQUEST_FIELDS}
+        out["needs_choice"] = item.get("status") == "awaiting_user"
+        path = None
+        final, root = item.get("final_path") or "", self.config.get("music_dir") or ""
+        if final and item.get("status") == "done" and root:
+            try:
+                rel = os.path.relpath(os.path.realpath(final), os.path.realpath(root))
+                if not rel.startswith(".."):
+                    path = rel.replace(os.sep, "/")
+            except ValueError:
+                path = None
+        out["path"] = path
+        return out
+
+    def request_status(self, item_id: int) -> dict:
+        """One queue item as an integration sees it. Any key with the ``request`` scope may read any
+        item's status: an ``already_queued`` answer hands out ids of items another caller filed."""
         item = self.db.get_grab_item(int(item_id))
-        if not item or (requested_by is not None and item.get("requested_by") != requested_by):
+        if not item:
             raise _not_found("request")
-        return {k: item.get(k) for k in self.REQUEST_FIELDS}
+        return self._request_view(item)
+
+    def request_statuses(self, raw_ids) -> dict:
+        """Several requests at once (``ids=1,2,3``; at most ``MAX_STATUS_IDS``). Unknown ids are left out."""
+        ids = []
+        for part in str(raw_ids or "").split(","):
+            part = part.strip()
+            if part.isdigit():
+                ids.append(int(part))
+        if not ids:
+            raise OpsError("no_ids", "send ids=1,2,3")
+        if len(ids) > self.MAX_STATUS_IDS:
+            raise OpsError("too_many", f"ask for at most {self.MAX_STATUS_IDS} ids at once")
+        return {"requests": [self._request_view(i) for i in self.db.get_grab_items(sorted(set(ids)))]}
 
     def library_has(self, data: dict) -> dict:
         title, artist, isrc = (str(data.get(k) or "").strip() for k in ("title", "artist", "isrc"))

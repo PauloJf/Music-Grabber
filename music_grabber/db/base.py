@@ -294,7 +294,7 @@ class _DBBase:
             )
         """)
         queue_cols = {r[1] for r in conn.execute("PRAGMA table_info(grab_queue)")}
-        for col in ("requested_by", "source_ref"):
+        for col in ("requested_by", "source_ref", "requested_for"):
             if col not in queue_cols:
                 conn.execute(f"ALTER TABLE grab_queue ADD COLUMN {col} TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_gq_source ON grab_queue(requested_by, source_ref)")

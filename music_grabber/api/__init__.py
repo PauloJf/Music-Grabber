@@ -324,8 +324,12 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
     @app.get("/api/v1/requests/<int:item_id>")
     def v1_request_status(item_id: int):
         need("request")
-        own = g.principal["username"] if g.principal["role"] == "key" else None
-        return jsonify(ops.request_status(item_id, own))
+        return jsonify(ops.request_status(item_id))
+
+    @app.get("/api/v1/requests")
+    def v1_request_statuses():
+        need("request")
+        return jsonify(ops.request_statuses(request.args.get("ids", "")))
 
     @app.get("/api/v1/suggestions")
     def v1_suggestions():
@@ -567,9 +571,10 @@ def create_app(ops: Ops, token: str, ui_dir: str = "", throttle: AuthThrottle | 
     @app.post("/api/browse/queue")
     def browse_queue():
         data = body()
+        who = g.principal["username"] if g.principal.get("id") else None     # an account, not the API token
         if data.get("album_id"):
-            return jsonify(ops.browse_queue_album(str(data["album_id"]), bool(data.get("force"))))
-        return jsonify(ops.browse_queue(data.get("tracks"), bool(data.get("force"))))
+            return jsonify(ops.browse_queue_album(str(data["album_id"]), bool(data.get("force")), who))
+        return jsonify(ops.browse_queue(data.get("tracks"), bool(data.get("force")), who))
 
     @app.post("/api/browse/undo")
     def browse_undo():

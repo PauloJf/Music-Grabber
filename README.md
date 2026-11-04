@@ -209,11 +209,16 @@ curl -H "Authorization: Bearer $KEY" -H "Content-Type: application/json"   -d '{
 ```
 
 - `POST /api/v1/requests` takes `dz_id` (a Deezer track id), or `isrc`, or `title` + `artist` (+ `album`,
-  `duration_ms`, `isrc`), and an optional `source_ref` of yours. It answers `queued` (201, with `id`),
-  `in_library`, `already_queued`, or `already_requested` (the same `source_ref` again; a failed one may be
-  requested again). `"force": true` queues a track you already own.
+  `duration_ms`, `isrc`), an optional `source_ref` of yours, and an optional `requested_for` (the person in
+  your app who asked, up to 80 characters). It answers `queued` (201, with `id`), `in_library`,
+  `already_queued` (with the `id` and `status` of the item already in flight, so you can follow it), or
+  `already_requested` (the same `source_ref` again; a failed one may be requested again). `"force": true`
+  queues a track you already own.
 - `GET /api/v1/requests/<id>`: `status` (`pending`, `searching`, `downloading`, `awaiting_user`, `done`,
-  `failed`...), `progress`, `error`. A key sees only the requests it made.
+  `failed`...), `progress`, `error`, `needs_choice` (someone has to pick a match in the Inbox) and, once done,
+  `path`: the file relative to the music folder (never a path outside it). Any key with the `request` scope
+  can read any request, since `already_queued` hands out ids another caller filed.
+- `GET /api/v1/requests?ids=1,2,3`: the same for up to 200 requests at once (unknown ids are left out).
 - `GET /api/v1/library/has?isrc=...` (or `title` + `artist`): `{"have": true|false}`.
 - `GET /api/v1/search?q=&type=track|artist|album`, `/artist/<id>`, `/album/<id>`: the Discover data.
 - `GET /api/v1/stats` (scope `stats`): flat JSON for a dashboard such as Glance's `custom-api` widget, see
@@ -221,7 +226,8 @@ curl -H "Authorization: Bearer $KEY" -H "Content-Type: application/json"   -d '{
 - `GET /api/v1/suggestions` (`gaps` and `artists`, each empty when its switch is off) and
   `GET /api/v1/releases?days=`: read-only, the unfiltered view (no account's hides or dismissals apply).
 
-The queue shows who asked ("requested by BPM Tagger").
+The queue shows who asked ("requested by BPM Tagger for ana"); downloads queued from the web UI show the
+account that queued them.
 
 ### Accounts and signing in
 

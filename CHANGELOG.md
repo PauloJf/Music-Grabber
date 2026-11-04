@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+The database gains one nullable column (`grab_queue.requested_for`) on first start; a `.bak-<version>` copy is written first.
+
+### Added
+- **Follow requests made by other apps more easily.** `POST /api/v1/requests` takes an optional `requested_for` (the
+  person who asked, shown in the Queue as "requested by BPM Tagger for ana"). `GET /api/v1/requests?ids=1,2,3` returns
+  up to 200 statuses in one call, and each status now carries `needs_choice` (waiting in the Inbox) and, once done,
+  `path`, the file relative to the music folder.
+- **The Queue shows which account queued a download** from Discover, an artist or an album page.
+
+### Changed
+- **`already_queued` now returns the `id` and `status` of the item already in flight**, and any key with the `request`
+  scope may read any request's status, so a request that joined someone else's download can still be followed.
+
+### Fixed
+- **The Library tab is now highlighted on the library's Artists and Albums pages**, not only on Playlists.
+
 ## 1.5.1 (2026-11-03)
 
 UI only. No database or configuration changes.
