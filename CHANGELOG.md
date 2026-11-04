@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.6.0 (2026-11-04)
+
 The database gains one nullable column (`grab_queue.requested_for`) on first start; a `.bak-<version>` copy is written first.
 
 ### Added
